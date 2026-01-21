@@ -1,0 +1,348 @@
+
+import React, { useState } from 'react';
+import { UserProfile, UserRole } from '../../types';
+import { Plus, Mail, Shield, UserCheck, MoreVertical, Search, CheckCircle, Pencil, X, Trash2, BadgeCheck, Briefcase } from 'lucide-react';
+
+// MOCK DATA FOR DEMO
+const MOCK_DB_USERS: UserProfile[] = [
+  { id: '1', full_name: 'Carlos Rivera', email: 'admin@coreflow.io', role: UserRole.ADMIN_SOLICITANTE, job_title: 'Plant Manager', tenant_id: 't1', status: 'ACTIVE', specialties: ['Management', 'Lean Six Sigma'] },
+  { id: '2', full_name: 'Sarah Connor', email: 'tech@coreflow.io', role: UserRole.TECNICO_MANT, job_title: 'Senior Mechanic', tenant_id: 't1', status: 'ACTIVE', specialties: ['Robotics', 'Hydraulics'] },
+  { id: '3', full_name: 'Mike Ross', email: 'auditor@coreflow.io', role: UserRole.AUDITOR, job_title: 'Safety Inspector', tenant_id: 't1', status: 'ACTIVE', specialties: ['OSHA', 'ISO 9001'] },
+  { id: '4', full_name: 'John Doe', email: 'john.d@coreflow.io', role: UserRole.TECNICO_MANT, job_title: 'Junior Tech', tenant_id: 't1', status: 'INVITED', specialties: [] },
+];
+
+export const UserManagement: React.FC = () => {
+  const [users, setUsers] = useState<UserProfile[]>(MOCK_DB_USERS);
+  
+  // Invite Modal State
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [newUser, setNewUser] = useState({ email: '', role: UserRole.TECNICO_MANT, fullName: '', title: '' });
+
+  // Edit Modal State
+  const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
+  const [newSpecialty, setNewSpecialty] = useState('');
+
+  // --- ACTIONS ---
+
+  const handleInvite = (e: React.FormEvent) => {
+    e.preventDefault();
+    const invitedUser: UserProfile = {
+      id: `u-${Date.now()}`,
+      full_name: newUser.fullName,
+      email: newUser.email,
+      role: newUser.role,
+      job_title: newUser.title,
+      tenant_id: 't1',
+      status: 'INVITED',
+      specialties: []
+    };
+    
+    setUsers([...users, invitedUser]);
+    setShowInviteModal(false);
+    setNewUser({ email: '', role: UserRole.TECNICO_MANT, fullName: '', title: '' });
+  };
+
+  const handleUpdateUser = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+    
+    setUsers(prev => prev.map(u => u.id === editingUser.id ? editingUser : u));
+    setEditingUser(null);
+  };
+
+  const addSpecialty = () => {
+    if (editingUser && newSpecialty.trim()) {
+        const currentSpecs = editingUser.specialties || [];
+        if (!currentSpecs.includes(newSpecialty.trim())) {
+            setEditingUser({
+                ...editingUser,
+                specialties: [...currentSpecs, newSpecialty.trim()]
+            });
+        }
+        setNewSpecialty('');
+    }
+  };
+
+  const removeSpecialty = (spec: string) => {
+      if (editingUser) {
+          setEditingUser({
+              ...editingUser,
+              specialties: (editingUser.specialties || []).filter(s => s !== spec)
+          });
+      }
+  };
+
+  return (
+    <div className="space-y-6">
+       <div className="flex justify-between items-center">
+          <h3 className="text-lg text-white font-medium flex items-center gap-2">
+             <Shield size={18} className="text-industrial-accent"/> Workforce Directory
+          </h3>
+          <button 
+             onClick={() => setShowInviteModal(true)}
+             className="bg-industrial-accent hover:bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium shadow-lg flex items-center gap-2 transition-colors"
+          >
+             <Plus size={16} /> Invite User
+          </button>
+       </div>
+
+       {/* Users Table */}
+       <div className="bg-industrial-800 rounded-lg border border-industrial-700 overflow-hidden shadow-lg">
+          <table className="w-full text-left text-sm text-industrial-400">
+             <thead className="bg-industrial-900 text-xs uppercase font-bold text-industrial-500">
+                <tr>
+                   <th className="px-6 py-4">User</th>
+                   <th className="px-6 py-4">Role / Access</th>
+                   <th className="px-6 py-4">Specialties</th>
+                   <th className="px-6 py-4">Status</th>
+                   <th className="px-6 py-4 text-right">Actions</th>
+                </tr>
+             </thead>
+             <tbody className="divide-y divide-industrial-700">
+                {users.map(user => (
+                   <tr key={user.id} className="hover:bg-industrial-700/30 transition-colors group">
+                      <td className="px-6 py-4">
+                         <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-industrial-700 border border-industrial-600 flex items-center justify-center text-xs text-white font-bold shadow-sm">
+                               {user.full_name.substring(0,2).toUpperCase()}
+                            </div>
+                            <div>
+                               <p className="text-white font-medium">{user.full_name}</p>
+                               <p className="text-xs text-industrial-500">{user.email}</p>
+                            </div>
+                         </div>
+                      </td>
+                      <td className="px-6 py-4">
+                         <div className="flex flex-col">
+                            <span className="text-white text-xs font-medium flex items-center gap-1">
+                                <Briefcase size={10} className="text-industrial-500"/> {user.job_title}
+                            </span>
+                            <span className={`text-[10px] uppercase font-bold mt-1 ${user.role === UserRole.ADMIN_SOLICITANTE ? 'text-red-400' : 'text-blue-400'}`}>
+                               {user.role.replace('_', ' ')}
+                            </span>
+                         </div>
+                      </td>
+                      <td className="px-6 py-4">
+                         <div className="flex flex-wrap gap-1">
+                            {user.specialties?.slice(0, 2).map((spec, i) => (
+                                <span key={i} className="px-1.5 py-0.5 rounded text-[10px] bg-industrial-900 border border-industrial-600 text-industrial-300">
+                                    {spec}
+                                </span>
+                            ))}
+                            {(user.specialties?.length || 0) > 2 && (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] bg-industrial-900 border border-industrial-600 text-industrial-500">
+                                    +{(user.specialties?.length || 0) - 2}
+                                </span>
+                            )}
+                         </div>
+                      </td>
+                      <td className="px-6 py-4">
+                         {user.status === 'ACTIVE' ? (
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] bg-emerald-900/30 text-emerald-400 border border-emerald-800">
+                               <CheckCircle size={10} /> Active
+                            </span>
+                         ) : (
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] bg-yellow-900/30 text-yellow-400 border border-yellow-800">
+                               <Mail size={10} /> Invited
+                            </span>
+                         )}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                         <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                             <button 
+                                onClick={() => setEditingUser(user)}
+                                className="p-1.5 text-industrial-400 hover:text-white hover:bg-industrial-600 rounded transition-colors"
+                                title="Edit Profile"
+                             >
+                                <Pencil size={14} />
+                             </button>
+                             <button className="p-1.5 text-industrial-400 hover:text-red-400 hover:bg-industrial-600 rounded transition-colors">
+                                <Trash2 size={14} />
+                             </button>
+                         </div>
+                      </td>
+                   </tr>
+                ))}
+             </tbody>
+          </table>
+       </div>
+
+       {/* --- MODAL: INVITE USER --- */}
+       {showInviteModal && (
+         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-fadeIn">
+            <div className="bg-industrial-800 rounded-lg border border-industrial-600 shadow-2xl w-full max-w-md overflow-hidden">
+               <div className="p-4 border-b border-industrial-700 bg-industrial-900/50">
+                  <h3 className="text-white font-bold">Invite New User</h3>
+               </div>
+               <form onSubmit={handleInvite} className="p-6 space-y-4">
+                  <div className="space-y-1">
+                     <label className="text-xs text-industrial-400 font-bold uppercase">Full Name</label>
+                     <input required type="text" className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm focus:border-industrial-accent outline-none" 
+                            value={newUser.fullName} onChange={e => setNewUser({...newUser, fullName: e.target.value})} placeholder="e.g. Alice Smith"/>
+                  </div>
+                  <div className="space-y-1">
+                     <label className="text-xs text-industrial-400 font-bold uppercase">Email Address</label>
+                     <input required type="email" className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm focus:border-industrial-accent outline-none" 
+                            value={newUser.email} onChange={e => setNewUser({...newUser, email: e.target.value})} placeholder="alice@company.com"/>
+                  </div>
+                  <div className="space-y-1">
+                     <label className="text-xs text-industrial-400 font-bold uppercase">Job Title</label>
+                     <input required type="text" className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm focus:border-industrial-accent outline-none" 
+                            value={newUser.title} onChange={e => setNewUser({...newUser, title: e.target.value})} placeholder="e.g. Mechanic L2"/>
+                  </div>
+                  <div className="space-y-1">
+                     <label className="text-xs text-industrial-400 font-bold uppercase">System Role</label>
+                     <select className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm focus:border-industrial-accent outline-none"
+                             value={newUser.role} onChange={e => setNewUser({...newUser, role: e.target.value as UserRole})}>
+                        <option value={UserRole.TECNICO_MANT}>Technician (Standard)</option>
+                        <option value={UserRole.ADMIN_SOLICITANTE}>Admin / Manager</option>
+                        <option value={UserRole.AUDITOR}>Auditor (Read Only)</option>
+                     </select>
+                  </div>
+                  <div className="flex justify-end gap-3 pt-4 border-t border-industrial-700">
+                     <button type="button" onClick={() => setShowInviteModal(false)} className="px-4 py-2 text-sm text-industrial-400 hover:text-white">Cancel</button>
+                     <button type="submit" className="px-4 py-2 bg-industrial-accent hover:bg-blue-600 text-white rounded text-sm font-bold shadow-lg">Send Invitation</button>
+                  </div>
+               </form>
+            </div>
+         </div>
+       )}
+
+       {/* --- MODAL: CONFIGURE PROFILE (EDIT) --- */}
+       {editingUser && (
+         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-fadeIn">
+            <div className="bg-industrial-800 rounded-lg border border-industrial-600 shadow-2xl w-full max-w-lg overflow-hidden">
+               
+               <div className="p-4 border-b border-industrial-700 bg-industrial-900/50 flex justify-between items-center">
+                  <h3 className="text-white font-bold flex items-center gap-2">
+                      <Pencil size={16} className="text-industrial-accent"/> Configure User Profile
+                  </h3>
+                  <button onClick={() => setEditingUser(null)} className="text-industrial-400 hover:text-white">
+                      <X size={18} />
+                  </button>
+               </div>
+
+               <form onSubmit={handleUpdateUser} className="p-6 space-y-5">
+                  
+                  {/* Avatar & Basic Info Header */}
+                  <div className="flex items-center gap-4 pb-4 border-b border-industrial-700">
+                      <div className="w-16 h-16 rounded-full bg-industrial-700 border-2 border-industrial-600 flex items-center justify-center text-2xl font-bold text-white">
+                          {editingUser.full_name.substring(0,2).toUpperCase()}
+                      </div>
+                      <div className="flex-1">
+                          <label className="text-[10px] text-industrial-500 font-bold uppercase">Full Name</label>
+                          <input 
+                              type="text" 
+                              className="w-full bg-transparent border-b border-industrial-600 text-white font-bold text-lg focus:border-industrial-accent outline-none"
+                              value={editingUser.full_name}
+                              onChange={e => setEditingUser({...editingUser, full_name: e.target.value})}
+                          />
+                          <p className="text-xs text-industrial-400 mt-1">{editingUser.email}</p>
+                      </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                          <label className="text-xs text-industrial-400 font-bold uppercase">Job Title</label>
+                          <input 
+                              type="text" 
+                              className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm focus:border-industrial-accent outline-none"
+                              value={editingUser.job_title}
+                              onChange={e => setEditingUser({...editingUser, job_title: e.target.value})}
+                          />
+                      </div>
+                      <div className="space-y-1">
+                          <label className="text-xs text-industrial-400 font-bold uppercase">System Access Role</label>
+                          <select 
+                              className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm focus:border-industrial-accent outline-none"
+                              value={editingUser.role}
+                              onChange={e => setEditingUser({...editingUser, role: e.target.value as UserRole})}
+                          >
+                              <option value={UserRole.ADMIN_SOLICITANTE}>Admin (Full Access)</option>
+                              <option value={UserRole.TECNICO_MANT}>Technician (Execution)</option>
+                              <option value={UserRole.AUDITOR}>Auditor (Read Only)</option>
+                          </select>
+                      </div>
+                  </div>
+
+                  {/* Specialties Tag Manager */}
+                  <div className="space-y-2">
+                      <label className="text-xs text-industrial-400 font-bold uppercase flex items-center gap-2">
+                          <BadgeCheck size={12} className="text-industrial-accent"/> Skills & Specialties
+                      </label>
+                      <div className="bg-industrial-900 border border-industrial-600 rounded p-3">
+                          <div className="flex flex-wrap gap-2 mb-3">
+                              {(editingUser.specialties || []).map((spec, i) => (
+                                  <span key={i} className="px-2 py-1 rounded bg-industrial-800 border border-industrial-600 text-industrial-300 text-xs flex items-center gap-1 group">
+                                      {spec}
+                                      <button 
+                                          type="button" 
+                                          onClick={() => removeSpecialty(spec)}
+                                          className="hover:text-red-400"
+                                      >
+                                          <X size={10} />
+                                      </button>
+                                  </span>
+                              ))}
+                              {(!editingUser.specialties || editingUser.specialties.length === 0) && (
+                                  <span className="text-xs text-industrial-600 italic">No specialties assigned.</span>
+                              )}
+                          </div>
+                          <div className="flex gap-2">
+                              <input 
+                                  type="text" 
+                                  className="flex-1 bg-industrial-800 border-b border-industrial-600 text-xs text-white p-1 focus:border-industrial-accent outline-none"
+                                  placeholder="Add skill (e.g. PLC Siemens)..."
+                                  value={newSpecialty}
+                                  onChange={e => setNewSpecialty(e.target.value)}
+                                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addSpecialty())}
+                              />
+                              <button 
+                                  type="button" 
+                                  onClick={addSpecialty}
+                                  className="text-xs bg-industrial-700 hover:bg-industrial-600 text-white px-2 rounded"
+                              >
+                                  Add
+                              </button>
+                          </div>
+                      </div>
+                  </div>
+
+                  <div className="space-y-2 pt-2 border-t border-industrial-700">
+                      <label className="text-xs text-industrial-400 font-bold uppercase">Account Status</label>
+                      <div className="flex gap-4">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                              <input 
+                                  type="radio" 
+                                  name="status" 
+                                  checked={editingUser.status === 'ACTIVE'} 
+                                  onChange={() => setEditingUser({...editingUser, status: 'ACTIVE'})}
+                                  className="accent-emerald-500"
+                              />
+                              <span className="text-sm text-white">Active</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                              <input 
+                                  type="radio" 
+                                  name="status" 
+                                  checked={editingUser.status === 'INACTIVE'} 
+                                  onChange={() => setEditingUser({...editingUser, status: 'INACTIVE'})}
+                                  className="accent-red-500"
+                              />
+                              <span className="text-sm text-white">Suspended</span>
+                          </label>
+                      </div>
+                  </div>
+
+                  <div className="flex justify-end gap-3 pt-4 border-t border-industrial-700">
+                     <button type="button" onClick={() => setEditingUser(null)} className="px-4 py-2 text-sm text-industrial-400 hover:text-white">Cancel</button>
+                     <button type="submit" className="px-4 py-2 bg-industrial-accent hover:bg-blue-600 text-white rounded text-sm font-bold shadow-lg">Save Profile Changes</button>
+                  </div>
+               </form>
+            </div>
+         </div>
+       )}
+
+    </div>
+  );
+};

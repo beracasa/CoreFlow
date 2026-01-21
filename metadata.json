@@ -1,0 +1,8 @@
+{
+  "name": "CoreFlow Maintenance Cloud",
+  "description": "Industrial 4.0 SaaS platform for maintenance management, IoT monitoring, and predictive analytics for high-precision manufacturing.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
