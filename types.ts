@@ -61,18 +61,33 @@ export interface TelemetryData {
 export interface Machine {
   id: string;
   name: string;
-  plate: string; // Matrícula
-  type: 'SACMI' | 'MOSS' | 'PMV' | 'GENERIC';
+  plate: string;
+  type: 'SACMI' | 'MOSS' | 'PMV' | 'GENERIC' | string; // Loosened type for dynamic input
   status: MachineStatus;
   location: { x: number; y: number };
-  zone?: string; // e.g. "Zone A - Line 1"
-  isIot: boolean; // true = Connected Gateway, false = Visual/Manual only
+  zone?: string;
+  isIot: boolean;
   runningHours: number;
   lastMaintenance: string;
   nextMaintenance: string;
-  intervals?: string[]; // e.g. ["360 Hours", "1080 Hours"]
+  intervals?: string[];
   telemetry: TelemetryData;
   history: TelemetryData[];
+
+  // New Fields
+  branch?: string;        // Empresa - Sucursal
+  category?: string;      // Categoría
+  alias?: string;         // Alias del Equipo
+  brand?: string;         // Marca
+  model?: string;         // Modelo
+  year?: number;          // Año de Fabricación
+  capacity?: string;      // Capacidad
+  currentRating?: number; // In (A)
+  frequency?: number;     // f (hz)
+  voltage?: number;       // V. 3PH (VAC)
+  power?: number;         // P (KVA)
+  imageUrl?: string;      // Imagen del Equipo
+  documents?: string[];   // Documentos adjuntos
 }
 
 export enum WorkOrderStatus {
@@ -135,7 +150,7 @@ export interface WorkOrder {
   completedDate?: string;
   type: 'PREVENTIVE' | 'CORRECTIVE' | 'PREDICTIVE' | 'PROGRAMMED' | 'OTHER';
   formType: 'R-MANT-02' | 'R-MANT-05' | 'R-INOC-07';
-  
+
   // R-MANT-02 Specifics (Image 2)
   maintenanceType?: 'Preventive' | 'Programmed' | 'Other';
   machinePlate?: string;
@@ -148,7 +163,7 @@ export interface WorkOrder {
   nextMaintenanceHours?: number;
   electromechanicalGroup?: string; // "Electromecánicos" select
   supervisor?: string;
-  
+
   // Cumulative Tasks List (The Golden Rule)
   tasks?: MaintenanceTask[];
 
@@ -178,7 +193,7 @@ export interface WorkOrder {
   frequency?: string; // Primera vez, Recurrente...
   consequence?: string; // Parada, Bajo Rendimiento...
   actionTaken?: string;
-  
+
   // Signature Placeholders (Base64 or boolean for mock)
   signatureExecutor?: boolean;
   signatureSupervisor?: boolean;
