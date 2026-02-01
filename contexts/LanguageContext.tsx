@@ -22,7 +22,7 @@ const translations: Translations = {
     'sidebar.masterData': 'Master Data Core',
     'sidebar.role': 'SysAdmin',
     'sidebar.plan': 'Business Plan',
-    
+
     // Forms Common
     'form.save': 'Save Record',
     'form.cancel': 'Cancel',
@@ -32,7 +32,7 @@ const translations: Translations = {
     'form.priority': 'Priority',
     'form.description': 'Description',
     'form.assigned': 'Assigned Technician',
-    
+
     // R-MANT-02 Image Specifics
     'mant02.formTitle': 'PREVENTIVE MAINTENANCE RECORD - R-MANT-02',
     'mant02.maintenanceType': 'Maintenance Type',
@@ -74,7 +74,7 @@ const translations: Translations = {
     'mant02.interval': 'Intervention Interval',
     'mant02.hoursStart': 'Start Time',
     'mant02.hoursEnd': 'End Time',
-    
+
     // R-MANT-05 Specific
     'mant05.dept': 'Department',
     'mant05.failType': 'Failure Type',
@@ -103,7 +103,7 @@ const translations: Translations = {
     'mant.col.priority': 'Priority',
     'mant.col.status': 'Status',
     'mant.col.tech': 'Assigned To',
-    
+
     // Inventory (Kardex)
     'inventory.title': 'Kardex 4.0',
     'inventory.subtitle': 'Real-time inventory & Safety Stock monitoring',
@@ -171,7 +171,7 @@ const translations: Translations = {
     'config.tab.assets': 'Asset Registry (Digital Twin)',
     'config.tab.workforce': 'Workforce (HR)',
     'config.tab.settings': 'Plant Settings',
-    
+
     // Config - Assets
     'assets.title': 'Connected Machinery',
     'assets.provision': '+ Provision New Gateway',
@@ -182,7 +182,7 @@ const translations: Translations = {
     'assets.col.schedule': 'Maint. Schedule',
     'assets.col.actions': 'Actions',
     'assets.next': 'Next:',
-    
+
     // Config - Workforce
     'workforce.title': 'Technicians & Operators',
     'workforce.add': '+ Add Personnel',
@@ -196,11 +196,11 @@ const translations: Translations = {
     'workforce.modal.shift': 'Assigned Shift',
     'workforce.modal.cancel': 'Cancel',
     'workforce.modal.confirm': 'Onboard Personnel',
-    
+
     // Config - Settings
     'settings.metadata.title': 'Plant Metadata',
     'settings.plantName': 'Plant Name',
-    'settings.costCenter': 'Cost Center Code',
+    'settings.costCenter': 'RNC (Tax ID)',
     'settings.timezone': 'Timezone',
     'settings.currency': 'Base Currency',
     'settings.compliance.title': 'Compliance & Thresholds (R-INOC-07)',
@@ -223,7 +223,7 @@ const translations: Translations = {
     'sidebar.role': 'AdminSis',
     'sidebar.plan': 'Plan Empresarial',
 
-     // Forms Common
+    // Forms Common
     'form.save': 'Guardar Registro',
     'form.cancel': 'Cancelar',
     'form.machine': 'Máquina / Equipo',
@@ -400,7 +400,7 @@ const translations: Translations = {
     // Config - Settings
     'settings.metadata.title': 'Metadatos de Planta',
     'settings.plantName': 'Nombre de Planta',
-    'settings.costCenter': 'Código Centro Costos',
+    'settings.costCenter': 'RNC (Registro Nacional de Contribuyentes)',
     'settings.timezone': 'Zona Horaria',
     'settings.currency': 'Moneda Base',
     'settings.compliance.title': 'Cumplimiento y Umbrales (R-INOC-07)',
@@ -420,7 +420,7 @@ interface LanguageContextType {
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [language, setLanguage] = useState<Language>('en');
+  const [language, setLanguage] = useState<Language>('es');
 
   const t = (key: string) => {
     return translations[language][key] || key;
