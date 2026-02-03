@@ -159,13 +159,12 @@ export interface WorkOrder {
   endDate?: string;
   startTime?: string;
   endTime?: string;
-  machineWorkHours?: number;
+  machineWorkHours?: number;   // Formatted in UI, number in generic
   nextMaintenanceHours?: number;
   electromechanicalGroup?: string; // "Electromecánicos" select
+  executors?: ExecutorInfo[];
   supervisor?: string;
 
-  // Cumulative Tasks List (The Golden Rule)
-  tasks?: MaintenanceTask[];
 
   // R-MANT-02 Specifics (Image 3 - Parts)
   consumedParts?: ConsumedPart[];

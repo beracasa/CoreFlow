@@ -1,24 +1,20 @@
 import React, { useState } from 'react';
-import { WorkOrder, WorkOrderStatus, Priority } from '../types';
+import { WorkOrderStatus, Priority } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useWorkOrderStore } from '../src/stores/useWorkOrderStore';
 
-interface KanbanProps {
-  orders: WorkOrder[];
-}
-
-// Simple calc helpers
-const calculateMTTR = (orders: WorkOrder[]) => {
+// Simple calc helpers (moved back or imported if desired, keeping local)
+const calculateMTTR = (orders: any[]) => {
   const completed = orders.filter(o => o.status === WorkOrderStatus.DONE && o.completedDate);
   if (completed.length === 0) return 0;
-  // Mock logic: Difference between created and completed in hours (randomized for demo if data insufficient)
-  return 4.2; // Constant for demo
+  return 4.2;
 };
 
-const calculateMTBF = () => 148.5; // Constant for demo
+const calculateMTBF = () => 148.5;
 
-export const MaintenanceKanban: React.FC<KanbanProps> = ({ orders: initialOrders }) => {
+export const MaintenanceKanban: React.FC = () => {
   const { t } = useLanguage();
-  const [orders, setOrders] = useState<WorkOrder[]>(initialOrders);
+  const { workOrders, updateOrder } = useWorkOrderStore();
   const [draggingId, setDraggingId] = useState<string | null>(null);
 
   const columns = [
@@ -40,7 +36,9 @@ export const MaintenanceKanban: React.FC<KanbanProps> = ({ orders: initialOrders
   const handleDrop = (e: React.DragEvent, status: WorkOrderStatus) => {
     e.preventDefault();
     const id = e.dataTransfer.getData('text/plain');
-    setOrders(prev => prev.map(o => o.id === id ? { ...o, status } : o));
+    if (id) {
+      updateOrder(id, { status });
+    }
     setDraggingId(null);
   };
 
@@ -59,7 +57,7 @@ export const MaintenanceKanban: React.FC<KanbanProps> = ({ orders: initialOrders
       <div className="flex gap-6 mb-8">
         <div className="bg-industrial-800 p-4 rounded border border-industrial-700 shadow-sm flex-1 max-w-xs">
           <p className="text-industrial-500 text-xs font-bold uppercase tracking-wider">{t('kanban.mttr')}</p>
-          <p className="text-2xl font-mono text-white mt-1">{calculateMTTR(orders)} <span className="text-sm text-industrial-500">hrs</span></p>
+          <p className="text-2xl font-mono text-white mt-1">{calculateMTTR(workOrders)} <span className="text-sm text-industrial-500">hrs</span></p>
         </div>
         <div className="bg-industrial-800 p-4 rounded border border-industrial-700 shadow-sm flex-1 max-w-xs">
           <p className="text-industrial-500 text-xs font-bold uppercase tracking-wider">{t('kanban.mtbf')}</p>
@@ -67,14 +65,14 @@ export const MaintenanceKanban: React.FC<KanbanProps> = ({ orders: initialOrders
         </div>
         <div className="bg-industrial-800 p-4 rounded border border-industrial-700 shadow-sm flex-1 max-w-xs">
           <p className="text-industrial-500 text-xs font-bold uppercase tracking-wider">{t('kanban.active')}</p>
-          <p className="text-2xl font-mono text-industrial-accent mt-1">{orders.filter(o => o.type === 'PREVENTIVE' && o.status !== WorkOrderStatus.DONE).length}</p>
+          <p className="text-2xl font-mono text-industrial-accent mt-1">{workOrders.filter(o => o.type === 'PREVENTIVE' && o.status !== WorkOrderStatus.DONE).length}</p>
         </div>
       </div>
 
       {/* Kanban Board */}
       <div className="flex-1 flex gap-4 overflow-x-auto pb-4">
         {columns.map(col => (
-          <div 
+          <div
             key={col.id}
             className="flex-1 min-w-[300px] bg-industrial-800/50 rounded-lg flex flex-col border border-industrial-700/50"
             onDragOver={handleDragOver}
@@ -83,12 +81,12 @@ export const MaintenanceKanban: React.FC<KanbanProps> = ({ orders: initialOrders
             <div className="p-3 border-b border-industrial-700 bg-industrial-800 rounded-t-lg flex justify-between items-center">
               <h3 className="font-semibold text-industrial-500 text-sm">{col.title}</h3>
               <span className="bg-industrial-900 text-xs px-2 py-0.5 rounded-full text-industrial-500 font-mono">
-                {orders.filter(o => o.status === col.id).length}
+                {workOrders.filter(o => o.status === col.id).length}
               </span>
             </div>
-            
+
             <div className="flex-1 p-2 space-y-2 overflow-y-auto">
-              {orders
+              {workOrders
                 .filter(order => order.status === col.id)
                 .map(order => (
                   <div
@@ -105,10 +103,10 @@ export const MaintenanceKanban: React.FC<KanbanProps> = ({ orders: initialOrders
                     </div>
                     <h4 className="text-sm font-medium text-white mb-1">{order.title}</h4>
                     <p className="text-xs text-industrial-400 truncate mb-3">{order.description}</p>
-                    
+
                     <div className="flex justify-between items-center text-[10px] text-industrial-500 border-t border-white/5 pt-2">
-                       <span>{order.type.substring(0,4)}</span>
-                       <span>{new Date(order.createdDate).toLocaleDateString()}</span>
+                      <span>{order.type?.substring(0, 4) || 'N/A'}</span>
+                      <span>{new Date(order.createdDate).toLocaleDateString()}</span>
                     </div>
                   </div>
                 ))}
