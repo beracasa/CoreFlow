@@ -1,10 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { InventoryMockService } from '../../services/implementations/inventoryMock';
-import { Package, PlusCircle, Save } from 'lucide-react';
+import { Package, PlusCircle, Save, Edit } from 'lucide-react';
+import { SparePart } from '../../types/inventory';
 
 const service = new InventoryMockService();
 
-export const PartCreationForm: React.FC = () => {
+interface PartCreationFormProps {
+    initialData?: SparePart;
+    onCancel?: () => void;
+    onSuccess?: () => void;
+}
+
+export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData, onCancel, onSuccess }) => {
     const [formData, setFormData] = useState({
         name: '',
         partNumber: '',
@@ -14,8 +21,78 @@ export const PartCreationForm: React.FC = () => {
         unitOfMeasure: 'PCS',
         location: '',
         initialStock: 0,
-        initialStock: 0,
+        maxStock: 0,
+        cost: 0,
+        photoUrl: ''
     });
+
+    // Formatting state for display
+    const [displayCost, setDisplayCost] = useState('');
+
+    useEffect(() => {
+        if (initialData) {
+            setFormData({
+                name: initialData.name,
+                partNumber: initialData.partNumber,
+                category: initialData.category,
+                description: initialData.description || '',
+                minStock: initialData.minStock,
+                unitOfMeasure: initialData.unitOfMeasure,
+                location: initialData.location,
+                initialStock: initialData.currentStock, // Editing typically shows current as initial or just stock
+                maxStock: initialData.maxStock || 0,
+                cost: initialData.cost,
+                photoUrl: initialData.photoUrl || ''
+            });
+            setDisplayCost(formatCurrency(initialData.cost).replace(/,/g, ',')); // Simplified format for display
+        }
+    }, [initialData]);
+
+    const formatCurrency = (value: number) => {
+        return new Intl.NumberFormat('en-US', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        }).format(value);
+    };
+
+    const formatNumberWithCommas = (value: string) => {
+        // Remove existing commas to get clean number
+        const cleanVal = value.replace(/,/g, '');
+        const parts = cleanVal.split('.');
+
+        // Format integer part
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+        return parts.join('.');
+    };
+
+    const handleCostChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value;
+
+        // Allow only digits, commas and one dot
+        if (!/^[0-9,]*\.?[0-9]*$/.test(val)) return;
+
+        // Strip commas for numeric value
+        const numericValue = parseFloat(val.replace(/,/g, '')) || 0;
+
+        // Update display with formatted value
+        const formatted = formatNumberWithCommas(val);
+        setDisplayCost(formatted);
+
+        // Update valid numeric value in state
+        setFormData(prev => ({ ...prev, cost: numericValue }));
+    };
+
+    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setFormData(prev => ({ ...prev, photoUrl: reader.result as string }));
+            };
+            reader.readAsDataURL(file);
+        }
+    };
 
     const [feedback, setFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
@@ -23,40 +100,64 @@ export const PartCreationForm: React.FC = () => {
         const { name, value } = e.target;
         setFormData(prev => ({
             ...prev,
-            [name]: name === 'minStock' || name === 'cost' || name === 'initialStock' ? parseFloat(value) || 0 : value
+            [name]: name === 'minStock' || name === 'maxStock' || name === 'initialStock' ? parseFloat(value) || 0 : value
         }));
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            await service.createPart(formData);
-            setFeedback({ type: 'success', message: 'Repuesto creado exitosamente.' });
-            setFormData({
-                name: '',
-                partNumber: '',
-                category: '',
-                description: '',
-                minStock: 0,
-                unitOfMeasure: 'PCS',
-                unitOfMeasure: 'PCS',
-                location: '',
-                initialStock: 0,
-                cost: 0
-            });
+            if (initialData) {
+                // Edit mode
+                await service.updatePart({
+                    ...initialData,
+                    ...formData,
+                    currentStock: formData.initialStock // Treat 'initialStock' input as current stock update if wished, or ignore. 
+                    // Usually we don't update stock via simple edit, but let's assume valid for now or strictly keep it separately.
+                    // The prompt didn't specify locking stock. Let's assume we map 'initialStock' back to 'currentStock'.
+                });
+                setFeedback({ type: 'success', message: 'Repuesto actualizado exitosamente.' });
+            } else {
+                await service.createPart(formData);
+                setFeedback({ type: 'success', message: 'Repuesto creado exitosamente.' });
+                // Reset only if create
+                setFormData({
+                    name: '',
+                    partNumber: '',
+                    category: '',
+                    description: '',
+                    minStock: 0,
+                    unitOfMeasure: 'PCS',
+                    location: '',
+                    initialStock: 0,
+                    maxStock: 0,
+                    cost: 0,
+                    photoUrl: ''
+                });
+                setDisplayCost('');
+            }
+            if (onSuccess) onSuccess();
         } catch (error: any) {
             console.error(error);
-            setFeedback({ type: 'error', message: error.message || 'Error al crear el repuesto.' });
+            setFeedback({ type: 'error', message: error.message || 'Error al procesar la solicitud.' });
         }
     };
 
     return (
         <div className="bg-industrial-800 rounded-lg shadow-xl border border-industrial-700 p-6">
-            <div className="flex items-center mb-6 text-white pb-6 border-b border-industrial-700">
-                <span className="p-1.5 bg-blue-900/30 rounded border border-blue-800 mr-3">
-                    <Package className="w-6 h-6 text-blue-500" />
-                </span>
-                <h2 className="text-xl font-bold">Crear Nuevo Repuesto</h2>
+            <div className="flex items-center mb-6 text-white pb-6 border-b border-industrial-700 justify-between">
+                <div className="flex items-center">
+                    <span className="p-1.5 bg-blue-900/30 rounded border border-blue-800 mr-3">
+                        <Package className="w-6 h-6 text-blue-500" />
+                    </span>
+                    <h2 className="text-xl font-bold">{initialData ? 'Editar Repuesto' : 'Crear Nuevo Repuesto'}</h2>
+                </div>
+                {onCancel && (
+                    <button onClick={onCancel} className="text-industrial-400 hover:text-white">
+                        <span className="sr-only">Cerrar</span>
+                        {/* Optional Close Icon or just rely on parent */}
+                    </button>
+                )}
             </div>
 
             {feedback && (
@@ -74,7 +175,8 @@ export const PartCreationForm: React.FC = () => {
                             type="text"
                             name="partNumber"
                             required
-                            className="w-full bg-industrial-900 border border-industrial-600 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-blue-500 transition-colors placeholder-industrial-600 font-mono"
+                            disabled={!!initialData}
+                            className={`w-full bg-industrial-900 border border-industrial-600 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-blue-500 transition-colors placeholder-industrial-600 font-mono ${initialData ? 'opacity-50 cursor-not-allowed' : ''}`}
                             placeholder="Ej. BRG-6204"
                             value={formData.partNumber}
                             onChange={handleChange}
@@ -136,21 +238,37 @@ export const PartCreationForm: React.FC = () => {
                             name="minStock"
                             min="0"
                             className="w-full bg-industrial-900 border border-industrial-600 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-blue-500 transition-colors font-mono"
-                            value={formData.minStock}
+                            value={formData.minStock === 0 ? '' : formData.minStock}
                             onChange={handleChange}
+                            placeholder="0"
                         />
                     </div>
 
-                    {/* Initial Stock */}
+                    {/* Max Stock */}
                     <div>
-                        <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">Stock Inicial</label>
+                        <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">Stock Máximo</label>
+                        <input
+                            type="number"
+                            name="maxStock"
+                            min="0"
+                            className="w-full bg-industrial-900 border border-industrial-600 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-blue-500 transition-colors font-mono"
+                            value={formData.maxStock === 0 ? '' : formData.maxStock}
+                            onChange={handleChange}
+                            placeholder="0"
+                        />
+                    </div>
+
+                    {/* Initial Stock / Current Stock */}
+                    <div>
+                        <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">{initialData ? 'Stock Actual' : 'Stock Inicial'}</label>
                         <input
                             type="number"
                             name="initialStock"
                             min="0"
                             className="w-full bg-industrial-900 border border-industrial-600 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-blue-500 transition-colors font-mono"
-                            value={formData.initialStock}
+                            value={formData.initialStock === 0 ? '' : formData.initialStock}
                             onChange={handleChange}
+                            placeholder="0"
                         />
                     </div>
 
@@ -172,16 +290,39 @@ export const PartCreationForm: React.FC = () => {
                     </div>
                     {/* Cost */}
                     <div>
-                        <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">Costo Unitario ($)</label>
+                        <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">Costo Unitario (RD$)</label>
                         <input
-                            type="number"
+                            type="text"
                             name="cost"
-                            min="0"
-                            step="0.01"
                             className="w-full bg-industrial-900 border border-industrial-600 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-blue-500 transition-colors font-mono"
-                            value={formData.cost}
-                            onChange={handleChange}
+                            value={displayCost}
+                            onChange={handleCostChange}
+                            placeholder="0.00"
                         />
+                    </div>
+
+                    {/* Image Upload */}
+                    <div className="md:col-span-2">
+                        <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">Imagen del Repuesto</label>
+                        <div className="flex items-center gap-4">
+                            <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handleImageUpload}
+                                className="block w-full text-sm text-industrial-400
+                                file:mr-4 file:py-2.5 file:px-4
+                                file:rounded-lg file:border-0
+                                file:text-sm file:font-semibold
+                                file:bg-industrial-700 file:text-white
+                                hover:file:bg-industrial-600
+                                cursor-pointer"
+                            />
+                            {formData.photoUrl && (
+                                <div className="h-16 w-16 rounded-lg border border-industrial-600 overflow-hidden bg-white/5 flex-shrink-0">
+                                    <img src={formData.photoUrl} alt="Preview" className="h-full w-full object-cover" />
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
 
@@ -198,16 +339,25 @@ export const PartCreationForm: React.FC = () => {
                     />
                 </div>
 
-                <div className="pt-4 border-t border-industrial-700">
+                <div className="pt-4 border-t border-industrial-700 flex justify-end gap-3">
+                    {onCancel && (
+                        <button
+                            type="button"
+                            onClick={onCancel}
+                            className="px-6 py-3 border border-industrial-600 rounded-lg text-sm font-bold text-industrial-300 hover:bg-industrial-700 focus:outline-none transition-all"
+                        >
+                            Cancelar
+                        </button>
+                    )}
                     <button
                         type="submit"
-                        className="w-full px-4 py-3 border border-transparent rounded-lg shadow-lg shadow-blue-900/20 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none transition-all flex items-center justify-center gap-2"
+                        className="px-6 py-3 border border-transparent rounded-lg shadow-lg shadow-blue-900/20 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none transition-all flex items-center justify-center gap-2"
                     >
                         <Save className="w-5 h-5" />
-                        Guardar Repuesto
+                        {initialData ? 'Guardar Cambios' : 'Guardar Repuesto'}
                     </button>
                 </div>
-            </form>
-        </div>
+            </form >
+        </div >
     );
 };

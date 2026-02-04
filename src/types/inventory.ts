@@ -7,8 +7,10 @@ export interface SparePart {
     unitOfMeasure: string;
     currentStock: number;
     minStock: number;
+    maxStock: number;
     location: string;
     cost: number;
+    photoUrl?: string;
 }
 
 export type TransactionType = 'IN' | 'OUT' | 'ADJUSTMENT';
@@ -30,6 +32,7 @@ export interface RequestItem {
     partId: string;
     quantityRequested: number;
     quantityDelivered: number;
+    usageLocation?: string;
 }
 
 export interface PartsRequest {

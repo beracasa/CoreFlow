@@ -90,6 +90,10 @@ export class InventoryMockService {
      * Deliver parts for a request.
      * THROWS Error if calling with quantity > currentStock.
      */
+    /**
+     * Deliver parts for a request.
+     * THROWS Error if calling with quantity > currentStock.
+     */
     async deliverParts(requestId: string, itemsToDeliver: { partId: string; quantity: number }[]): Promise<PartsRequest> {
         const parts = this.getParts();
         const requests = this.getRequests();
@@ -111,6 +115,8 @@ export class InventoryMockService {
 
         // 2. Perform Updates
         for (const deliveryItem of itemsToDeliver) {
+            if (deliveryItem.quantity <= 0) continue;
+
             // Update Stock
             const partIndex = parts.findIndex(p => p.id === deliveryItem.partId);
             parts[partIndex].currentStock -= deliveryItem.quantity;
@@ -136,7 +142,14 @@ export class InventoryMockService {
 
         // 3. Update Status
         const allDelivered = request.items.every(i => i.quantityDelivered >= i.quantityRequested);
-        request.status = allDelivered ? 'CLOSED' : 'PARTIAL';
+        const someDelivered = request.items.some(i => i.quantityDelivered > 0);
+
+        if (allDelivered) {
+            request.status = 'CLOSED';
+        } else if (someDelivered) {
+            request.status = 'PARTIAL';
+        }
+        // If nothing delivered yet, it stays OPEN or PENDING_STOCK
 
         // Save everything
         this.saveParts(parts);
@@ -144,6 +157,16 @@ export class InventoryMockService {
         this.saveTransactions(transactions);
 
         return request;
+    }
+
+    async closeRequest(requestId: string): Promise<PartsRequest> {
+        const requests = this.getRequests();
+        const index = requests.findIndex(r => r.id === requestId);
+        if (index === -1) throw new Error('Request not found');
+
+        requests[index].status = 'CLOSED';
+        this.saveRequests(requests);
+        return requests[index];
     }
 
     /**
@@ -210,5 +233,86 @@ export class InventoryMockService {
         this.saveParts(parts);
         this.saveTransactions(transactions);
         return newPart;
+    }
+
+    /**
+     * Update an existing Spare Part.
+     */
+    async updatePart(updatedPart: SparePart): Promise<SparePart> {
+        const parts = this.getParts();
+        const index = parts.findIndex(p => p.id === updatedPart.id);
+        if (index === -1) throw new Error('Part not found');
+
+        // Check for duplicate part number if it changed (though UI blocks this)
+        if (parts[index].partNumber !== updatedPart.partNumber) {
+            if (parts.some(p => p.partNumber === updatedPart.partNumber)) {
+                throw new Error(`Part number ${updatedPart.partNumber} already exists.`);
+            }
+        }
+
+        // Preserve fields that shouldn't change via this update if needed, but here we update all passed fields
+        // except keeping the ID safe is good practice, but updatedPart includes it.
+
+        parts[index] = updatedPart;
+        this.saveParts(parts);
+        return updatedPart;
+    }
+    /**
+     * Delete a request.
+     */
+    async deleteRequest(requestId: string): Promise<void> {
+        const requests = this.getRequests();
+        const index = requests.findIndex(r => r.id === requestId);
+        if (index === -1) throw new Error('Request not found');
+
+        requests.splice(index, 1);
+        this.saveRequests(requests);
+    }
+
+    /**
+     * Update a request.
+     * Re-evaluates status based on stock if items changed.
+     */
+    async updateRequest(updatedRequest: PartsRequest): Promise<PartsRequest> {
+        const requests = this.getRequests();
+        const parts = this.getParts();
+        const index = requests.findIndex(r => r.id === updatedRequest.id);
+        if (index === -1) throw new Error('Request not found');
+
+        // Re-evaluate status based on stock availability for any INCREASES or NEW items
+        // This is a simplified check. Ideally we compare with previous state.
+        // For now, we'll just check if any requested quantity > current stock
+        let status: RequestStatus = 'OPEN';
+
+        // If it was already PARTIAL or CLOSED, we might need to be careful. 
+        // But user said "Open, Pending Stock, Partial" are editable.
+        // If it's PARTIAL, we shouldn't revert to OPEN easily if things are delivered.
+
+        const currentRequest = requests[index];
+
+        // Preserve delivery status
+        const hasDeliveries = updatedRequest.items.some(i => i.quantityDelivered > 0);
+        const allDelivered = updatedRequest.items.length > 0 && updatedRequest.items.every(i => i.quantityDelivered >= i.quantityRequested);
+
+        if (allDelivered) {
+            status = 'CLOSED';
+        } else if (hasDeliveries) {
+            status = 'PARTIAL';
+        } else {
+            // Check stock for pending items
+            for (const item of updatedRequest.items) {
+                const part = parts.find(p => p.id === item.partId);
+                const remainingNeeded = item.quantityRequested - item.quantityDelivered;
+                if (remainingNeeded > 0 && part && remainingNeeded > part.currentStock) {
+                    status = 'PENDING_STOCK';
+                    break;
+                }
+            }
+        }
+
+        updatedRequest.status = status;
+        requests[index] = updatedRequest;
+        this.saveRequests(requests);
+        return updatedRequest;
     }
 }

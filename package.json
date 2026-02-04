@@ -12,6 +12,8 @@
     "@google/genai": "^1.37.0",
     "@supabase/supabase-js": "^2.93.3",
     "framer-motion": "10.16.4",
+    "jspdf": "^4.1.0",
+    "jspdf-autotable": "^5.0.7",
     "lucide-react": "^0.292.0",
     "react": "18.2.0",
     "react-dom": "18.2.0",

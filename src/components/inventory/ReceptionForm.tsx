@@ -71,8 +71,11 @@ export const ReceptionForm: React.FC = () => {
                             type="number"
                             min="1"
                             className="w-full bg-industrial-900 border border-industrial-600 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-emerald-500 transition-colors font-mono"
-                            value={quantity}
-                            onChange={e => setQuantity(parseInt(e.target.value) || 0)}
+                            value={quantity === 0 ? '' : quantity}
+                            onChange={e => {
+                                const val = e.target.value;
+                                setQuantity(val === '' ? 0 : parseInt(val));
+                            }}
                             required
                         />
                     </div>
