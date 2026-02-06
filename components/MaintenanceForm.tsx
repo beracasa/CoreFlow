@@ -5,6 +5,7 @@ import { WorkOrder, Machine, Technician, Priority, WorkOrderStatus, SparePart, W
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Save, X, CheckSquare, Plus, Trash2, Lock, PlayCircle, CheckCircle, ArrowRight, Settings, User, Clock, AlertCircle } from 'lucide-react';
+import { ProtocolViewer } from './ProtocolViewer';
 
 // --- 1. CONFIGURATION & MASTER DATA ENGINE ---
 
@@ -12,20 +13,51 @@ import { Save, X, CheckSquare, Plus, Trash2, Lock, PlayCircle, CheckCircle, Arro
 const INTERVAL_HIERARCHY = ['360 Hours', '1080 Hours', '2160 Hours', '4320 Hours', '8640 Hours'];
 
 // Master Task Database (Simulating a DB Table: maintenance_protocols)
-const MAINTENANCE_PROTOCOLS: Record<string, Record<string, string[]>> = {
+// Master Task Database (Simulating a DB Table: maintenance_protocols)
+// UPDATED: Now uses detailed MaintenanceTask structure
+const MOCK_FLAGS = { clean: false, inspect: false, lubricate: false, adjust: false, refill: false, replace: false, mount: false };
+const MAINTENANCE_PROTOCOLS: Record<string, Record<string, MaintenanceTask[]>> = {
    'SACMI': {
-      '360 Hours': ['Engrase general de columna central', 'Limpieza de sensores de visión', 'Verificar presión neumática (6 bar)'],
-      '1080 Hours': ['Cambio de aceite hidráulico (Nivel 1)', 'Reapriete de tornillería de molde', 'Inspección de bandas transportadoras'],
-      '2160 Hours': ['Sustitución de rodamientos de carrusel', 'Calibración de cámaras de inspección', 'Prueba de fugas en sellos rotativos']
+      '360 Hours': [
+         {
+            id: 't1', sequence: 1, group: 'Extrusor', component: 'Boquilla extrusor', activity: 'Limpieza',
+            referenceCode: '8.1.2.2.3.7', estimatedTime: 10,
+            actionFlags: { ...MOCK_FLAGS, clean: true }
+         },
+         {
+            id: 't2', sequence: 2, group: 'Extrusor', component: 'Tornillo de encastre', activity: 'Limpieza',
+            referenceCode: '8.1.2.2.3.7', estimatedTime: 10,
+            actionFlags: { ...MOCK_FLAGS, clean: true }
+         },
+         {
+            id: 't3', sequence: 3, group: 'Carrusel de Introducción', component: 'Cuchilla de corte', activity: 'Afilado / Regulado',
+            referenceCode: '8.1.2.3.1', estimatedTime: 45,
+            actionFlags: { ...MOCK_FLAGS, adjust: true, replace: true }
+         }
+      ],
+      '1080 Hours': [
+         {
+            id: 't4', sequence: 14, group: 'Motorizacion', component: 'Motorreductor Carrusel', activity: 'Control nivel aceite',
+            referenceCode: '8.1.2.1.6', estimatedTime: 15,
+            actionFlags: { ...MOCK_FLAGS, inspect: true, refill: true }
+         }
+      ],
+      '2160 Hours': []
    },
    'MOSS': {
-      '360 Hours': ['Limpieza de cabezales de impresión', 'Verificar tinta y solvente'],
-      '1080 Hours': ['Cambio de filtros de tinta', 'Ajuste de lámparas UV'],
-      '2160 Hours': ['Reemplazo de servomotores eje X', 'Alineación de rodillos']
+      '360 Hours': [],
+      '1080 Hours': [],
+      '2160 Hours': []
    },
    'GENERIC': {
-      '360 Hours': ['Inspección visual general', 'Limpieza externa'],
-      '1080 Hours': ['Revisión eléctrica básica', 'Lubricación de partes móviles']
+      '360 Hours': [
+         {
+            id: 'tg1', sequence: 1, group: 'General', component: 'Inspección Visual', activity: 'Control General',
+            estimatedTime: 30,
+            actionFlags: { ...MOCK_FLAGS, inspect: true }
+         }
+      ],
+      '1080 Hours': []
    }
 };
 
@@ -130,6 +162,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
    }, [initialMachineId, initialData]);
 
    // -- LOGIC ENGINE: Cumulative Tasks --
+   // -- LOGIC ENGINE: Cumulative Tasks --
    const generateCumulativeTasks = (machineType: string, selectedInterval: string): MaintenanceTask[] => {
       const selectedIndex = INTERVAL_HIERARCHY.indexOf(selectedInterval);
       if (selectedIndex === -1) return [];
@@ -140,13 +173,14 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
       // Cumulative Loop: Add tasks from 0 to selectedIndex
       for (let i = 0; i <= selectedIndex; i++) {
          const interval = INTERVAL_HIERARCHY[i];
-         const taskDescriptions = protocolSet[interval] || [];
+         const sourceTasks = protocolSet[interval] || [];
 
-         const newTasks = taskDescriptions.map(desc => ({
-            id: `t-${interval.replace(/\s/g, '')}-${Math.random().toString(36).substr(2, 5)}`,
-            description: desc,
+         // Clone and tag
+         const newTasks = sourceTasks.map(t => ({
+            ...t,
+            id: `t-${interval.replace(/\s/g, '')}-${t.id}-${Math.random().toString(36).substr(2, 5)}`, // Unique ID for this instance
             intervalOrigin: interval,
-            completed: false
+            completed: false // Reset completion state
          }));
          tasks = [...tasks, ...newTasks];
       }
@@ -334,8 +368,8 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
               Context: Solicitante / Gerente fills this to create the request.
           ===================================================================================== */}
                <section className={`rounded-lg border-2 transition-all duration-300 ${formData.currentStage === WorkOrderStage.DRAFT
-                     ? 'bg-emerald-900/10 border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.1)]'
-                     : 'bg-industrial-900 border-industrial-700 opacity-60'
+                  ? 'bg-emerald-900/10 border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.1)]'
+                  : 'bg-industrial-900 border-industrial-700 opacity-60'
                   }`}>
                   <div className={`p-4 border-b flex justify-between items-center ${formData.currentStage === WorkOrderStage.DRAFT ? 'bg-emerald-900/20 border-emerald-500/30' : 'bg-industrial-800 border-industrial-700'}`}>
                      <h3 className={`${formData.currentStage === WorkOrderStage.DRAFT ? 'text-emerald-400' : 'text-industrial-400'} font-bold flex items-center gap-2`}>
@@ -495,8 +529,8 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
               Context: Maintenance Tech performs tasks, logs parts, and times.
           ===================================================================================== */}
                <section className={`rounded-lg border-2 transition-all duration-300 ${formData.currentStage === WorkOrderStage.EXECUTION || formData.currentStage === WorkOrderStage.REQUESTED
-                     ? 'bg-pink-900/10 border-pink-500 shadow-[0_0_15px_rgba(236,72,153,0.1)]'
-                     : 'bg-industrial-900 border-industrial-700 opacity-60'
+                  ? 'bg-pink-900/10 border-pink-500 shadow-[0_0_15px_rgba(236,72,153,0.1)]'
+                  : 'bg-industrial-900 border-industrial-700 opacity-60'
                   }`}>
                   <div className={`p-4 border-b flex justify-between items-center ${formData.currentStage === WorkOrderStage.EXECUTION || formData.currentStage === WorkOrderStage.REQUESTED ? 'bg-pink-900/20 border-pink-500/30' : 'bg-industrial-800 border-industrial-700'}`}>
                      <h3 className={`${formData.currentStage === WorkOrderStage.EXECUTION ? 'text-pink-400' : 'text-industrial-400'} font-bold flex items-center gap-2`}>
@@ -531,31 +565,21 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                         <div className="mb-6">
                            <h4 className="text-sm font-bold text-white mb-2 flex items-center gap-2"><CheckSquare size={14} className="text-pink-500" /> Tareas de Mantenimiento Acumuladas</h4>
                            <div className="bg-industrial-900 rounded border border-industrial-700 overflow-hidden">
-                              {formData.tasks?.length === 0 ? (
-                                 <p className="p-4 text-sm text-industrial-500 italic">Sin tareas. Seleccione un equipo e intervalo.</p>
-                              ) : (
-                                 <div className="divide-y divide-industrial-700">
-                                    {formData.tasks?.map((task, idx) => (
-                                       <div key={task.id} className="p-3 flex items-start gap-3 hover:bg-industrial-800 transition-colors">
-                                          <input
-                                             type="checkbox"
-                                             disabled={!isSection2Editable}
-                                             checked={task.completed}
-                                             onChange={() => {
-                                                const updated = [...(formData.tasks || [])];
-                                                updated[idx].completed = !updated[idx].completed;
-                                                setFormData({ ...formData, tasks: updated });
-                                             }}
-                                             className="mt-1 w-4 h-4 text-pink-500 bg-industrial-900 border-industrial-500 rounded focus:ring-pink-500 cursor-pointer"
-                                          />
-                                          <div>
-                                             <p className={`text-sm ${task.completed ? 'text-industrial-400 line-through' : 'text-white'}`}>{task.description}</p>
-                                             <span className="text-[10px] px-1.5 py-0.5 rounded bg-industrial-800 text-industrial-500 border border-industrial-700 font-mono">
-                                                {task.intervalOrigin}
-                                             </span>
-                                          </div>
-                                       </div>
-                                    ))}
+                              {/* New Protocol Viewer */}
+                              <ProtocolViewer tasks={formData.tasks || []} />
+
+                              {/* Temporary explicit completion override for demo since Viewer is read-only for now */}
+                              {isSection2Editable && formData.tasks && formData.tasks.length > 0 && (
+                                 <div className="p-2 bg-industrial-800 border-t border-industrial-700 flex justify-end">
+                                    <button
+                                       onClick={() => {
+                                          const updated = formData.tasks?.map(t => ({ ...t, completed: true }));
+                                          setFormData({ ...formData, tasks: updated });
+                                       }}
+                                       className="text-xs text-emerald-400 hover:text-emerald-300 underline"
+                                    >
+                                       Mark All Tasks Completed (Demo Shortcut)
+                                    </button>
                                  </div>
                               )}
                            </div>
@@ -609,8 +633,8 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
               Context: Supervisor review, checklist, and signature.
           ===================================================================================== */}
                <section className={`rounded-lg border-2 transition-all duration-300 ${formData.currentStage === WorkOrderStage.HANDOVER
-                     ? 'bg-emerald-900/10 border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.1)]'
-                     : 'bg-industrial-900 border-industrial-700 opacity-60'
+                  ? 'bg-emerald-900/10 border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.1)]'
+                  : 'bg-industrial-900 border-industrial-700 opacity-60'
                   }`}>
                   <div className={`p-4 border-b ${formData.currentStage === WorkOrderStage.HANDOVER ? 'bg-emerald-900/20 border-emerald-500/30' : 'bg-industrial-800 border-industrial-700'}`}>
                      <h3 className={`${formData.currentStage === WorkOrderStage.HANDOVER ? 'text-emerald-400' : 'text-industrial-400'} font-bold flex items-center gap-2`}>

@@ -129,12 +129,47 @@ export interface ExecutorInfo {
   position: string;
 }
 
+// Maintenance Protocol Structure (R-MANT-02)
+export interface MaintenancePlan {
+  machineId: string;
+  intervals: MaintenanceInterval[];
+}
+
+export interface MaintenanceInterval {
+  id: string; // Add ID for keying
+  hours: number;
+  label: string; // e.g., "360 Horas"
+  tasks: MaintenanceTask[];
+}
+
 export interface MaintenanceTask {
   id: string;
-  description: string;
-  intervalOrigin: string; // e.g., "360 Hours" (where this task came from)
-  completed: boolean;
+  sequence: number;          // Columna: Nº
+  group: string;             // Columna: Grupo (ej: "Extrusor")
+  component: string;         // Columna: Punto de intervencion
+  activity: string;          // Columna: Tipo de intervencion
+
+  // Datos Técnicos
+  referenceCode?: string;    // Columna: Ref de interv.
+  lubricantType?: string;    // Columna: Tipo de Lub.
+  lubricantCode?: string;    // Columna: Codigo
+  estimatedTime: number;     // Columna: Tiem. Estim min
+
+  // Compatibility fields
+  intervalOrigin?: string;   // Keeping for compatibility
+  completed?: boolean;       // Keeping for state
   notes?: string;
+
+  // Matriz de Acciones
+  actionFlags: {
+    clean: boolean;        // Limpieza
+    inspect: boolean;      // Controlar/Verificar
+    lubricate: boolean;    // Lubricación
+    adjust: boolean;       // Regulación/Ajuste
+    refill: boolean;       // Llenado/Recarga
+    replace: boolean;      // Sustitución/Cambio
+    mount: boolean;        // Desmontaje/Montaje
+  };
 }
 
 export interface WorkOrder {

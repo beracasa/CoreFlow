@@ -1,9 +1,9 @@
-
 import React, { useState } from 'react';
-import { Machine, Technician, MachineStatus } from '../types';
+import { Machine, Technician, MachineStatus, MaintenanceTask, MaintenancePlan, MaintenanceInterval } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
 import { UserManagement } from './user/UserManagement';
 import { RoleManagement } from './user/RoleManagement';
+import { ProtocolBuilder } from './ProtocolBuilder';
 import { X, UserPlus, Mail, Briefcase, Clock, Calendar, Server, Cpu, Wifi, Plus, MapPin, Layout, Box, Settings, Shield, Pencil, Camera, FileText, Trash2, CornerDownRight } from 'lucide-react';
 
 interface ConfigurationProps {
@@ -22,13 +22,108 @@ interface ConfigurationProps {
   onUpdateSettings?: (newSettings: any) => void;
 }
 
-type Tab = 'ASSETS' | 'WORKFORCE' | 'ROLES' | 'SETTINGS';
+type Tab = 'ASSETS' | 'WORKFORCE' | 'ROLES' | 'PROTOCOLS' | 'SETTINGS';
 
 export const Configuration: React.FC<ConfigurationProps> = ({ machines, technicians, onAddTechnician, onAddMachine, onUpdateMachine, settings, onUpdateSettings }) => {
-  const [activeTab, setActiveTab] = useState<Tab>('ASSETS');
+  const [activeTab, setActiveTab] = useState<Tab>('PROTOCOLS');
+  const { t } = useLanguage();
 
   const [settingsTab, setSettingsTab] = useState<'GENERAL' | 'ZONES' | 'EQUIPMENT'>('GENERAL');
-  const { t } = useLanguage();
+
+  // Protocol State (Machine -> Intervals -> Tasks)
+  const [selectedProtocolMachineId, setSelectedProtocolMachineId] = useState<string | null>(null);
+  const [activeIntervalTab, setActiveIntervalTab] = useState<string | null>(null);
+
+  // Mock Plans Store (In real app, fetch from backend)
+  const [maintenancePlans, setMaintenancePlans] = useState<MaintenancePlan[]>([
+    {
+      machineId: 'm-123', // Example ID, matches a mock machine
+      intervals: [
+        { id: 'i-1', hours: 360, label: '360 Horas', tasks: [] },
+        { id: 'i-2', hours: 1080, label: '1,080 Horas', tasks: [] }
+      ]
+    }
+  ]);
+
+  const [machineToAssociate, setMachineToAssociate] = useState<string>('');
+
+  const handleAssociateMachine = () => {
+    if (machineToAssociate) {
+      // Check if already exists
+      if (maintenancePlans.some(p => p.machineId === machineToAssociate)) {
+        alert('Este equipo ya tiene un plan de mantenimiento asociado.');
+        return;
+      }
+
+      const newPlan: MaintenancePlan = {
+        machineId: machineToAssociate,
+        intervals: []
+      };
+
+      setMaintenancePlans([...maintenancePlans, newPlan]);
+      setSelectedProtocolMachineId(machineToAssociate);
+      setMachineToAssociate('');
+    }
+  };
+
+  const handleSaveProtocol = (tasks: MaintenanceTask[]) => {
+    if (selectedProtocolMachineId && activeIntervalTab) {
+      setMaintenancePlans(prevPlans => {
+        const existingPlanIndex = prevPlans.findIndex(p => p.machineId === selectedProtocolMachineId);
+        if (existingPlanIndex >= 0) {
+          // Update existing plan
+          const updatedPlans = [...prevPlans];
+          updatedPlans[existingPlanIndex] = {
+            ...updatedPlans[existingPlanIndex],
+            intervals: updatedPlans[existingPlanIndex].intervals.map(i =>
+              i.id === activeIntervalTab ? { ...i, tasks } : i
+            )
+          };
+          return updatedPlans;
+        }
+        return prevPlans;
+      });
+      alert('Protocol saved successfully!');
+    }
+  };
+
+  const handleAddInterval = (machineId: string) => {
+    const hoursStr = prompt("Ingrese las horas del intervalo (ej. 2160):");
+    if (!hoursStr) return;
+    const hours = parseInt(hoursStr);
+    if (isNaN(hours)) return;
+
+    const newInterval: MaintenanceInterval = {
+      id: `i-${Date.now()}`,
+      hours: hours,
+      label: `${hours.toLocaleString()} Horas`,
+      tasks: []
+    };
+
+    setMaintenancePlans(prev => {
+      const idx = prev.findIndex(p => p.machineId === machineId);
+      if (idx >= 0) {
+        const updated = [...prev];
+        updated[idx] = { ...updated[idx], intervals: [...updated[idx].intervals, newInterval].sort((a, b) => a.hours - b.hours) };
+        return updated;
+      } else {
+        return [...prev, { machineId, intervals: [newInterval] }];
+      }
+    });
+  };
+
+  const handleDeleteInterval = (machineId: string, intervalId: string) => {
+    if (!confirm('¿Seguro que desea eliminar este intervalo?')) return;
+    setMaintenancePlans(prev => {
+      return prev.map(p => {
+        if (p.machineId === machineId) {
+          return { ...p, intervals: p.intervals.filter(i => i.id !== intervalId) };
+        }
+        return p;
+      });
+    });
+    if (activeIntervalTab === intervalId) setActiveIntervalTab(null);
+  };
 
   // State for Equipment Configuration
   const [branches, setBranches] = useState<string[]>(['Main Branch', 'Secondary Branch']);
@@ -382,6 +477,18 @@ export const Configuration: React.FC<ConfigurationProps> = ({ machines, technici
           >
             {t('workforce.title')}
           </button>
+
+          <button
+            onClick={() => setActiveTab('PROTOCOLS')}
+            className={`pb-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'PROTOCOLS'
+              ? 'text-white border-industrial-accent'
+              : 'text-industrial-500 border-transparent hover:text-industrial-300'
+              }`}
+          >
+            Mantenimientos
+          </button>
+
+
           <button
             onClick={() => setActiveTab('ROLES')}
             className={`pb-3 text-sm font-medium transition-colors border-b-2 ${activeTab === 'ROLES'
@@ -487,10 +594,150 @@ export const Configuration: React.FC<ConfigurationProps> = ({ machines, technici
         {/* LOCATIONS TAB */}
 
 
-        {/* WORKFORCE TAB */}
         {activeTab === 'WORKFORCE' && (
           <UserManagement />
         )}
+
+        {/* PROTOCOLS TAB (Refined) */}
+        {activeTab === 'PROTOCOLS' && (
+          <div className="h-full flex flex-col animate-fadeIn">
+            {/* Header / Sub-nav */}
+            <div className="bg-industrial-800 p-4 border-b border-industrial-700 flex justify-between items-center">
+              <div>
+                <h3 className="text-lg text-white font-bold">Mantenimientos</h3>
+                <p className="text-sm text-industrial-400">Intervalos de Intervención R-MANT-02</p>
+              </div>
+            </div>
+
+            <div className="flex h-full overflow-hidden">
+              {/* Sidebar List (Machines) */}
+              <div className="w-72 border-r border-industrial-700 bg-industrial-800 shrink-0 flex flex-col">
+                <div className="p-3 border-b border-industrial-700 space-y-2">
+                  <p className="text-xs text-industrial-400 font-bold uppercase">Equipos Asociados</p>
+
+                  {/* Association Control */}
+                  <div className="flex gap-1">
+                    <select
+                      className="bg-industrial-900 border border-industrial-600 text-white text-xs rounded p-1.5 flex-1 outline-none focus:border-industrial-accent"
+                      value={machineToAssociate}
+                      onChange={(e) => setMachineToAssociate(e.target.value)}
+                    >
+                      <option value="">Seleccionar Equipo...</option>
+                      {machines
+                        .filter(m => !maintenancePlans.some(p => p.machineId === m.id))
+                        .map(m => (
+                          <option key={m.id} value={m.id}>{m.name}</option>
+                        ))}
+                    </select>
+                    <button
+                      onClick={handleAssociateMachine}
+                      disabled={!machineToAssociate}
+                      className={`p-1.5 rounded transition-colors ${machineToAssociate ? 'bg-industrial-accent text-white hover:bg-blue-600' : 'bg-industrial-700 text-industrial-500 cursor-not-allowed'}`}
+                    >
+                      <Plus size={16} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="overflow-y-auto flex-1 p-2 space-y-1">
+                  {maintenancePlans.map(plan => {
+                    const m = machines.find(mac => mac.id === plan.machineId);
+                    if (!m) return null; // Should not happen if data is consistent
+
+                    return (
+                      <button
+                        key={m.id}
+                        onClick={() => {
+                          setSelectedProtocolMachineId(m.id);
+                          // Auto select first interval if exists
+                          const currentPlan = maintenancePlans.find(p => p.machineId === m.id);
+                          if (currentPlan && currentPlan.intervals.length > 0) {
+                            setActiveIntervalTab(currentPlan.intervals[0].id);
+                          } else {
+                            setActiveIntervalTab(null);
+                          }
+                        }}
+                        className={`w-full text-left p-3 rounded text-sm transition-colors flex flex-col gap-1 ${selectedProtocolMachineId === m.id ? 'bg-industrial-700 text-white border border-industrial-600' : 'text-industrial-400 hover:bg-industrial-700/50'}`}
+                      >
+                        <span className="font-bold text-white">{m.name}</span>
+                        <div className="flex justify-between items-center w-full">
+                          <span className="text-[10px] bg-black/30 rounded px-1.5 py-0.5 w-fit font-mono">{m.id.toUpperCase()}</span>
+                          <span className="text-[10px] text-industrial-500">{plan.intervals.length} Intervalos</span>
+                        </div>
+                      </button>
+                    )
+                  })}
+
+                  {maintenancePlans.length === 0 && (
+                    <div className="text-center p-4 text-industrial-500 text-xs italic">
+                      No hay equipos asociados. Seleccione uno arriba para comenzar.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Editor Area */}
+              <div className="flex-1 flex flex-col bg-industrial-900 overflow-hidden">
+                {selectedProtocolMachineId ? (
+                  <>
+                    {/* Interval Tabs */}
+                    <div className="flex items-center gap-2 p-2 border-b border-industrial-700 bg-industrial-800/50 overflow-x-auto">
+                      {maintenancePlans.find(p => p.machineId === selectedProtocolMachineId)?.intervals.map(interval => (
+                        <div key={interval.id} className="group relative flex items-center">
+                          <button
+                            onClick={() => setActiveIntervalTab(interval.id)}
+                            className={`px-4 py-2 rounded text-xs font-bold transition-all border ${activeIntervalTab === interval.id ? 'bg-industrial-600 text-white border-industrial-500 shadow-md' : 'bg-industrial-900 text-industrial-400 border-industrial-700 hover:bg-industrial-700'}`}
+                          >
+                            {interval.label}
+                          </button>
+                          {activeIntervalTab === interval.id && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleDeleteInterval(selectedProtocolMachineId, interval.id); }}
+                              className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                              title="Eliminar Intervalo"
+                            >
+                              <X size={10} />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+
+                      <button
+                        onClick={() => handleAddInterval(selectedProtocolMachineId)}
+                        className="px-3 py-2 rounded text-xs font-medium text-industrial-400 hover:text-white hover:bg-industrial-700 border border-transparent border-dashed hover:border-industrial-500 flex items-center gap-1"
+                      >
+                        <Plus size={12} /> Nvo. Intervalo
+                      </button>
+                    </div>
+
+                    {/* Content */}
+                    <div className="flex-1 overflow-hidden relative">
+                      {activeIntervalTab ? (
+                        <ProtocolBuilder
+                          key={activeIntervalTab} // Force re-render on tab switch
+                          initialTasks={maintenancePlans.find(p => p.machineId === selectedProtocolMachineId)?.intervals.find(i => i.id === activeIntervalTab)?.tasks}
+                          onSave={handleSaveProtocol}
+                        />
+                      ) : (
+                        <div className="h-full flex flex-col items-center justify-center text-industrial-500 gap-4 opacity-50">
+                          <Clock size={48} />
+                          <p className="text-sm">Seleccione o cree un intervalo de mantenimiento para comenzar.</p>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="h-full flex flex-col items-center justify-center text-industrial-500 gap-4">
+                    <Server size={48} className="opacity-20" />
+                    <p>Seleccione un equipo para configurar sus protocolos de mantenimiento.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+
 
         {/* ROLES TAB (NEW) */}
         {activeTab === 'ROLES' && (
