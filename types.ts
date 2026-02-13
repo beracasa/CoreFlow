@@ -64,6 +64,7 @@ export interface Machine {
   plate: string;
   type: 'SACMI' | 'MOSS' | 'PMV' | 'GENERIC' | string; // Loosened type for dynamic input
   status: MachineStatus;
+  isActive: boolean; // Administrative status (Active/Inactive)
   location: { x: number; y: number };
   zone?: string;
   isIot: boolean;
@@ -158,6 +159,7 @@ export interface MaintenanceTask {
   // Compatibility fields
   intervalOrigin?: string;   // Keeping for compatibility
   completed?: boolean;       // Keeping for state
+  checks?: Record<string, boolean>; // Granular completion tracking (clean, inspect, etc.)
   notes?: string;
 
   // Matriz de Acciones
@@ -228,9 +230,11 @@ export interface WorkOrder {
   consequence?: string; // Parada, Bajo Rendimiento...
   actionTaken?: string;
 
-  // Signature Placeholders (Base64 or boolean for mock)
-  signatureExecutor?: boolean;
-  signatureSupervisor?: boolean;
+  // Signatures
+  signatureExecutor?: string; // Name of executor
+  signatureExecutorDate?: string;
+  signatureSupervisor?: string; // Name of supervisor
+  signatureSupervisorDate?: string;
 }
 
 export interface MachineHourLog {
@@ -264,6 +268,17 @@ export interface Technician {
   shift: 'MORNING' | 'AFTERNOON' | 'NIGHT';
   status: 'ACTIVE' | 'LEAVE' | 'INACTIVE';
   email: string;
+}
+
+export interface ZoneStructure {
+  id: string;
+  name: string;
+  lines: string[];
+  color?: string; // Optional for map visualization
+  x?: number;     // Optional layout (percent 0-100)
+  y?: number;
+  width?: number; // Optional layout (percent 0-100)
+  height?: number;
 }
 
 export enum AppView {

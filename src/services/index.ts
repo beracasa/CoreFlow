@@ -11,4 +11,13 @@ export const workOrderService: IWorkOrderService = useMock
 
 console.log(`Service Layer initialized in ${useMock ? 'MOCK' : 'LIVE'} mode.`);
 
+import { IInventoryService } from './inventoryService';
+import { InventoryMockService } from './implementations/inventoryMock';
+import { InventorySupabaseService } from './implementations/inventorySupabase';
+
+export const inventoryService: IInventoryService = useMock
+    ? new InventoryMockService()
+    : new InventorySupabaseService();
+
 export * from './workOrderService';
+export * from './inventoryService';

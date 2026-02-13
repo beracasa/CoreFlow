@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { SparePart } from '../../types/inventory';
 import { X, Package, MapPin, AlertTriangle, Activity, Edit } from 'lucide-react';
 import { PartCreationForm } from './PartCreationForm';
-import { InventoryMockService } from '../../services/implementations/inventoryMock';
+import { inventoryService } from '../../services';
 
-const service = new InventoryMockService();
+// Service initialized in index.ts
 
 interface SparePartDetailProps {
     part: SparePart;
@@ -18,7 +18,7 @@ export const SparePartDetail: React.FC<SparePartDetailProps> = ({ part, onClose 
     const handleEditSuccess = () => {
         setIsEditing(false);
         // Reload part data
-        service.getAllParts().then(parts => {
+        inventoryService.getAllParts().then(parts => {
             const updated = parts.find(p => p.id === currentPart.id);
             if (updated) setCurrentPart(updated);
         });

@@ -39,6 +39,7 @@ export const useWorkOrderStore = create<WorkOrderState>((set, get) => ({
             }));
         } catch (err: any) {
             set({ error: err.message || 'Failed to create order', loading: false });
+            throw err; // Re-throw for UI handling
         }
     },
 
@@ -54,6 +55,7 @@ export const useWorkOrderStore = create<WorkOrderState>((set, get) => ({
             // Optionally re-fetch to be sure?
         } catch (err: any) {
             set({ error: err.message || 'Failed to update order', loading: false });
+            throw err; // Re-throw for UI handling
         }
     },
 

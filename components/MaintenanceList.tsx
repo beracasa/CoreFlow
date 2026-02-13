@@ -21,15 +21,15 @@ export const MaintenanceList: React.FC<MaintenanceListProps> = ({ type }) => {
   const getStatusBadge = (stage: WorkOrderStage) => {
     switch (stage) {
       case WorkOrderStage.CLOSED:
-        return <span className="px-2 py-1 rounded-full text-xs font-bold bg-emerald-900/30 text-emerald-400 border border-emerald-800 flex items-center gap-1 w-fit"><CheckCircle size={12} /> Cerrado</span>;
+        return <span className="px-3 py-1.5 rounded-full text-sm font-bold bg-emerald-900/40 text-emerald-300 border border-emerald-700 flex items-center gap-2 w-fit shadow-md"><CheckCircle size={16} /> CERRADO</span>;
       case WorkOrderStage.HANDOVER:
-        return <span className="px-2 py-1 rounded-full text-xs font-bold bg-teal-900/30 text-teal-400 border border-teal-800 flex items-center gap-1 w-fit"><CheckCircle size={12} /> Entrega</span>;
+        return <span className="px-3 py-1.5 rounded-full text-sm font-bold bg-purple-900/40 text-purple-300 border border-purple-700 flex items-center gap-2 w-fit shadow-md"><CheckCircle size={16} /> SUPERVISIÓN</span>;
       case WorkOrderStage.EXECUTION:
-        return <span className="px-2 py-1 rounded-full text-xs font-bold bg-pink-900/30 text-pink-400 border border-pink-800 flex items-center gap-1 w-fit"><Clock size={12} /> En Ejecución</span>;
+        return <span className="px-3 py-1.5 rounded-full text-sm font-bold bg-pink-900/40 text-pink-300 border border-pink-700 flex items-center gap-2 w-fit shadow-md"><Clock size={16} /> EJECUCIÓN</span>;
       case WorkOrderStage.DRAFT:
       case WorkOrderStage.REQUESTED:
       default:
-        return <span className="px-2 py-1 rounded-full text-xs font-bold bg-blue-900/30 text-blue-400 border border-blue-800 flex items-center gap-1 w-fit"><AlertCircle size={12} /> Solicitado</span>;
+        return <span className="px-3 py-1.5 rounded-full text-sm font-bold bg-blue-900/40 text-blue-300 border border-blue-700 flex items-center gap-2 w-fit shadow-md"><AlertCircle size={16} /> SOLICITADO</span>;
     }
   };
 

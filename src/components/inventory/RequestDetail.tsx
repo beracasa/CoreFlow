@@ -1,11 +1,12 @@
 import React from 'react';
-import { InventoryMockService } from '../../services/implementations/inventoryMock';
+import { inventoryService } from '../../services';
 import { PartsRequest, SparePart } from '../../types/inventory';
 import { Package, Calendar, User, Clock, ArrowLeft, CheckCircle, Truck, XCircle, Save, Edit, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { PartRequestForm } from './PartRequestForm';
+import { PurchaseRequestModal } from './PurchaseRequestModal';
 
-const service = new InventoryMockService();
+// Service initialized in index.ts
 
 interface RequestDetailProps {
     request: PartsRequest;
@@ -13,11 +14,21 @@ interface RequestDetailProps {
     onBack: () => void;
 }
 
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { useMasterStore } from '../../stores/useMasterStore';
+
+// ... (existing imports)
+
 export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, onBack }) => {
+    const { technicians, plantSettings } = useMasterStore();
     const [isProcessing, setIsProcessing] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [deliveryQuantities, setDeliveryQuantities] = useState<Record<string, number>>({});
     const [localRequest, setLocalRequest] = useState(request);
+    const [selectedReceiver, setSelectedReceiver] = useState('');
+    const [showReceiverError, setShowReceiverError] = useState(false);
+    const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
 
     const handleStartProcessing = () => {
         const initialQuantities: Record<string, number> = {};
@@ -37,15 +48,22 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
     };
 
     const handleConfirmDelivery = async () => {
+        if (!selectedReceiver) {
+            setShowReceiverError(true);
+            // alert('Por favor seleccione a quién se le entrega el repuesto (Entregado a).'); // Replaced by visual error
+            return;
+        }
+
         try {
             const itemsToDeliver = Object.entries(deliveryQuantities).map(([partId, quantity]) => ({
                 partId,
                 quantity
             }));
 
-            const updatedRequest = await service.deliverParts(localRequest.id, itemsToDeliver);
+            const updatedRequest = await inventoryService.deliverParts(localRequest.id, itemsToDeliver, selectedReceiver);
             setLocalRequest(updatedRequest);
             setIsProcessing(false);
+            setSelectedReceiver(''); // Reset
         } catch (error) {
             console.error('Error delivering parts:', error);
             alert('Error al procesar la entrega. Verifique el stock.');
@@ -55,7 +73,7 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
     const handleCloseRequest = async () => {
         if (!confirm('¿Está seguro de cerrar esta solicitud?')) return;
         try {
-            const updatedRequest = await service.closeRequest(localRequest.id);
+            const updatedRequest = await inventoryService.closeRequest(localRequest.id);
             setLocalRequest(updatedRequest);
         } catch (error) {
             console.error('Error closing request:', error);
@@ -65,7 +83,7 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
     const handleDeleteRequest = async () => {
         if (!confirm('¿Está seguro de eliminar esta solicitud permanentemente?')) return;
         try {
-            await service.deleteRequest(localRequest.id);
+            await inventoryService.deleteRequest(localRequest.id);
             onBack();
         } catch (error) {
             console.error('Error deleting request:', error);
@@ -75,13 +93,90 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
 
     const handleEditSuccess = () => {
         // Reload request data
-        service.getAllRequests().then(requests => {
+        inventoryService.getAllRequests().then(requests => {
             const updated = requests.find(r => r.id === localRequest.id);
             if (updated) {
                 setLocalRequest(updated);
                 setIsEditing(false);
             }
         });
+    };
+
+    const handleGenerateDetailsPDF = () => {
+        const doc = new jsPDF();
+
+        // Logo & Header
+        if (plantSettings.logoUrl) {
+            try {
+                doc.addImage(plantSettings.logoUrl, 'PNG', 14, 10, 30, 15);
+            } catch (e) {
+                console.warn('Could not add logo', e);
+            }
+        }
+
+        doc.setFontSize(16);
+        doc.text('Detalles de la Solicitud de Repuestos', 14, 35);
+
+        doc.setFontSize(10);
+        doc.text(`Solicitud N°: ${localRequest.requestNumber}`, 14, 45);
+        doc.text(`Fecha Creación: ${new Date(localRequest.createdDate).toLocaleString()}`, 14, 51);
+        doc.text(`Solicitante: ${localRequest.technicianId}`, 14, 57);
+        const priorityMap: Record<string, string> = {
+            'NORMAL': 'Normal',
+            'HIGH': 'Alta',
+            'EMERGENCY': 'Urgente'
+        };
+        const priorityText = priorityMap[localRequest.priority] || localRequest.priority;
+        doc.text(`Prioridad: ${priorityText}`, 14, 63);
+
+        const deliveredToName = localRequest.deliveredTo
+            ? (technicians.find(t => t.id === localRequest.deliveredTo)?.name || localRequest.deliveredTo)
+            : '-';
+        doc.text(`Entregado a: ${deliveredToName}`, 14, 69);
+
+        const statusMap: Record<string, string> = {
+            'OPEN': 'Abierto',
+            'PENDING_STOCK': 'Stock Pendiente',
+            'PARTIAL': 'Entrega Parcial',
+            'CLOSED': 'Cerrado'
+        };
+        const statusText = statusMap[localRequest.status] || localRequest.status;
+        doc.text(`Estado: ${statusText}`, 14, 75);
+
+        const tableBody = localRequest.items.map(item => {
+            const part = parts.find(p => p.id === item.partId);
+            return [
+                part?.partNumber || '-',
+                part?.name || item.partId,
+                item.quantityRequested,
+                item.quantityDelivered,
+                item.quantityDelivered >= item.quantityRequested ? 'Completado' : 'Pendiente/Parcial'
+            ];
+        });
+
+        autoTable(doc, {
+            startY: 85,
+            head: [['Código', 'Repuesto', 'Solicitado', 'Entregado', 'Estado']],
+            body: tableBody,
+            theme: 'grid',
+            headStyles: { fillColor: [41, 128, 185], fontSize: 9 },
+            bodyStyles: { fontSize: 9 },
+            margin: { left: 14, right: 14 }
+        });
+
+        // Signatures
+        // @ts-ignore
+        let yPos = doc.lastAutoTable.finalY + 40;
+
+        doc.setLineWidth(0.5);
+        doc.line(14, yPos, 80, yPos);
+        doc.line(120, yPos, 186, yPos);
+
+        doc.setFontSize(8);
+        doc.text('Firma Solicitante', 14, yPos + 5);
+        doc.text('Firma Almacén / Entrega', 120, yPos + 5);
+
+        doc.save(`solicitud_detalle_${localRequest.requestNumber}.pdf`);
     };
 
     const getPartName = (partId: string) => {
@@ -162,14 +257,37 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
                             </button>
                         </>
                     )}
-                    {!isProcessing && !isEditing && (
+
+                    {!isProcessing && !isEditing && (localRequest.status === 'PENDING_STOCK' || localRequest.status === 'PARTIAL' || localRequest.items.some(i => i.quantityDelivered < i.quantityRequested)) && (
                         <button
-                            onClick={handleDeleteRequest}
-                            className="flex items-center px-4 py-2 bg-red-900/30 border border-red-800 hover:bg-red-900/50 text-red-400 rounded-lg font-bold text-sm transition-all"
+                            onClick={() => setIsPurchaseModalOpen(true)}
+                            className={`flex items-center px-4 py-2 rounded-lg font-bold text-sm transition-colors shadow-lg ${(localRequest.purchaseHistory && localRequest.purchaseHistory.length > 0)
+                                ? 'bg-orange-800 text-orange-200 border border-orange-600 hover:bg-orange-700'
+                                : 'bg-orange-600 hover:bg-orange-700 text-white'
+                                }`}
                         >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Eliminar
+                            <Package className="w-4 h-4 mr-2" />
+                            {(localRequest.purchaseHistory && localRequest.purchaseHistory.length > 0) ? 'Repuestos Solicitados' : 'Solicitar Repuestos'}
                         </button>
+                    )}
+                    {!isProcessing && !isEditing && (
+                        localRequest.status === 'CLOSED' ? (
+                            <button
+                                onClick={handleGenerateDetailsPDF}
+                                className="flex items-center px-4 py-2 bg-industrial-800 border border-industrial-600 hover:bg-industrial-700 text-industrial-300 hover:text-white rounded-lg font-bold text-sm transition-all"
+                            >
+                                <Save className="w-4 h-4 mr-2" />
+                                Generar Reporte
+                            </button>
+                        ) : (
+                            <button
+                                onClick={handleDeleteRequest}
+                                className="flex items-center px-4 py-2 bg-red-900/30 border border-red-800 hover:bg-red-900/50 text-red-400 rounded-lg font-bold text-sm transition-all"
+                            >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Eliminar
+                            </button>
+                        )
                     )}
 
                     {isProcessing && (
@@ -227,6 +345,17 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
                                     </p>
                                 </div>
                             </div>
+                            <div className="flex items-center gap-3 text-industrial-300">
+                                <User className="w-4 h-4 text-industrial-500" />
+                                <div className="flex-1">
+                                    <p className="text-xs text-industrial-500">Entregado a</p>
+                                    <p className="font-medium text-white truncate">
+                                        {localRequest.deliveredTo
+                                            ? (technicians.find(t => t.id === localRequest.deliveredTo)?.name || localRequest.deliveredTo)
+                                            : '-'}
+                                    </p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -243,6 +372,7 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
                                     <th className="px-6 py-3">Repuesto</th>
                                     <th className="px-6 py-3 text-center">Solicitado</th>
                                     <th className="px-6 py-3 text-center">Entregado</th>
+                                    <th className="px-6 py-3 text-center">Stock Actual</th>
                                     {isProcessing && <th className="px-6 py-3 text-center w-32">A Entregar</th>}
                                     <th className="px-6 py-3 text-right">Estado</th>
                                 </tr>
@@ -268,6 +398,11 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
                                             </td>
                                             <td className="px-6 py-4 text-center text-industrial-300 font-mono">
                                                 {item.quantityDelivered}
+                                            </td>
+                                            <td className="px-6 py-4 text-center text-white font-mono">
+                                                <span className={`${part && part.currentStock <= part.minStock ? 'text-red-400 font-bold' : ''}`}>
+                                                    {part?.currentStock ?? '-'}
+                                                </span>
                                             </td>
                                             {isProcessing && (
                                                 <td className="px-6 py-4">
@@ -302,8 +437,49 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
                             </tbody>
                         </table>
                     </div>
+
+                    {isProcessing && (
+                        <div className="mt-4 bg-industrial-900/50 rounded-lg p-4 border border-industrial-700">
+                            <label className="block text-xs font-bold text-industrial-500 uppercase tracking-wider mb-2">Entregado a: <span className="text-red-400">*</span></label>
+                            <select
+                                className={`w-full md:w-1/2 bg-industrial-800 border rounded-lg px-4 py-2 text-white outline-none focus:ring-2 transition-colors ${showReceiverError ? 'border-red-500 ring-2 ring-red-500/20' : 'border-industrial-600 focus:ring-blue-500'}`}
+                                value={selectedReceiver}
+                                onChange={(e) => {
+                                    setSelectedReceiver(e.target.value);
+                                    if (e.target.value) setShowReceiverError(false);
+                                }}
+                            >
+                                <option value="">Seleccionar Persona...</option>
+                                {technicians.filter(t => t.status === 'ACTIVE').map(tech => (
+                                    <option key={tech.id} value={tech.id}>{tech.name} ({tech.role})</option>
+                                ))}
+                            </select>
+                            {showReceiverError && (
+                                <p className="text-xs text-red-400 mt-1 font-medium">Debe seleccionar quién recibe el repuesto.</p>
+                            )}
+                        </div>
+                    )}
                 </div>
             </div>
-        </div>
+            {
+                isPurchaseModalOpen && (
+                    <PurchaseRequestModal
+                        request={localRequest}
+                        parts={parts}
+                        onClose={() => setIsPurchaseModalOpen(false)}
+                        onSuccess={(updated) => {
+                            setLocalRequest(updated);
+                            // Keep modal open or close? User might want to see it became history.
+                            // But usually we close modals on success.
+                            // The modal component handles saving but not closing automatically in the code I wrote (I wrote onSuccess call then optional close).
+                            // Let's verify modal code. Ah, I see in modal I didn't close it.
+                            // Wait, in handleGenerateRequest I put "onSuccess(updatedRequest)".
+                            // I will close it here for now, or let the user close it.
+                            setIsPurchaseModalOpen(false); // Close on success
+                        }}
+                    />
+                )
+            }
+        </div >
     );
 };

@@ -1,4 +1,4 @@
-import { SparePart, PartsRequest, InventoryTransaction, RequestStatus, RequestPriority } from '../../types/inventory';
+import { SparePart, PartsRequest, InventoryTransaction, RequestStatus, TransactionType, PurchaseRequest } from '../../types/inventory';
 import { saveToStorage, loadFromStorage } from '../../utils/persistence';
 
 const PARTS_KEY = 'v1_inventory_parts';
@@ -11,7 +11,9 @@ const INITIAL_PARTS: SparePart[] = [
     { id: 'p3', name: 'Limit Switch', partNumber: 'LS-001', description: 'Industrial limit switch', category: 'Electronics', unitOfMeasure: 'PCS', currentStock: 8, minStock: 3, location: 'C-02', cost: 45.00 },
 ];
 
-export class InventoryMockService {
+import { IInventoryService } from '../inventoryService';
+
+export class InventoryMockService implements IInventoryService {
 
     // --- Persistence Helpers ---
     private getParts(): SparePart[] {
@@ -41,7 +43,21 @@ export class InventoryMockService {
     // --- Public API ---
 
     async getAllParts(): Promise<SparePart[]> {
-        return this.getParts();
+        const parts = this.getParts();
+        // Sort by createdAt desc (if available), otherwise by ID desc (as ID is timestamp based)
+        return parts.sort((a, b) => {
+            // Newest first
+            const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+
+            if (dateA !== dateB) {
+                return dateB - dateA;
+            }
+
+            // Fallback to ID if dates are equal (or both missing)
+            // Assuming ID format contains timestamp for created items, or arbitrary string for others
+            return b.id.localeCompare(a.id);
+        });
     }
 
     async getAllRequests(): Promise<PartsRequest[]> {
@@ -94,7 +110,7 @@ export class InventoryMockService {
      * Deliver parts for a request.
      * THROWS Error if calling with quantity > currentStock.
      */
-    async deliverParts(requestId: string, itemsToDeliver: { partId: string; quantity: number }[]): Promise<PartsRequest> {
+    async deliverParts(requestId: string, itemsToDeliver: { partId: string; quantity: number }[], receiverId?: string): Promise<PartsRequest> {
         const parts = this.getParts();
         const requests = this.getRequests();
         const transactions = this.getTransactions();
@@ -129,7 +145,8 @@ export class InventoryMockService {
                 quantity: deliveryItem.quantity,
                 date: new Date().toISOString(),
                 userId: 'current-user', // Mock user
-                relatedDocumentId: requestId
+                relatedDocumentId: requestId,
+                deliveredTo: receiverId
             };
             transactions.push(transaction);
 
@@ -149,6 +166,11 @@ export class InventoryMockService {
         } else if (someDelivered) {
             request.status = 'PARTIAL';
         }
+
+        // Save receiver
+        if (receiverId) {
+            request.deliveredTo = receiverId;
+        }
         // If nothing delivered yet, it stays OPEN or PENDING_STOCK
 
         // Save everything
@@ -157,6 +179,21 @@ export class InventoryMockService {
         this.saveTransactions(transactions);
 
         return request;
+    }
+
+    async savePurchaseRequest(requestId: string, purchaseRequest: PurchaseRequest): Promise<PartsRequest> {
+        const requests = this.getRequests();
+        const index = requests.findIndex(r => r.id === requestId);
+
+        if (index !== -1) {
+            if (!requests[index].purchaseHistory) {
+                requests[index].purchaseHistory = [];
+            }
+            requests[index].purchaseHistory!.push(purchaseRequest);
+            this.saveRequests(requests);
+            return requests[index];
+        }
+        throw new Error('Request not found');
     }
 
     async closeRequest(requestId: string): Promise<PartsRequest> {
@@ -212,7 +249,8 @@ export class InventoryMockService {
         const newPart: SparePart = {
             id: `P-${Date.now()}`,
             ...partData,
-            currentStock: initialStock
+            currentStock: initialStock,
+            createdAt: new Date().toISOString()
         };
 
         parts.push(newPart);
@@ -314,5 +352,42 @@ export class InventoryMockService {
         requests[index] = updatedRequest;
         this.saveRequests(requests);
         return updatedRequest;
+    }
+
+    async bulkCreate(partsData: Omit<SparePart, 'id'>[]): Promise<void> {
+        const parts = this.getParts();
+        const transactions = this.getTransactions();
+
+        for (const partData of partsData) {
+            // Check for duplicate part number
+            if (parts.some(p => p.partNumber === partData.partNumber)) {
+                console.warn(`Skipping duplicate part number: ${partData.partNumber}`);
+                continue;
+            }
+
+            const newPart: SparePart = {
+                id: `P-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+                ...partData,
+                currentStock: partData.currentStock || 0
+            };
+
+            parts.push(newPart);
+
+            // Log transaction if there is initial stock
+            if (newPart.currentStock > 0) {
+                transactions.push({
+                    id: `TX-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+                    partId: newPart.id,
+                    type: 'IN',
+                    quantity: newPart.currentStock,
+                    date: new Date().toISOString(),
+                    userId: 'current-user',
+                    relatedDocumentId: 'BULK_IMPORT'
+                });
+            }
+        }
+
+        this.saveParts(parts);
+        this.saveTransactions(transactions);
     }
 }

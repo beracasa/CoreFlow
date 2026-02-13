@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { InventoryMockService } from '../../services/implementations/inventoryMock';
+import { inventoryService } from '../../services';
+import { ImportSpareParts } from './ImportSpareParts';
 import { SparePart } from '../../types/inventory';
 import { Search, AlertCircle } from 'lucide-react';
 import { SparePartDetail } from './SparePartDetail';
 
-const service = new InventoryMockService();
+// Service initialized in index.ts
 
 export const InventoryList: React.FC = () => {
     const [parts, setParts] = useState<SparePart[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(true);
     const [selectedPart, setSelectedPart] = useState<SparePart | null>(null);
+    const [showImportModal, setShowImportModal] = useState(false);
 
     // Filters
     const [categoryFilter, setCategoryFilter] = useState('');
@@ -28,7 +30,7 @@ export const InventoryList: React.FC = () => {
 
     const fetchParts = async () => {
         setLoading(true);
-        const data = await service.getAllParts();
+        const data = await inventoryService.getAllParts();
         setParts(data);
         setLoading(false);
     };
@@ -58,6 +60,12 @@ export const InventoryList: React.FC = () => {
                     </span>
                     Inventario de Repuestos
                 </h2>
+                <button
+                    onClick={() => setShowImportModal(true)}
+                    className="px-4 py-2 bg-industrial-600 text-white rounded-lg hover:bg-industrial-500 transition-colors text-sm font-medium flex items-center gap-2"
+                >
+                    Importar Excel/CSV
+                </button>
             </div>
 
 
@@ -182,6 +190,14 @@ export const InventoryList: React.FC = () => {
                     />
                 )
             }
+            {showImportModal && (
+                <ImportSpareParts
+                    onClose={() => setShowImportModal(false)}
+                    onSuccess={() => {
+                        fetchParts();
+                    }}
+                />
+            )}
         </div >
     );
 };

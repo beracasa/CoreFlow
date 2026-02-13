@@ -6,6 +6,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Save, X, CheckSquare, Plus, Trash2, Lock, PlayCircle, CheckCircle, ArrowRight, Settings, User, Clock, AlertCircle } from 'lucide-react';
 import { ProtocolViewer } from './ProtocolViewer';
+import { useMasterStore } from '../src/stores/useMasterStore';
 
 // --- 1. CONFIGURATION & MASTER DATA ENGINE ---
 
@@ -94,6 +95,7 @@ interface MaintenanceFormProps {
    machines: Machine[];
    technicians: Technician[];
    onSave: (order: WorkOrder) => void;
+   onSaveAndStay?: (order: WorkOrder) => void;
    onCancel: () => void;
    initialMachineId?: string;
    initialData?: Partial<WorkOrder>;
@@ -104,6 +106,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
    machines,
    technicians,
    onSave,
+   onSaveAndStay,
    onCancel,
    initialMachineId,
    initialData
@@ -126,9 +129,25 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
       totalMaintenanceCost: 0
    });
 
-   const [selectedMachine, setSelectedMachine] = useState<Machine | undefined>(undefined);
+   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
    const [validationError, setValidationError] = useState<string | null>(null);
    const [duration, setDuration] = useState<string>('0h 0m');
+   const [editingSection, setEditingSection] = useState<number | null>(null);
+
+   // Helper UI renderers - Defined early to avoid TDZ and usage in handlers
+   const isSection1Editable = (formData.currentStage === WorkOrderStage.DRAFT || editingSection === 1) && hasRole([UserRole.ADMIN_SOLICITANTE]);
+   // Allow editing section 2 in DRAFT, REQUESTED, EXECUTION
+   const isSection2Editable = ((formData.currentStage === WorkOrderStage.DRAFT || formData.currentStage === WorkOrderStage.EXECUTION || formData.currentStage === WorkOrderStage.REQUESTED) || editingSection === 2) && hasRole([UserRole.TECNICO_MANT, UserRole.ADMIN_SOLICITANTE]);
+
+   console.log('DEBUG: MaintenanceForm Render', {
+      stage: formData.currentStage,
+      role: user?.role,
+      isSection2Editable,
+      tasksCount: formData.tasks?.length
+   });
+
+   const isSection3Editable = (formData.currentStage === WorkOrderStage.HANDOVER || editingSection === 3) && hasRole([UserRole.ADMIN_SOLICITANTE]);
+
 
    // -- INITIALIZATION EFFECT --
    useEffect(() => {
@@ -152,8 +171,10 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
             // If we have an interval but NO tasks (e.g. fresh from map), generate tasks.
             // If we are editing an existing record, tasks should already be in initialData.
             if (initialData.interval && (!initialData.tasks || initialData.tasks.length === 0)) {
+               const machine = machines.find(m => m.id === machineIdToUse);
                if (machine) {
-                  const tasks = generateCumulativeTasks(machine.type, initialData.interval);
+                  // Pass the machine ID to generate tasks from the store
+                  const tasks = generateCumulativeTasks(machine.id, machine.type, initialData.interval);
                   setFormData(prev => ({ ...prev, tasks }));
                }
             }
@@ -161,30 +182,93 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
       }
    }, [initialMachineId, initialData]);
 
+   // Access store
+   // Access store
+   const { maintenancePlans } = useMasterStore();
+
    // -- LOGIC ENGINE: Cumulative Tasks --
-   // -- LOGIC ENGINE: Cumulative Tasks --
-   const generateCumulativeTasks = (machineType: string, selectedInterval: string): MaintenanceTask[] => {
-      const selectedIndex = INTERVAL_HIERARCHY.indexOf(selectedInterval);
-      if (selectedIndex === -1) return [];
+   const generateCumulativeTasks = (machineId: string, machineType: string, selectedInterval: string): MaintenanceTask[] => {
+      // 1. Try to find a specific plan for this machine
+      const specificPlan = maintenancePlans.find(p => p.machineId === machineId);
 
-      let tasks: MaintenanceTask[] = [];
-      const protocolSet = MAINTENANCE_PROTOCOLS[machineType] || MAINTENANCE_PROTOCOLS['GENERIC'];
+      if (specificPlan) {
+         // Dynamic Logic based on Maintenance Module
+         // Find the target interval object to get its hours
+         const targetInterval = specificPlan.intervals.find(i => i.label === selectedInterval);
+         if (!targetInterval) return [];
 
-      // Cumulative Loop: Add tasks from 0 to selectedIndex
-      for (let i = 0; i <= selectedIndex; i++) {
-         const interval = INTERVAL_HIERARCHY[i];
-         const sourceTasks = protocolSet[interval] || [];
+         const targetHours = targetInterval.hours;
 
-         // Clone and tag
-         const newTasks = sourceTasks.map(t => ({
-            ...t,
-            id: `t-${interval.replace(/\s/g, '')}-${t.id}-${Math.random().toString(36).substr(2, 5)}`, // Unique ID for this instance
-            intervalOrigin: interval,
-            completed: false // Reset completion state
-         }));
-         tasks = [...tasks, ...newTasks];
+         // Filter intervals <= targetHours and Sort by hours ASC
+         const relevantIntervals = specificPlan.intervals
+            .filter(i => i.hours <= targetHours)
+            .sort((a, b) => a.hours - b.hours);
+
+         // Flatten tasks
+         // Note: references, estimatedTime etc are already in tasks.
+         // We add a unique ID to avoid collisions if we were to have same task in multiple (unlikely but possible logic)
+         // But mainly we tag them with intervalOrigin
+         let cumulativeTasks: MaintenanceTask[] = [];
+
+         relevantIntervals.forEach(interval => {
+            const labeledTasks = interval.tasks.map(t => ({
+               ...t,
+               id: `t-${interval.id}-${t.id}-${Math.random().toString(36).substr(2, 5)}`, // Ensure unique ID for this instance
+               intervalOrigin: interval.label,
+               completed: false
+            }));
+            cumulativeTasks = [...cumulativeTasks, ...labeledTasks];
+         });
+
+         return cumulativeTasks;
+      } else {
+         // Fallback to legacy hardcoded logic if no plan exists
+         const selectedIndex = INTERVAL_HIERARCHY.indexOf(selectedInterval);
+         if (selectedIndex === -1) return [];
+
+         let tasks: MaintenanceTask[] = [];
+
+         for (let i = 0; i <= selectedIndex; i++) {
+            const intervalLabel = INTERVAL_HIERARCHY[i];
+            const protocolSet = MAINTENANCE_PROTOCOLS[machineType] || MAINTENANCE_PROTOCOLS['GENERIC'];
+            const sourceTasks = protocolSet[intervalLabel] || [];
+
+            const newTasks = sourceTasks.map(t => ({
+               ...t,
+               id: `t-${intervalLabel.replace(/\s/g, '')}-${t.id}-${Math.random().toString(36).substr(2, 5)}`,
+               intervalOrigin: intervalLabel,
+               completed: false
+            }));
+
+            tasks = [...tasks, ...newTasks];
+         }
+         return tasks;
       }
-      return tasks;
+   };
+
+   const handleTaskToggle = (taskId: string, action: string) => {
+      console.log('DEBUG: handleTaskToggle called', { taskId, action, isSection2Editable });
+      // Only allow toggle if editable
+      if (!isSection2Editable) {
+         console.warn('DEBUG: Toggle blocked because isSection2Editable is false');
+         return;
+      }
+
+      setFormData(prev => {
+         const tasks = prev.tasks?.map(t => {
+            if (t.id === taskId) {
+               const newChecks = { ...(t.checks || {}), [action]: !t.checks?.[action] };
+
+               // Check if all required actions are done
+               const requiredActions = Object.keys(t.actionFlags).filter(k => t.actionFlags[k as keyof typeof t.actionFlags] === true);
+               const isComplete = requiredActions.every(k => newChecks[k] === true);
+
+               return { ...t, checks: newChecks, completed: isComplete };
+            }
+            return t;
+         });
+         return { ...prev, tasks };
+      });
    };
 
    // -- LOGIC ENGINE: Time Calculation --
@@ -228,12 +312,32 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
       const interval = e.target.value;
       if (!selectedMachine) return;
 
-      const tasks = generateCumulativeTasks(selectedMachine.type, interval);
+      const tasks = generateCumulativeTasks(selectedMachine.id, selectedMachine.type, interval);
       setFormData(prev => ({
          ...prev,
          interval: interval,
          tasks: tasks
       }));
+   };
+
+   const handleInternalSave = (order: WorkOrder, stay: boolean = false) => {
+      const orderToSave = { ...order };
+      if (!orderToSave.title || orderToSave.title.trim() === '') {
+         const machine = machines.find(m => m.id === orderToSave.machineId);
+         const machineName = machine ? (machine.alias || machine.name) : 'Unknown Machine';
+
+         if (type === 'R-MANT-02') {
+            orderToSave.title = `${t('mant02.formTitle')} - ${machineName} - ${orderToSave.interval || 'N/A'}`;
+         } else {
+            const desc = orderToSave.description || 'Reporte de Falla';
+            orderToSave.title = `Correctivo - ${machineName} - ${desc.substring(0, 30)}`;
+         }
+      }
+      if (stay && onSaveAndStay) {
+         onSaveAndStay(orderToSave);
+      } else {
+         onSave(orderToSave);
+      }
    };
 
    const saveProgress = () => {
@@ -243,7 +347,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
          id: formData.id || `WO-${Date.now()}` // Generate ID if it's the first save
       } as WorkOrder;
 
-      onSave(orderToSave);
+      handleInternalSave(orderToSave, false); // False = Close (Navigate back)
    };
 
    // -- STATE MACHINE TRANSITIONS --
@@ -270,7 +374,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
       setFormData(updated);
       setValidationError(null);
       // Auto save on transition
-      onSave({ ...updated, id: formData.id || `WO-${Date.now()}` } as WorkOrder);
+      handleInternalSave({ ...updated, id: formData.id || `WO-${Date.now()}` } as WorkOrder, true);
    };
 
    const startExecution = () => {
@@ -284,7 +388,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
          startTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
       };
       setFormData(updated);
-      onSave({ ...updated, id: formData.id || `WO-${Date.now()}` } as WorkOrder);
+      handleInternalSave({ ...updated, id: formData.id || `WO-${Date.now()}` } as WorkOrder, true);
    };
 
    const finishExecution = () => {
@@ -306,7 +410,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
       };
       setFormData(updated);
       setValidationError(null);
-      onSave({ ...updated, id: formData.id || `WO-${Date.now()}` } as WorkOrder);
+      handleInternalSave({ ...updated, id: formData.id || `WO-${Date.now()}` } as WorkOrder, true);
    };
 
    const closeWorkOrder = () => {
@@ -324,13 +428,19 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
          completedDate: new Date().toISOString()
       } as WorkOrder;
 
-      onSave(newOrder);
+      handleInternalSave(newOrder);
    };
 
-   // Helper UI renderers
-   const isSection1Editable = formData.currentStage === WorkOrderStage.DRAFT && hasRole([UserRole.ADMIN_SOLICITANTE]);
-   const isSection2Editable = formData.currentStage === WorkOrderStage.EXECUTION && hasRole([UserRole.TECNICO_MANT, UserRole.ADMIN_SOLICITANTE]);
-   const isSection3Editable = formData.currentStage === WorkOrderStage.HANDOVER && hasRole([UserRole.ADMIN_SOLICITANTE]);
+   const signSupervisor = () => {
+      if (!isSection3Editable) return;
+      if (formData.signatureSupervisor) return; // Already signed
+
+      setFormData(prev => ({
+         ...prev,
+         signatureSupervisor: user?.full_name || 'Admin User',
+         signatureSupervisorDate: new Date().toISOString()
+      }));
+   };
 
    return (
       <div className="h-full bg-industrial-900 flex flex-col overflow-hidden animate-fadeIn">
@@ -342,12 +452,22 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                   <span className="text-sm font-mono text-industrial-500 ml-2">{formData.id ? `ID: ${formData.id}` : '(New)'}</span>
                </h2>
                {/* Status Pills */}
-               <div className="flex gap-2 text-xs mt-1">
-                  <div className={`px-2 py-0.5 rounded transition-colors ${formData.currentStage === WorkOrderStage.DRAFT ? 'bg-emerald-500 text-white font-bold' : 'bg-industrial-800 text-gray-500'}`}>1. Request</div>
-                  <span className="text-gray-600">→</span>
-                  <div className={`px-2 py-0.5 rounded transition-colors ${formData.currentStage === WorkOrderStage.EXECUTION || formData.currentStage === WorkOrderStage.REQUESTED ? 'bg-pink-500 text-white font-bold' : 'bg-industrial-800 text-gray-500'}`}>2. Execution</div>
-                  <span className="text-gray-600">→</span>
-                  <div className={`px-2 py-0.5 rounded transition-colors ${formData.currentStage === WorkOrderStage.HANDOVER ? 'bg-emerald-500 text-white font-bold' : 'bg-industrial-800 text-gray-500'}`}>3. Handover</div>
+               <div className="flex gap-2 text-xs mt-1 items-center">
+                  <div className={`px-2 py-0.5 rounded transition-colors font-bold ${formData.currentStage === WorkOrderStage.DRAFT || formData.currentStage === WorkOrderStage.REQUESTED ? 'bg-emerald-500 text-white' : 'bg-industrial-800 text-industrial-500'}`}>
+                     1. Solicitud
+                  </div>
+                  <span className="text-industrial-600">→</span>
+                  <div className={`px-2 py-0.5 rounded transition-colors font-bold ${formData.currentStage === WorkOrderStage.EXECUTION ? 'bg-pink-500 text-white' : 'bg-industrial-800 text-industrial-500'}`}>
+                     2. Ejecución
+                  </div>
+                  <span className="text-industrial-600">→</span>
+                  <div className={`px-2 py-0.5 rounded transition-colors font-bold ${formData.currentStage === WorkOrderStage.HANDOVER ? 'bg-emerald-500 text-white' : 'bg-industrial-800 text-industrial-500'}`}>
+                     3. Supervisión
+                  </div>
+                  <span className="text-industrial-600">→</span>
+                  <div className={`px-2 py-0.5 rounded transition-colors font-bold ${formData.currentStage === WorkOrderStage.CLOSED ? 'bg-emerald-600 text-white shadow-[0_0_10px_rgba(16,185,129,0.3)]' : 'bg-industrial-800 text-industrial-500'}`}>
+                     4. Cerrado
+                  </div>
                </div>
             </div>
             <button onClick={onCancel} className="text-industrial-400 hover:text-white"><X className="w-6 h-6" /></button>
@@ -367,14 +487,24 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
               SECTION 1: REQUEST (GREEN)
               Context: Solicitante / Gerente fills this to create the request.
           ===================================================================================== */}
-               <section className={`rounded-lg border-2 transition-all duration-300 ${formData.currentStage === WorkOrderStage.DRAFT
+               <section className={`rounded-lg border-2 transition-all duration-300 ${isSection1Editable
                   ? 'bg-emerald-900/10 border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.1)]'
-                  : 'bg-industrial-900 border-industrial-700 opacity-60'
+                  : 'bg-industrial-900 border-industrial-700'
                   }`}>
-                  <div className={`p-4 border-b flex justify-between items-center ${formData.currentStage === WorkOrderStage.DRAFT ? 'bg-emerald-900/20 border-emerald-500/30' : 'bg-industrial-800 border-industrial-700'}`}>
-                     <h3 className={`${formData.currentStage === WorkOrderStage.DRAFT ? 'text-emerald-400' : 'text-industrial-400'} font-bold flex items-center gap-2`}>
+                  <div className={`p-4 border-b flex justify-between items-center ${isSection1Editable ? 'bg-emerald-900/20 border-emerald-500/30' : 'bg-industrial-800 border-industrial-700'}`}>
+                     <h3 className={`${isSection1Editable ? 'text-emerald-400' : 'text-industrial-400'} font-bold flex items-center gap-2`}>
                         1. Solicitud de Mantenimiento {!isSection1Editable && <Lock size={14} />}
                      </h3>
+                     {!isSection1Editable && hasRole([UserRole.ADMIN_SOLICITANTE]) && (
+                        <button onClick={() => setEditingSection(1)} className="bg-emerald-900/50 hover:bg-emerald-800 text-emerald-400 px-4 py-2 rounded text-sm font-bold transition-colors border border-emerald-500/30">
+                           Editar
+                        </button>
+                     )}
+                     {editingSection === 1 && (
+                        <button onClick={() => { setEditingSection(null); handleInternalSave(formData, true); }} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded text-sm font-bold transition-colors shadow-lg">
+                           Guardar
+                        </button>
+                     )}
                   </div>
 
                   <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -454,8 +584,14 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                            className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm disabled:opacity-50"
                            value={formData.interval || ''} onChange={handleIntervalChange}>
                            <option value="">- Seleccionar Programa -</option>
-                           {/* In real app, load from machine.intervals or generic hierarchy */}
-                           {(selectedMachine?.intervals || INTERVAL_HIERARCHY).map(int => <option key={int} value={int}>{int}</option>)}
+                           {(() => {
+                              const plan = maintenancePlans.find(p => p.machineId === selectedMachine?.id);
+                              // Prioritize Configured Plans -> Legacy Machine Intervals -> Hardcoded Hierarchy
+                              const intervals = plan?.intervals.map(i => i.label)
+                                 || (selectedMachine?.intervals && selectedMachine.intervals.length > 0 ? selectedMachine.intervals : INTERVAL_HIERARCHY);
+
+                              return intervals.map(int => <option key={int} value={int}>{int}</option>);
+                           })()}
                         </select>
                      </div>
 
@@ -514,7 +650,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                   {isSection1Editable && (
                      <div className="p-4 border-t border-emerald-500/30 flex justify-end gap-3">
                         <button type="button" onClick={saveProgress} className="text-emerald-400 hover:text-white px-4 py-2 text-sm font-medium">
-                           Save Draft
+                           Guardar Borrador
                         </button>
                         <button type="button" onClick={transitionToRequested} className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2 rounded font-bold shadow-lg transition-colors flex items-center gap-2">
                            Solicitar Mantenimiento <ArrowRight size={16} />
@@ -528,22 +664,34 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
               SECTION 2: EXECUTION (PINK)
               Context: Maintenance Tech performs tasks, logs parts, and times.
           ===================================================================================== */}
-               <section className={`rounded-lg border-2 transition-all duration-300 ${formData.currentStage === WorkOrderStage.EXECUTION || formData.currentStage === WorkOrderStage.REQUESTED
+               <section className={`rounded-lg border-2 transition-all duration-300 ${isSection2Editable
                   ? 'bg-pink-900/10 border-pink-500 shadow-[0_0_15px_rgba(236,72,153,0.1)]'
-                  : 'bg-industrial-900 border-industrial-700 opacity-60'
+                  : 'bg-industrial-900 border-industrial-700'
                   }`}>
-                  <div className={`p-4 border-b flex justify-between items-center ${formData.currentStage === WorkOrderStage.EXECUTION || formData.currentStage === WorkOrderStage.REQUESTED ? 'bg-pink-900/20 border-pink-500/30' : 'bg-industrial-800 border-industrial-700'}`}>
-                     <h3 className={`${formData.currentStage === WorkOrderStage.EXECUTION ? 'text-pink-400' : 'text-industrial-400'} font-bold flex items-center gap-2`}>
-                        2. Ejecución y Repuestos {!isSection2Editable && formData.currentStage !== WorkOrderStage.REQUESTED && <Lock size={14} />}
+                  <div className={`p-4 border-b flex justify-between items-center ${isSection2Editable ? 'bg-pink-900/20 border-pink-500/30' : 'bg-industrial-800 border-industrial-700'}`}>
+                     <h3 className={`${isSection2Editable ? 'text-pink-400' : 'text-industrial-400'} font-bold flex items-center gap-2`}>
+                        2. Intervenciones de Mantenimiento {!isSection2Editable && <Lock size={14} />}
                      </h3>
-                     {formData.currentStage === WorkOrderStage.REQUESTED && hasRole([UserRole.TECNICO_MANT, UserRole.ADMIN_SOLICITANTE]) && (
-                        <button onClick={startExecution} className="bg-pink-600 hover:bg-pink-500 text-white px-4 py-1 rounded text-sm font-bold flex items-center gap-1 animate-pulse">
-                           <PlayCircle size={14} /> Iniciar Trabajo
-                        </button>
-                     )}
+                     <div className="flex gap-2">
+                        {formData.currentStage === WorkOrderStage.REQUESTED && hasRole([UserRole.TECNICO_MANT, UserRole.ADMIN_SOLICITANTE]) && (
+                           <button onClick={startExecution} className="bg-pink-600 hover:bg-pink-500 text-white px-4 py-1 rounded text-sm font-bold flex items-center gap-1 animate-pulse">
+                              <PlayCircle size={14} /> Iniciar Trabajo
+                           </button>
+                        )}
+                        {!isSection2Editable && hasRole([UserRole.ADMIN_SOLICITANTE, UserRole.TECNICO_MANT]) && (
+                           <button onClick={() => setEditingSection(2)} className="bg-pink-900/50 hover:bg-pink-800 text-pink-400 px-4 py-2 rounded text-sm font-bold transition-colors border border-pink-500/30">
+                              Editar
+                           </button>
+                        )}
+                        {editingSection === 2 && (
+                           <button onClick={() => { setEditingSection(null); handleInternalSave(formData, true); }} className="bg-pink-600 hover:bg-pink-500 text-white px-4 py-2 rounded text-sm font-bold transition-colors shadow-lg">
+                              Guardar
+                           </button>
+                        )}
+                     </div>
                   </div>
 
-                  <div className={`p-6 ${formData.currentStage === WorkOrderStage.REQUESTED || formData.currentStage === WorkOrderStage.DRAFT ? 'opacity-50 pointer-events-none filter blur-[1px]' : ''}`}>
+                  <div className={`p-6`}>
                      {/* Time & Duration */}
                      <div className="grid grid-cols-3 gap-4 mb-6">
                         <div className="bg-industrial-900 p-3 rounded border border-industrial-700">
@@ -566,7 +714,23 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                            <h4 className="text-sm font-bold text-white mb-2 flex items-center gap-2"><CheckSquare size={14} className="text-pink-500" /> Tareas de Mantenimiento Acumuladas</h4>
                            <div className="bg-industrial-900 rounded border border-industrial-700 overflow-hidden">
                               {/* New Protocol Viewer */}
-                              <ProtocolViewer tasks={formData.tasks || []} />
+                              {/* New Protocol Viewer - Grouped by Interval Origin */}
+                              {formData.tasks && formData.tasks.length > 0 ? (
+                                 Array.from(new Set(formData.tasks.map(t => t.intervalOrigin))).map(origin => (
+                                    <div key={origin} className="mb-8 last:mb-0">
+                                       <h5 className="text-industrial-300 font-bold mb-2 border-b border-industrial-700 pb-1 text-xs uppercase tracking-wider">
+                                          {origin || 'Tareas Generales'}
+                                       </h5>
+                                       <ProtocolViewer
+                                          tasks={formData.tasks?.filter(t => t.intervalOrigin === origin) || []}
+                                          readOnly={!isSection2Editable}
+                                          onToggle={handleTaskToggle}
+                                       />
+                                    </div>
+                                 ))
+                              ) : (
+                                 <div className="text-center p-4 text-industrial-500 italic">No tasks generated.</div>
+                              )}
 
                               {/* Temporary explicit completion override for demo since Viewer is read-only for now */}
                               {isSection2Editable && formData.tasks && formData.tasks.length > 0 && (
@@ -611,7 +775,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                            </div>
                         ))}
                         {isSection2Editable && (
-                           <button onClick={() => setFormData(p => ({ ...p, executors: [...(p.executors || []), { name: '', lastName: '', position: '' }] }))} className="text-xs text-pink-400 flex items-center gap-1"><Plus size={12} /> Add Tech</button>
+                           <button type="button" onClick={() => setFormData(p => ({ ...p, executors: [...(p.executors || []), { name: '', lastName: '', position: '' }] }))} className="text-xs text-pink-400 flex items-center gap-1"><Plus size={12} /> Add Tech</button>
                         )}
                      </div>
                   </div>
@@ -619,7 +783,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                   {isSection2Editable && (
                      <div className="p-4 border-t border-pink-500/30 flex justify-end gap-3">
                         <button type="button" onClick={saveProgress} className="text-pink-400 hover:text-white px-4 py-2 text-sm font-medium">
-                           Save Progress
+                           Guardar Progreso
                         </button>
                         <button type="button" onClick={finishExecution} className="bg-pink-600 hover:bg-pink-500 text-white px-6 py-2 rounded font-bold shadow-lg transition-colors flex items-center gap-2">
                            Finalizar Ejecución <CheckCircle size={16} />
@@ -632,26 +796,56 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
               SECTION 3: HANDOVER & CLOSE (GREEN)
               Context: Supervisor review, checklist, and signature.
           ===================================================================================== */}
-               <section className={`rounded-lg border-2 transition-all duration-300 ${formData.currentStage === WorkOrderStage.HANDOVER
+               <section className={`rounded-lg border-2 transition-all duration-300 ${isSection3Editable
                   ? 'bg-emerald-900/10 border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.1)]'
-                  : 'bg-industrial-900 border-industrial-700 opacity-60'
+                  : 'bg-industrial-900 border-industrial-700'
                   }`}>
-                  <div className={`p-4 border-b ${formData.currentStage === WorkOrderStage.HANDOVER ? 'bg-emerald-900/20 border-emerald-500/30' : 'bg-industrial-800 border-industrial-700'}`}>
-                     <h3 className={`${formData.currentStage === WorkOrderStage.HANDOVER ? 'text-emerald-400' : 'text-industrial-400'} font-bold flex items-center gap-2`}>
+                  <div className={`p-4 border-b flex justify-between items-center ${isSection3Editable ? 'bg-emerald-900/20 border-emerald-500/30' : 'bg-industrial-800 border-industrial-700'}`}>
+                     <h3 className={`${isSection3Editable ? 'text-emerald-400' : 'text-industrial-400'} font-bold flex items-center gap-2`}>
                         3. Cierre y Entrega {!isSection3Editable && <Lock size={14} />}
                      </h3>
+                     {!isSection3Editable && hasRole([UserRole.ADMIN_SOLICITANTE]) && formData.currentStage === WorkOrderStage.CLOSED && (
+                        <button onClick={() => setEditingSection(3)} className="bg-emerald-900/50 hover:bg-emerald-800 text-emerald-400 px-4 py-2 rounded text-sm font-bold transition-colors border border-emerald-500/30">
+                           Editar
+                        </button>
+                     )}
+                     {editingSection === 3 && (
+                        <button onClick={() => { setEditingSection(null); handleInternalSave(formData, true); }} className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded text-sm font-bold transition-colors shadow-lg">
+                           Guardar
+                        </button>
+                     )}
                   </div>
 
-                  <div className={`p-6 ${formData.currentStage !== WorkOrderStage.HANDOVER ? 'opacity-50 pointer-events-none filter blur-[1px]' : ''}`}>
+                  <div className={`p-6`}>
                      <div className="mb-6">
                         <h4 className="text-sm font-bold text-white mb-4 uppercase">{t('mant02.checklist.title')}</h4>
                         <div className="space-y-1">
                            {['pointClean', 'areaClean', 'guardsComplete', 'toolsRemoved', 'safetyActivated'].map((key) => (
-                              <div key={key} className="flex justify-between py-2 border-b border-industrial-700/50">
+                              <div key={key} className="flex justify-between py-2 border-b border-industrial-700/50 items-center">
                                  <span className="text-sm text-industrial-300">{t(`mant02.check.${key === 'pointClean' ? '1' : '2'}`)} (Mock Label)</span>
                                  <div className="flex gap-4">
-                                    <label className="flex items-center gap-2"><input type="radio" disabled={!isSection3Editable} name={key} checked={formData.checklist?.[key as keyof typeof formData.checklist] === true} onChange={() => setFormData(p => ({ ...p, checklist: { ...p.checklist, [key]: true } }))} /> Si</label>
-                                    <label className="flex items-center gap-2"><input type="radio" disabled={!isSection3Editable} name={key} checked={formData.checklist?.[key as keyof typeof formData.checklist] === false} onChange={() => setFormData(p => ({ ...p, checklist: { ...p.checklist, [key]: false } }))} /> No</label>
+                                    <label className={`flex items-center gap-2 px-2 py-1 rounded ${!isSection3Editable && formData.checklist?.[key as keyof typeof formData.checklist] === true ? 'bg-emerald-900/50 border border-emerald-500/50' : ''}`}>
+                                       <input
+                                          type="radio"
+                                          disabled={!isSection3Editable}
+                                          name={key}
+                                          checked={formData.checklist?.[key as keyof typeof formData.checklist] === true}
+                                          onChange={() => setFormData(p => ({ ...p, checklist: { ...p.checklist, [key]: true } }))}
+                                          className={`${!isSection3Editable ? 'accent-emerald-500 opacity-100' : ''}`}
+                                       />
+                                       <span className={`${!isSection3Editable && formData.checklist?.[key as keyof typeof formData.checklist] === true ? 'text-emerald-400 font-bold' : ''}`}>Si</span>
+                                    </label>
+                                    <label className={`flex items-center gap-2 px-2 py-1 rounded ${!isSection3Editable && formData.checklist?.[key as keyof typeof formData.checklist] === false ? 'bg-red-900/50 border border-red-500/50' : ''}`}>
+                                       <input
+                                          type="radio"
+                                          disabled={!isSection3Editable}
+                                          name={key}
+                                          checked={formData.checklist?.[key as keyof typeof formData.checklist] === false}
+                                          onChange={() => setFormData(p => ({ ...p, checklist: { ...p.checklist, [key]: false } }))}
+                                          className={`${!isSection3Editable ? 'accent-red-500 opacity-100' : ''}`}
+                                       />
+                                       <span className={`${!isSection3Editable && formData.checklist?.[key as keyof typeof formData.checklist] === false ? 'text-red-400 font-bold' : ''}`}>No</span>
+                                    </label>
                                  </div>
                               </div>
                            ))}
@@ -662,10 +856,20 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                      <div className="grid grid-cols-2 gap-8 mt-8">
                         <div>
                            <label className="text-xs text-industrial-400 font-bold mb-2 block">Firma Supervisor (Conformidad)</label>
-                           <div className={`h-24 bg-white/5 rounded border-2 border-dashed ${isSection3Editable ? 'border-emerald-500/50 cursor-pointer hover:bg-white/10' : 'border-industrial-600'} flex items-center justify-center`}>
-                              <span className="text-xs text-industrial-500">
-                                 {formData.currentStage === WorkOrderStage.CLOSED ? 'Signed by ' + user?.full_name : 'Click to Sign'}
-                              </span>
+                           <div
+                              onClick={signSupervisor}
+                              className={`h-24 bg-white/5 rounded border-2 border-dashed ${isSection3Editable && !formData.signatureSupervisor ? 'border-emerald-500/50 cursor-pointer hover:bg-white/10' : 'border-industrial-600'} flex items-center justify-center flex-col gap-1 transition-colors`}
+                           >
+                              {formData.signatureSupervisor ? (
+                                 <>
+                                    <span className="text-emerald-400 font-script text-xl">{formData.signatureSupervisor}</span>
+                                    <span className="text-xs text-industrial-500">{new Date(formData.signatureSupervisorDate!).toLocaleDateString()}</span>
+                                 </>
+                              ) : (
+                                 <span className="text-xs text-industrial-500">
+                                    {isSection3Editable ? 'Click to Sign' : 'Pending Signature'}
+                                 </span>
+                              )}
                            </div>
                         </div>
                      </div>

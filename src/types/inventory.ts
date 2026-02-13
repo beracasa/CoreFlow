@@ -11,6 +11,7 @@ export interface SparePart {
     location: string;
     cost: number;
     photoUrl?: string;
+    createdAt?: string;
 }
 
 export type TransactionType = 'IN' | 'OUT' | 'ADJUSTMENT';
@@ -23,6 +24,7 @@ export interface InventoryTransaction {
     date: string;
     userId: string;
     relatedDocumentId?: string; // ID of the Request or Purchase Order
+    deliveredTo?: string; // ID or Name of the person who received the parts
 }
 
 export type RequestStatus = 'OPEN' | 'PARTIAL' | 'CLOSED' | 'PENDING_STOCK';
@@ -43,4 +45,14 @@ export interface PartsRequest {
     priority: RequestPriority;
     items: RequestItem[];
     createdDate: string;
+    deliveredTo?: string; // ID or Name of receiver
+    purchaseHistory?: PurchaseRequest[];
+}
+
+export interface PurchaseRequest {
+    id: string;
+    requestDate: string;
+    items: { partId: string; quantity: number }[];
+    requestedBy: string; // User ID
+    purchaseRequestNumber: string; // e.g. "SC-001"
 }

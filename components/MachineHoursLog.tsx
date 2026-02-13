@@ -13,6 +13,10 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
     const [currentReading, setCurrentReading] = useState<number>(0);
     const [displayReading, setDisplayReading] = useState<string>('');
 
+    // Searchable Dropdown State
+    const [searchTerm, setSearchTerm] = useState('');
+    const [showDropdown, setShowDropdown] = useState(false);
+
     // Mock history
     const [history, setHistory] = useState<MachineHourLog[]>([
         { id: '1', machineId: 'm1', date: '2023-10-20', hoursLogged: 12400, operator: 'John Doe' },
@@ -42,6 +46,8 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
         setHistory([newLog, ...history]);
         setCurrentReading(0);
         setDisplayReading('');
+        setSearchTerm('');
+        setSelectedMachineId('');
         alert("Hours logged successfully. Maintenance schedule updated.");
     };
 
@@ -86,14 +92,54 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
                     <form onSubmit={handleLog} className="space-y-4">
                         <div className="space-y-1">
                             <label className="text-xs text-industrial-400 font-bold uppercase">{t('form.machine')}</label>
-                            <select
-                                className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white"
-                                value={selectedMachineId}
-                                onChange={(e) => setSelectedMachineId(e.target.value)}
-                            >
-                                <option value="">-- Select --</option>
-                                {machines.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                            </select>
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    placeholder="Buscar por Nombre, Alias o Matrícula..."
+                                    className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white outline-none focus:border-emerald-500 transition-colors"
+                                    value={searchTerm}
+                                    onChange={e => {
+                                        setSearchTerm(e.target.value);
+                                        setSelectedMachineId('');
+                                        setShowDropdown(true);
+                                    }}
+                                    onFocus={() => setShowDropdown(true)}
+                                    // Delay blur to allow click on dropdown items
+                                    onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
+                                />
+                                {showDropdown && (
+                                    <div className="absolute z-10 w-full mt-1 bg-industrial-800 border border-industrial-600 rounded shadow-xl max-h-60 overflow-y-auto">
+                                        {machines.filter(m =>
+                                            m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                            (m.alias && m.alias.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                                            (m.plate && m.plate.toLowerCase().includes(searchTerm.toLowerCase()))
+                                        ).length > 0 ? (
+                                            machines.filter(m =>
+                                                m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                                (m.alias && m.alias.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                                                (m.plate && m.plate.toLowerCase().includes(searchTerm.toLowerCase()))
+                                            ).map(m => (
+                                                <div
+                                                    key={m.id}
+                                                    className="px-4 py-2 hover:bg-industrial-700 cursor-pointer text-white text-sm border-b border-industrial-700/50 last:border-0"
+                                                    onClick={() => {
+                                                        setSelectedMachineId(m.id);
+                                                        setSearchTerm(m.name + (m.plate ? ` (${m.plate})` : ''));
+                                                        setShowDropdown(false);
+                                                    }}
+                                                >
+                                                    <div className="font-bold text-emerald-400">{m.name}</div>
+                                                    <div className="text-xs text-industrial-400">
+                                                        {m.plate ? `Mat: ${m.plate}` : ''} {m.alias ? `• Alias: ${m.alias}` : ''}
+                                                    </div>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div className="px-4 py-2 text-industrial-400 text-sm">No se encontraron equipos</div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         {selectedMachine && (

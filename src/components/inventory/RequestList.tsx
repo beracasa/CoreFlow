@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { InventoryMockService } from '../../services/implementations/inventoryMock';
+import { inventoryService } from '../../services';
 import { PartsRequest } from '../../types/inventory';
 import { FileText, AlertCircle, CheckCircle, Clock, ChevronRight, Search, Download, Filter, Calendar } from 'lucide-react';
 import jsPDF from 'jspdf';
@@ -9,7 +9,7 @@ import { SparePart } from '../../types/inventory'; // Need this to lookup part n
 
 import { useMasterStore } from '../../stores/useMasterStore';
 
-const service = new InventoryMockService();
+// Service initialized in index.ts
 
 interface RequestListProps {
     onSelectRequest: (request: PartsRequest) => void;
@@ -33,8 +33,8 @@ export const RequestList: React.FC<RequestListProps> = ({ onSelectRequest }) => 
 
     useEffect(() => {
         Promise.all([
-            service.getAllRequests(),
-            service.getAllParts()
+            inventoryService.getAllRequests(),
+            inventoryService.getAllParts()
         ]).then(([reqs, partsData]) => {
             setRequests(reqs);
             setParts(partsData);
@@ -116,19 +116,26 @@ export const RequestList: React.FC<RequestListProps> = ({ onSelectRequest }) => 
                 const part = parts.find(p => p.id === item.partId);
                 const status = item.quantityDelivered >= item.quantityRequested ? 'Completado' :
                     item.quantityDelivered > 0 ? 'Parcial' : 'Pendiente';
+
+                // Get receiver name if available
+                const receiver = req.deliveredTo
+                    ? (useMasterStore.getState().technicians.find(t => t.id === req.deliveredTo)?.name || req.deliveredTo)
+                    : '-';
+
                 return [
                     part?.partNumber || 'N/A',
                     part?.name || item.partId,
                     item.usageLocation || '-',
                     item.quantityRequested,
                     item.quantityDelivered,
+                    receiver,
                     status
                 ];
             });
 
             autoTable(doc, {
                 startY: yPos,
-                head: [['Código', 'Repuesto', 'Lugar Uso', 'Solicitado', 'Entregado', 'Estado']],
+                head: [['Código', 'Repuesto', 'Lugar Uso', 'Solicitado', 'Entregado', 'Entregado a', 'Estado']],
                 body: tableBody,
                 theme: 'grid',
                 headStyles: { fillColor: [41, 128, 185], fontSize: 9 },

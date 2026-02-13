@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { InventoryMockService } from '../../services/implementations/inventoryMock';
+import { inventoryService } from '../../services';
 import { SparePart, RequestPriority } from '../../types/inventory';
 import { AlertTriangle, Plus, Trash2, Search, Edit, X, Save as SaveIcon } from 'lucide-react';
 
 import { PartsRequest, RequestItem } from '../../types/inventory';
 
-const service = new InventoryMockService();
+// Service initialized in index.ts
 
 interface PartRequestFormProps {
     initialData?: PartsRequest;
@@ -44,7 +44,7 @@ export const PartRequestForm: React.FC<PartRequestFormProps> = ({ initialData, o
     const [feedback, setFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
     useEffect(() => {
-        service.getAllParts().then(data => {
+        inventoryService.getAllParts().then(data => {
             setParts(data);
             // Update part names if editing
             if (initialData) {
@@ -133,7 +133,7 @@ export const PartRequestForm: React.FC<PartRequestFormProps> = ({ initialData, o
         try {
             if (initialData) {
                 // UPDATE logic
-                await service.updateRequest({
+                await inventoryService.updateRequest({
                     ...initialData,
                     technicianId,
                     priority,
@@ -148,7 +148,7 @@ export const PartRequestForm: React.FC<PartRequestFormProps> = ({ initialData, o
                 if (onSuccess) onSuccess();
             } else {
                 // CREATE logic
-                await service.createRequest({
+                await inventoryService.createRequest({
                     technicianId,
                     priority,
                     items: requestItems.map(i => ({

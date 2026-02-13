@@ -3,11 +3,13 @@ import { MaintenanceTask } from '../types';
 
 interface ProtocolViewerProps {
     tasks: MaintenanceTask[];
-    readOnly?: boolean;  // If false, could allow ticking checkboxes in execution mode? (Reserved for future)
+    readOnly?: boolean;
+    onToggle?: (taskId: string, action: string) => void;
     className?: string;
 }
 
-export const ProtocolViewer: React.FC<ProtocolViewerProps> = ({ tasks, className = '' }) => {
+export const ProtocolViewer: React.FC<ProtocolViewerProps> = ({ tasks, readOnly = false, onToggle, className = '' }) => {
+    console.log('DEBUG: ProtocolViewer Render', { readOnly, tasksCount: tasks.length, hasOnToggle: !!onToggle });
 
     // Helper to calculate rowspans for the 'Group' column
     const getRowSpan = (taskIndex: number) => {
@@ -28,12 +30,56 @@ export const ProtocolViewer: React.FC<ProtocolViewerProps> = ({ tasks, className
         return count;
     };
 
-    const renderFlag = (isActive: boolean) => {
-        return isActive ? (
-            <div className="w-full h-full flex items-center justify-center">
-                <div className="w-2.5 h-2.5 bg-black rounded-full print:bg-black"></div>
-            </div>
-        ) : null;
+    const renderFlag = (task: MaintenanceTask, actionKey: string) => {
+        // Defensive check for actionFlags
+        if (!task.actionFlags) return null;
+
+        const isRequired = task.actionFlags[actionKey as keyof typeof task.actionFlags];
+        const isChecked = task.checks?.[actionKey] || false;
+
+        if (!isRequired) return null;
+
+        if (readOnly) {
+            return isChecked ? (
+                <div className="w-full h-full flex items-center justify-center">
+                    <span className="text-black font-bold text-xs">X</span>
+                </div>
+            ) : <div className="w-full h-full flex items-center justify-center"><div className="w-1.5 h-1.5 bg-gray-300 rounded-full"></div></div>;
+        }
+
+        return (
+            <>
+                <button
+                    type="button"
+                    className={`w-full h-full flex items-center justify-center cursor-pointer transition-colors focus:outline-none relative z-10 ${isChecked ? 'bg-emerald-100/50 hover:bg-emerald-200/50' : 'hover:bg-gray-50'}`}
+                    onClick={(e) => {
+                        // e.stopPropagation(); // Try removing stopPropagation in case it interferes with some global handler, though unlikely.
+                        console.log('DEBUG: ProtocolViewer Button Clicked', { id: task.id, actionKey, readOnly });
+                        if (onToggle) onToggle(task.id, actionKey);
+                    }}
+                >
+                    {isChecked ? (
+                        <span className="text-emerald-700 font-bold text-lg leading-none transform scale-110 pointer-events-none">X</span>
+                    ) : (
+                        <div className="w-5 h-5 border-2 border-industrial-400 rounded-sm bg-white hover:border-emerald-500 transition-colors pointer-events-none"></div>
+                    )}
+                </button>
+                {/* Native Checkbox for Debugging */}
+                {
+                    !readOnly && (
+                        <input
+                            type="checkbox"
+                            className="absolute top-0 right-0 h-4 w-4 z-50 opacity-50 cursor-pointer"
+                            checked={isChecked}
+                            onChange={() => {
+                                console.log('DEBUG: Native Checkbox Changed');
+                                if (onToggle) onToggle(task.id, actionKey);
+                            }}
+                        />
+                    )
+                }
+            </>
+        );
     };
 
     return (
@@ -96,14 +142,19 @@ export const ProtocolViewer: React.FC<ProtocolViewerProps> = ({ tasks, className
                                 <td className="border border-black p-1 text-center text-[10px]">{task.lubricantCode}</td>
                                 <td className="border border-black p-1 text-center font-bold">{task.estimatedTime}</td>
 
-                                {/* Grid Checkboxes */}
-                                <td className="border border-black p-0">{renderFlag(task.actionFlags.clean)}</td>
-                                <td className="border border-black p-0">{renderFlag(task.actionFlags.inspect)}</td>
-                                <td className="border border-black p-0">{renderFlag(task.actionFlags.lubricate)}</td>
-                                <td className="border border-black p-0">{renderFlag(task.actionFlags.adjust)}</td>
-                                <td className="border border-black p-0">{renderFlag(task.actionFlags.refill)}</td>
-                                <td className="border border-black p-0">{renderFlag(task.actionFlags.replace)}</td>
-                                <td className="border border-black p-0">{renderFlag(task.actionFlags.mount)}</td>
+                                {/* Grid Checkboxes - Added explicit handlers on TDs for debugging */}
+                                <td
+                                    className="border border-black p-0 h-10 w-10 relative"
+                                    onClick={() => console.log('DEBUG: TD Clean Clicked')}
+                                >
+                                    {renderFlag(task, 'clean')}
+                                </td>
+                                <td className="border border-black p-0 h-10 w-10 relative">{renderFlag(task, 'inspect')}</td>
+                                <td className="border border-black p-0 h-10 w-10 relative">{renderFlag(task, 'lubricate')}</td>
+                                <td className="border border-black p-0 h-10 w-10 relative">{renderFlag(task, 'adjust')}</td>
+                                <td className="border border-black p-0 h-10 w-10 relative">{renderFlag(task, 'refill')}</td>
+                                <td className="border border-black p-0 h-10 w-10 relative">{renderFlag(task, 'replace')}</td>
+                                <td className="border border-black p-0 h-10 w-10 relative">{renderFlag(task, 'mount')}</td>
                             </tr>
                         );
                     })}
@@ -124,6 +175,6 @@ export const ProtocolViewer: React.FC<ProtocolViewerProps> = ({ tasks, className
                     text-orientation: mixed;
                 }
             `}</style>
-        </div>
+        </div >
     );
 };

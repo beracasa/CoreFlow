@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { InventoryMockService } from '../../services/implementations/inventoryMock';
-import { Package, PlusCircle, Save, Edit } from 'lucide-react';
+import { inventoryService } from '../../services';
+import { Package, PlusCircle, Save, Edit, Plus } from 'lucide-react';
 import { SparePart } from '../../types/inventory';
+import { useMasterStore } from '../../stores/useMasterStore';
 
-const service = new InventoryMockService();
+// Service initialized in index.ts
 
 interface PartCreationFormProps {
     initialData?: SparePart;
@@ -12,6 +13,7 @@ interface PartCreationFormProps {
 }
 
 export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData, onCancel, onSuccess }) => {
+    const { partCategories, partLocations, partUnits, addPartCategory, addPartLocation, addPartUnit } = useMasterStore();
     const [formData, setFormData] = useState({
         name: '',
         partNumber: '',
@@ -109,7 +111,7 @@ export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData,
         try {
             if (initialData) {
                 // Edit mode
-                await service.updatePart({
+                await inventoryService.updatePart({
                     ...initialData,
                     ...formData,
                     currentStock: formData.initialStock // Treat 'initialStock' input as current stock update if wished, or ignore. 
@@ -118,7 +120,7 @@ export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData,
                 });
                 setFeedback({ type: 'success', message: 'Repuesto actualizado exitosamente.' });
             } else {
-                await service.createPart(formData);
+                await inventoryService.createPart(formData);
                 setFeedback({ type: 'success', message: 'Repuesto creado exitosamente.' });
                 // Reset only if create
                 setFormData({
@@ -198,7 +200,7 @@ export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData,
                     </div>
 
                     {/* Category */}
-                    <div>
+                    <div className="relative">
                         <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">Categoría</label>
                         <select
                             name="category"
@@ -208,26 +210,26 @@ export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData,
                             onChange={handleChange}
                         >
                             <option value="">Seleccionar...</option>
-                            <option value="Bearings">Rodamientos</option>
-                            <option value="Hydraulics">Hidráulica</option>
-                            <option value="Electronics">Electrónica</option>
-                            <option value="Pneumatics">Neumática</option>
-                            <option value="Consumables">Consumibles</option>
-                            <option value="Mechanical">Mecánica</option>
+                            {partCategories.map(cat => (
+                                <option key={cat} value={cat}>{cat}</option>
+                            ))}
                         </select>
                     </div>
 
                     {/* Location */}
                     <div>
                         <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">Ubicación</label>
-                        <input
-                            type="text"
+                        <select
                             name="location"
-                            className="w-full bg-industrial-900 border border-industrial-600 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-blue-500 transition-colors placeholder-industrial-600"
-                            placeholder="Ej. Estante A-01"
+                            className="w-full bg-industrial-900 border border-industrial-600 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-blue-500 transition-colors appearance-none cursor-pointer"
                             value={formData.location}
                             onChange={handleChange}
-                        />
+                        >
+                            <option value="">Seleccionar...</option>
+                            {partLocations.map(loc => (
+                                <option key={loc} value={loc}>{loc}</option>
+                            ))}
+                        </select>
                     </div>
 
                     {/* Min Stock */}
@@ -281,11 +283,9 @@ export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData,
                             value={formData.unitOfMeasure}
                             onChange={handleChange}
                         >
-                            <option value="PCS">Piezas (UN)</option>
-                            <option value="M">Metros (M)</option>
-                            <option value="KG">Kilogramos (KG)</option>
-                            <option value="L">Litros (L)</option>
-                            <option value="SET">Juego (SET)</option>
+                            {partUnits.map(unit => (
+                                <option key={unit} value={unit}>{unit}</option>
+                            ))}
                         </select>
                     </div>
                     {/* Cost */}
