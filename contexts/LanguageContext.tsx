@@ -345,10 +345,10 @@ const translations: Translations = {
     'kanban.mttr': 'MTTR (Tiempo Medio Reparación)',
     'kanban.mtbf': 'MTBF (Tiempo Medio Entre Fallas)',
     'kanban.active': 'Preventivos Activos',
-    'kanban.col.backlog': 'Backlog / Pendientes',
-    'kanban.col.progress': 'En Progreso',
-    'kanban.col.review': 'Calidad / Revisión',
-    'kanban.col.done': 'Cerrado (R-INOC-07)',
+    'kanban.col.backlog': 'Solicitados',
+    'kanban.col.progress': 'En Ejecución',
+    'kanban.col.review': 'Calidad / Supervisión',
+    'kanban.col.done': 'Cerrados',
 
     // Analytics
     'analytics.title': 'Inteligencia de Negocios (BI)',
