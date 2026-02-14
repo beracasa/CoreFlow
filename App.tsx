@@ -293,13 +293,20 @@ const RequireAuth = ({ children }: { children: JSX.Element }) => {
 
 // --- INITIALIZER ---
 const AppInitializer = () => {
-  // Only fetch once
   const { fetchOrders, workOrders } = useWorkOrderStore();
+  const { fetchMasterData, machines } = useMasterStore();
+
   React.useEffect(() => {
     if (workOrders.length === 0) {
       fetchOrders();
     }
   }, [fetchOrders, workOrders.length]);
+
+  React.useEffect(() => {
+    if (machines.length === 0) {
+        fetchMasterData();
+    }
+  }, [fetchMasterData, machines.length]);
 
   return null;
 }

@@ -9,113 +9,9 @@ import { Machine, Technician, SparePart, MachineStatus, PlanTier, ZoneStructure 
 
 // Let's target the imports first.
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import { Machine, Technician, SparePart, MachineStatus, PlanTier, ZoneStructure, MaintenancePlan, MaintenanceTask } from '../../types';
-
-// Mock Data for Maintenance Protocols (Initial)
-const INITIAL_MAINTENANCE_PLANS: MaintenancePlan[] = [
-    {
-        machineId: 'm1', // SACMI Press
-        intervals: [
-            {
-                id: 'i-360', hours: 360, label: '360 Hours', tasks: [
-                    {
-                        id: 't1', sequence: 1, group: 'Extrusor', component: 'Boquilla extrusor', activity: 'Limpieza',
-                        referenceCode: '8.1.2.2.3.7', estimatedTime: 10,
-                        actionFlags: { clean: true, inspect: false, lubricate: false, adjust: false, refill: false, replace: false, mount: false }
-                    },
-                    {
-                        id: 't2', sequence: 2, group: 'Extrusor', component: 'Tornillo de encastre', activity: 'Limpieza',
-                        referenceCode: '8.1.2.2.3.7', estimatedTime: 10,
-                        actionFlags: { clean: true, inspect: false, lubricate: false, adjust: false, refill: false, replace: false, mount: false }
-                    }
-                ]
-            }
-        ]
-    }
-];
-
-// Mock Data
-const INITIAL_MACHINES: Machine[] = [
-    {
-        id: 'm1',
-        name: 'SACMI Press 01',
-        plate: '10022775',
-        type: 'SACMI',
-        status: MachineStatus.RUNNING,
-        location: { x: 20, y: 30 },
-        zone: 'Zone A - Production Line 1',
-        isIot: true,
-        runningHours: 12450,
-        lastMaintenance: '2023-10-01',
-        nextMaintenance: '2023-11-01',
-        intervals: ['360 Hours', '1080 Hours', '2160 Hours', '4320 Hours'],
-        telemetry: { timestamp: new Date().toISOString(), temperature: 65, vibration: 1.2, pressure: 5.5, powerConsumption: 45 },
-        history: Array(5).fill({ timestamp: new Date().toISOString(), temperature: 65, vibration: 1.2, pressure: 5.5, powerConsumption: 45 }),
-        branch: 'Planta Principal',
-        category: 'Producción',
-        brand: 'SACMI',
-        model: 'PH-3000'
-    },
-    {
-        id: 'm2',
-        name: 'MOSS Printer 03',
-        plate: '10321238',
-        type: 'MOSS',
-        status: MachineStatus.WARNING,
-        location: { x: 50, y: 60 },
-        zone: 'Zone B - Assembly',
-        isIot: true,
-        runningHours: 8500,
-        lastMaintenance: '2023-09-15',
-        nextMaintenance: '2023-10-25',
-        intervals: ['150 Hours', '300 Hours', '600 Hours'],
-        telemetry: { timestamp: new Date().toISOString(), temperature: 82, vibration: 4.5, pressure: 2.1, powerConsumption: 12 },
-        history: Array(5).fill({ timestamp: new Date().toISOString(), temperature: 82, vibration: 4.5, pressure: 2.1, powerConsumption: 12 }),
-        branch: 'Planta Principal',
-        category: 'Producción',
-        brand: 'MOSS',
-        model: 'MO-2023'
-    },
-    {
-        id: 'm3',
-        name: 'PMV Lining 02',
-        plate: '10259010',
-        type: 'PMV',
-        status: MachineStatus.RUNNING,
-        location: { x: 75, y: 25 },
-        zone: 'Zone B - Assembly',
-        isIot: true,
-        runningHours: 3200,
-        lastMaintenance: '2023-10-10',
-        nextMaintenance: '2023-12-10',
-        intervals: ['500 Hours', '1000 Hours'],
-        telemetry: { timestamp: new Date().toISOString(), temperature: 45, vibration: 0.5, pressure: 6.0, powerConsumption: 22 },
-        history: Array(5).fill({ timestamp: new Date().toISOString(), temperature: 45, vibration: 0.5, pressure: 6.0, powerConsumption: 22 }),
-        branch: 'Planta Principal',
-        category: 'Producción',
-        brand: 'PMV',
-        model: 'Liner-X'
-    },
-];
-
-const INITIAL_PARTS: SparePart[] = [
-    { id: 'sp1', sku: 'BRG-6205', name: 'Ball Bearing 6205', currentStock: 4, minimumStock: 5, unitCost: 12.50, supplier: 'SKF', leadTimeDays: 3 },
-    { id: 'sp2', sku: 'PLC-CPU', name: 'Siemens S7 CPU', currentStock: 2, minimumStock: 1, unitCost: 850.00, supplier: 'Siemens', leadTimeDays: 14 },
-    { id: 'sp3', sku: 'OIL-SYN-50', name: 'Synthetic Oil 50L', currentStock: 12, minimumStock: 2, unitCost: 120.00, supplier: 'Mobil', leadTimeDays: 2 },
-];
-
-const INITIAL_ZONES: ZoneStructure[] = [
-    { id: '1', name: 'Zone A', lines: ['Production Line 1'], x: 5, y: 15, width: 20, height: 30 },
-    { id: '2', name: 'Zone B', lines: ['Assembly'], x: 27, y: 15, width: 20, height: 30 }
-];
-
-const INITIAL_TECHNICIANS: Technician[] = [
-    { id: 'T-042', name: 'Jorge Perez', role: 'SUPERVISOR', shift: 'MORNING', status: 'ACTIVE', email: 'jorge.perez@coreflow.io' },
-    { id: 'T-089', name: 'Sarah Connor', role: 'MECHANICAL', shift: 'NIGHT', status: 'ACTIVE', email: 'sarah.c@coreflow.io' },
-    { id: 'T-112', name: 'Mike Ross', role: 'ELECTRICAL', shift: 'AFTERNOON', status: 'LEAVE', email: 'mike.r@coreflow.io' },
-    { id: 'T-155', name: 'Luis Diaz', role: 'MECHANICAL', shift: 'MORNING', status: 'ACTIVE', email: 'luis.d@coreflow.io' },
-];
+import { Machine, Technician, SparePart, ZoneStructure, MaintenancePlan, PlanTier } from '../../types';
+import { MasterDataService } from '../services/masterDataService';
+import { inventoryService } from '../services'; // For parts
 
 interface PlantSettings {
     plantName: string;
@@ -132,30 +28,38 @@ interface MasterState {
     zones: ZoneStructure[];
     plantSettings: PlantSettings;
     currentPlan: PlanTier;
-    maintenancePlans: MaintenancePlan[]; // Added
+    maintenancePlans: MaintenancePlan[];
+
+    // Loading & Error
+    isLoading: boolean;
+    error: string | null;
 
     // Configuration Lists
     branches: string[];
     categories: string[];
     assetTypes: string[];
     maintenanceSchedules: string[];
+    
+    // Spare Parts Configuration
+    partCategories: string[];
+    partLocations: string[];
+    partUnits: string[];
 
     // Actions
-    updateMachine: (updatedMachine: Machine) => void;
-    addMachine: (machine: Machine) => void;
+    fetchMasterData: () => Promise<void>;
+    
+    updateMachine: (updatedMachine: Machine) => Promise<void>;
+    addMachine: (machine: Machine) => Promise<void>;
+    addTechnician: (tech: Technician) => Promise<void>;
+    addPart: (part: SparePart) => Promise<void>;
+    
+    addZone: (zone: ZoneStructure) => Promise<void>;
+    updateZone: (zone: ZoneStructure) => Promise<void>;
+    removeZone: (id: string) => Promise<void>;
 
-    addTechnician: (tech: Technician) => void;
-    addPart: (part: SparePart) => void;
-
-    addZone: (zone: ZoneStructure) => void;
-    updateZone: (zone: ZoneStructure) => void;
-    removeZone: (id: string) => void;
-
-    // Protocol Actions
-    addMaintenancePlan: (plan: MaintenancePlan) => void;
-    updateMaintenancePlan: (plan: MaintenancePlan) => void;
-
-    // List Actions
+    // Config Actions (Keep local for now or TODO: move to DB)
+    updateSettings: (settings: PlantSettings) => void;
+    
     addBranch: (branch: string) => void;
     removeBranch: (branch: string) => void;
     updateBranch: (oldVal: string, newVal: string) => void;
@@ -168,126 +72,179 @@ interface MasterState {
     removeAssetType: (type: string) => void;
     updateAssetType: (oldVal: string, newVal: string) => void;
 
-    addMaintenanceSchedule: (schedule: string) => void;
-    removeMaintenanceSchedule: (schedule: string) => void;
-
-    updateSettings: (settings: PlantSettings) => void;
-
-    // Spare Parts Configuration
-    partCategories: string[];
-    partLocations: string[];
-    partUnits: string[];
-
+    // Spare Parts Config Actions
     addPartCategory: (category: string) => void;
     removePartCategory: (category: string) => void;
-    updatePartCategory: (oldCat: string, newCat: string) => void;
+    updatePartCategory: (oldVal: string, newVal: string) => void;
 
     addPartLocation: (location: string) => void;
     removePartLocation: (location: string) => void;
-    updatePartLocation: (oldLoc: string, newLoc: string) => void;
+    updatePartLocation: (oldVal: string, newVal: string) => void;
 
     addPartUnit: (unit: string) => void;
     removePartUnit: (unit: string) => void;
-    updatePartUnit: (oldUnit: string, newUnit: string) => void;
+    updatePartUnit: (oldVal: string, newVal: string) => void;
 }
 
-export const useMasterStore = create<MasterState>()(
-    persist(
-        (set) => ({
-            machines: INITIAL_MACHINES,
-            technicians: INITIAL_TECHNICIANS,
-            parts: INITIAL_PARTS,
-            zones: INITIAL_ZONES,
-            plantSettings: {
-                plantName: 'Sede Principal - Rep. Dom.',
-                rnc: '131-23456-9',
-                timezone: 'AST',
-                currency: 'DOP',
-                logoUrl: ''
-            },
-            currentPlan: PlanTier.BUSINESS,
-            maintenancePlans: INITIAL_MAINTENANCE_PLANS,
+export const useMasterStore = create<MasterState>((set, get) => ({
+    machines: [],
+    technicians: [],
+    parts: [],
+    zones: [],
+    
+    // Default Settings
+    plantSettings: {
+        plantName: 'Sede Principal - Rep. Dom.',
+        rnc: '131-23456-9',
+        timezone: 'AST',
+        currency: 'DOP',
+        logoUrl: ''
+    },
+    currentPlan: PlanTier.BUSINESS,
+    maintenancePlans: [], // TODO: Migrate to DB
 
-            // Shared Configuration Lists
-            branches: ['Planta Principal', 'Planta Secundaria'],
-            categories: ['Producción', 'Empaque', 'Servicios'],
-            assetTypes: ['GENERIC', 'CONVEYOR', 'MIXER', 'OVEN', 'SENSOR'],
-            maintenanceSchedules: ['250 Horas', '500 Horas', '1000 Horas'],
+    isLoading: false,
+    error: null,
 
-            updateMachine: (updatedMachine) => set((state) => ({
-                machines: state.machines.map(m => m.id === updatedMachine.id ? updatedMachine : m)
-            })),
+    // Shared Configuration Lists (Defaults)
+    branches: ['Planta Principal', 'Planta Secundaria'],
+    categories: ['Producción', 'Empaque', 'Servicios'],
+    assetTypes: ['GENERIC', 'CONVEYOR', 'MIXER', 'OVEN', 'SENSOR'],
+    maintenanceSchedules: ['250 Horas', '500 Horas', '1000 Horas'],
+    partCategories: ['Rodamientos', 'Hidráulica', 'Electrónica', 'Neumática', 'Consumibles', 'Mecánica'],
+    partLocations: ['Estante A', 'Estante B', 'Estante C', 'Almacén Central'],
+    partUnits: ['PCS', 'M', 'KG', 'L', 'SET'],
 
-            addMachine: (machine) => set((state) => ({
-                machines: [machine, ...state.machines]
-            })),
-
-            addTechnician: (tech) => set((state) => ({
-                technicians: [...state.technicians, tech]
-            })),
-
-            addPart: (part) => set((state) => ({
-                parts: [...state.parts, part]
-            })),
-
-            addZone: (zone) => set((state) => ({
-                zones: [...state.zones, zone]
-            })),
-
-            updateZone: (updatedZone) => set((state) => ({
-                zones: state.zones.map(z => z.id === updatedZone.id ? updatedZone : z)
-            })),
-
-            removeZone: (id) => set((state) => ({
-                zones: state.zones.filter(z => z.id !== id)
-            })),
-
-            addMaintenancePlan: (plan) => set((state) => ({
-                maintenancePlans: [...state.maintenancePlans, plan]
-            })),
-
-            updateMaintenancePlan: (updatedPlan) => set((state) => ({
-                maintenancePlans: state.maintenancePlans.map(p => p.machineId === updatedPlan.machineId ? updatedPlan : p)
-            })),
-
-            // List Management Actions
-            addBranch: (branch) => set((state) => ({ branches: [...state.branches, branch] })),
-            removeBranch: (branch) => set((state) => ({ branches: state.branches.filter(b => b !== branch) })),
-            updateBranch: (oldVal, newVal) => set((state) => ({ branches: state.branches.map(b => b === oldVal ? newVal : b) })),
-
-            addCategory: (category) => set((state) => ({ categories: [...state.categories, category] })),
-            removeCategory: (category) => set((state) => ({ categories: state.categories.filter(c => c !== category) })),
-            updateCategory: (oldVal, newVal) => set((state) => ({ categories: state.categories.map(c => c === oldVal ? newVal : c) })),
-
-            addAssetType: (type) => set((state) => ({ assetTypes: [...state.assetTypes, type] })),
-            removeAssetType: (type) => set((state) => ({ assetTypes: state.assetTypes.filter(t => t !== type) })),
-            updateAssetType: (oldVal, newVal) => set((state) => ({ assetTypes: state.assetTypes.map(t => t === oldVal ? newVal : t) })),
-
-            addMaintenanceSchedule: (schedule) => set((state) => ({ maintenanceSchedules: [...state.maintenanceSchedules, schedule] })),
-            removeMaintenanceSchedule: (schedule) => set((state) => ({ maintenanceSchedules: state.maintenanceSchedules.filter(s => s !== schedule) })),
-
-            updateSettings: (settings) => set({ plantSettings: settings }),
-
-            // Spare Parts Configuration
-            partCategories: ['Rodamientos', 'Hidráulica', 'Electrónica', 'Neumática', 'Consumibles', 'Mecánica'],
-            partLocations: ['Estante A', 'Estante B', 'Estante C', 'Almacén Central'],
-            partUnits: ['PCS', 'M', 'KG', 'L', 'SET'],
-
-            addPartCategory: (category) => set((state) => ({ partCategories: [...state.partCategories, category] })),
-            removePartCategory: (category) => set((state) => ({ partCategories: state.partCategories.filter(c => c !== category) })),
-            updatePartCategory: (oldCat, newCat) => set((state) => ({ partCategories: state.partCategories.map(c => c === oldCat ? newCat : c) })),
-
-            addPartLocation: (location) => set((state) => ({ partLocations: [...state.partLocations, location] })),
-            removePartLocation: (location) => set((state) => ({ partLocations: state.partLocations.filter(l => l !== location) })),
-            updatePartLocation: (oldLoc, newLoc) => set((state) => ({ partLocations: state.partLocations.map(l => l === oldLoc ? newLoc : l) })),
-
-            addPartUnit: (unit) => set((state) => ({ partUnits: [...state.partUnits, unit] })),
-            removePartUnit: (unit) => set((state) => ({ partUnits: state.partUnits.filter(u => u !== unit) })),
-            updatePartUnit: (oldUnit, newUnit) => set((state) => ({ partUnits: state.partUnits.map(u => u === oldUnit ? newUnit : u) })),
-        }),
-        {
-            name: 'coreflow-master-storage', // unique name
-            storage: createJSONStorage(() => localStorage),
+    fetchMasterData: async () => {
+        set({ isLoading: true, error: null });
+        try {
+            const [machines, technicians, zones, parts] = await Promise.all([
+                MasterDataService.getMachines(),
+                MasterDataService.getTechnicians(),
+                MasterDataService.getZones(),
+                inventoryService.getAllParts()
+            ]);
+            
+            set({
+                machines,
+                technicians,
+                zones,
+                parts,
+                isLoading: false
+            });
+        } catch (error: any) {
+            console.error('Failed to fetch master data:', error);
+            set({ error: error.message, isLoading: false });
         }
-    )
-);
+    },
+
+    updateMachine: async (updatedMachine) => {
+        try {
+            await MasterDataService.updateMachine(updatedMachine);
+            set((state) => ({
+                machines: state.machines.map(m => m.id === updatedMachine.id ? updatedMachine : m)
+            }));
+        } catch (error: any) {
+            set({ error: error.message });
+        }
+    },
+
+    addMachine: async (machine) => {
+        try {
+            const newMachine = await MasterDataService.createMachine(machine);
+            set((state) => ({
+                machines: [newMachine, ...state.machines]
+            }));
+        } catch (error: any) {
+             set({ error: error.message });
+        }
+    },
+
+    addTechnician: async (tech) => {
+        try {
+            const newTech = await MasterDataService.createTechnician(tech);
+             set((state) => ({
+                technicians: [...state.technicians, newTech]
+            }));
+        } catch (error: any) {
+             set({ error: error.message });
+        }
+    },
+
+    addPart: async (part) => {
+        try {
+            const newPart = await inventoryService.createPart(part);
+            set((state) => ({
+                parts: [...state.parts, newPart]
+            }));
+        } catch (error: any) {
+             set({ error: error.message });
+        }
+    },
+
+    addZone: async (zone) => {
+        try {
+            const newZone = (await MasterDataService.createZone(zone)) as any; // Cast if array returned
+            set((state) => ({
+                zones: [...state.zones, newZone] // Ensure implementation returns single or array
+            }));
+        } catch (error: any) {
+             set({ error: error.message });
+        }
+    },
+
+    updateZone: async (updatedZone) => {
+        try {
+            await MasterDataService.updateZone(updatedZone);
+            set((state) => ({
+                zones: state.zones.map(z => z.id === updatedZone.id ? updatedZone : z)
+            }));
+        } catch (error: any) {
+             set({ error: error.message });
+        }
+    },
+
+    removeZone: async (id) => {
+        try {
+            await MasterDataService.removeZone(id);
+             set((state) => ({
+                zones: state.zones.filter(z => z.id !== id)
+            }));
+        } catch (error: any) {
+             set({ error: error.message });
+        }
+    },
+
+    // Sync Actions (Config)
+    updateSettings: (settings) => set({ plantSettings: settings }),
+
+    // Branches
+    addBranch: (branch) => set((state) => ({ branches: [...state.branches, branch] })),
+    removeBranch: (branch) => set((state) => ({ branches: state.branches.filter(b => b !== branch) })),
+    updateBranch: (oldVal, newVal) => set((state) => ({ branches: state.branches.map(b => b === oldVal ? newVal : b) })),
+
+    // Categories
+    addCategory: (category) => set((state) => ({ categories: [...state.categories, category] })),
+    removeCategory: (category) => set((state) => ({ categories: state.categories.filter(c => c !== category) })),
+    updateCategory: (oldVal, newVal) => set((state) => ({ categories: state.categories.map(c => c === oldVal ? newVal : c) })),
+
+    // Asset Types
+    addAssetType: (type) => set((state) => ({ assetTypes: [...state.assetTypes, type] })),
+    removeAssetType: (type) => set((state) => ({ assetTypes: state.assetTypes.filter(t => t !== type) })),
+    updateAssetType: (oldVal, newVal) => set((state) => ({ assetTypes: state.assetTypes.map(t => t === oldVal ? newVal : t) })),
+
+    // Part Categories
+    addPartCategory: (category) => set((state) => ({ partCategories: [...state.partCategories, category] })),
+    removePartCategory: (category) => set((state) => ({ partCategories: state.partCategories.filter(c => c !== category) })),
+    updatePartCategory: (oldVal, newVal) => set((state) => ({ partCategories: state.partCategories.map(c => c === oldVal ? newVal : c) })),
+
+    // Part Locations
+    addPartLocation: (location) => set((state) => ({ partLocations: [...state.partLocations, location] })),
+    removePartLocation: (location) => set((state) => ({ partLocations: state.partLocations.filter(l => l !== location) })),
+    updatePartLocation: (oldVal, newVal) => set((state) => ({ partLocations: state.partLocations.map(l => l === oldVal ? newVal : l) })),
+
+    // Part Units
+    addPartUnit: (unit) => set((state) => ({ partUnits: [...state.partUnits, unit] })),
+    removePartUnit: (unit) => set((state) => ({ partUnits: state.partUnits.filter(u => u !== unit) })),
+    updatePartUnit: (oldVal, newVal) => set((state) => ({ partUnits: state.partUnits.map(u => u === oldVal ? newVal : u) })),
+}));

@@ -1,43 +1,13 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { UserProfile, UserRole } from '../types';
-
-// Mock Users for Simulation
-const MOCK_USERS: Record<string, UserProfile> = {
-  'admin@coreflow.io': {
-    id: 'u-admin-01',
-    email: 'admin@coreflow.io',
-    full_name: 'Carlos Rivera',
-    job_title: 'Plant Manager',
-    role: UserRole.ADMIN_SOLICITANTE,
-    tenant_id: 'tenant-mx-01',
-    status: 'ACTIVE'
-  },
-  'tech@coreflow.io': {
-    id: 'u-tech-01',
-    email: 'tech@coreflow.io',
-    full_name: 'Sarah Connor',
-    job_title: 'Senior Mechanic',
-    role: UserRole.TECNICO_MANT,
-    tenant_id: 'tenant-mx-01',
-    status: 'ACTIVE'
-  },
-  'auditor@coreflow.io': {
-    id: 'u-audit-01',
-    email: 'auditor@coreflow.io',
-    full_name: 'Mike Ross',
-    job_title: 'Safety Inspector',
-    role: UserRole.AUDITOR,
-    tenant_id: 'tenant-mx-01',
-    status: 'ACTIVE'
-  }
-};
+import { supabase } from '../src/services/supabaseClient';
 
 interface AuthContextType {
   user: UserProfile | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   hasRole: (allowedRoles: UserRole[]) => boolean;
 }
 
@@ -47,42 +17,76 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Simulate Session Check on Mount
+  // Map Supabase User to UserProfile
+  const mapSupabaseUser = (sbUser: any): UserProfile | null => {
+    if (!sbUser) return null;
+    
+    // In a real app, user meta would come from a 'profiles' table or user_metadata
+    // For now, we fallback to defaults if metadata is missing/incomplete
+    const metadata = sbUser.user_metadata || {};
+    
+    return {
+        id: sbUser.id,
+        email: sbUser.email || '',
+        full_name: metadata.full_name || 'Agente Supabase',
+        role: metadata.role || UserRole.ADMIN_SOLICITANTE, // Default until roles logic is hardened
+        tenant_id: metadata.tenant_id || 'default-tenant',
+        status: 'ACTIVE',
+        job_title: metadata.job_title || 'Operator'
+    };
+  };
+
   useEffect(() => {
-    const storedUser = localStorage.getItem('coreflow_session');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-    setIsLoading(false);
+    // 1. Check active session
+    const checkSession = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+            setUser(mapSupabaseUser(session.user));
+        }
+        setIsLoading(false);
+    };
+    
+    checkSession();
+
+    // 2. Listen for changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        if (session?.user) {
+            setUser(mapSupabaseUser(session.user));
+        } else {
+            setUser(null);
+        }
+        setIsLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
-    // Simulate Network Delay
-    await new Promise(resolve => setTimeout(resolve, 800));
+    const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+    });
 
-    // Simple Mock Authentication Logic
-    // In production, this would call supabase.auth.signInWithPassword()
-    const mockUser = MOCK_USERS[email];
-    
-    if (mockUser && password.length > 3) {
-      setUser(mockUser);
-      localStorage.setItem('coreflow_session', JSON.stringify(mockUser));
-      setIsLoading(false);
-    } else {
-      setIsLoading(false);
-      throw new Error('Invalid credentials');
+    if (error) {
+        setIsLoading(false);
+        throw error;
     }
+    // onAuthStateChange will handle setting user
   };
 
-  const logout = () => {
+  const logout = async () => {
+    setIsLoading(true);
+    await supabase.auth.signOut();
     setUser(null);
-    localStorage.removeItem('coreflow_session');
+    setIsLoading(false);
   };
 
   const hasRole = (allowedRoles: UserRole[]) => {
     if (!user) return false;
-    return allowedRoles.includes(user.role);
+    // Simple logic: if user role is in allowed list. 
+    // Types might need casting if role comes as string from DB
+    return allowedRoles.includes(user.role as UserRole);
   };
 
   return (

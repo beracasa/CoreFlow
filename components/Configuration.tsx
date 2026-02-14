@@ -569,27 +569,7 @@ export const Configuration: React.FC<ConfigurationProps> = ({
             <button className="px-4 py-2 bg-industrial-accent hover:bg-blue-600 text-white text-sm rounded font-medium shadow-lg shadow-blue-900/20 transition-colors">
               {t('config.save')}
             </button>
-            <button
-              onClick={() => {
-                if (confirm('Esto actualizará el Branch y Category de todos los equipos al primer valor disponible en la configuración. ¿Continuar?')) {
-                  const firstBranch = branches[0] || 'Planta Principal';
-                  const firstCategory = categories[0] || 'Producción';
-                  machines.forEach(m => {
-                    if (!branches.includes(m.branch || '') || !categories.includes(m.category || '')) {
-                      updateMachine({
-                        ...m,
-                        branch: branches.includes(m.branch || '') ? m.branch : firstBranch,
-                        category: categories.includes(m.category || '') ? m.category : firstCategory
-                      });
-                    }
-                  });
-                  alert('Datos actualizados correctamente.');
-                }
-              }}
-              className="px-4 py-2 bg-yellow-600 hover:bg-yellow-500 text-white text-sm rounded font-medium shadow-lg transition-colors flex items-center gap-2"
-            >
-              <Shield size={14} /> Reparar Datos
-            </button>
+
           </div>
         </div>
 

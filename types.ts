@@ -224,11 +224,29 @@ export interface WorkOrder {
   receivedBy?: string;
 
   // R-MANT-05 Specifics
-  department?: string;
-  failureType?: string; // Mecánica, Eléctrica...
-  frequency?: string; // Primera vez, Recurrente...
-  consequence?: string; // Parada, Bajo Rendimiento...
-  actionTaken?: string;
+  department?: 'Mantenimiento' | 'Almacén' | 'Calidad' | 'Producción' | 'Servicios Generales' | 'Administración';
+  equipmentType?: 'Mantenimiento Maquinaria' | 'Mantenimiento Elemento Auxiliar';
+  failureType?: 'Mecánica' | 'Eléctrica' | 'Electrónica' | 'Plomería'; 
+  condition?: 'Crítica' | 'Media' | 'Normal';
+  frequency?: 'Primera vez' | 'Ocasional' | 'Frecuente' | 'Muy frecuente';
+  consequence?: 'Ninguna' | 'Bajo Rendimiento' | 'Parada';
+  actionTaken?: string; // Containment Action
+  requestDescription?: string; // Detalles Solicitud - Avería
+
+  requestReceivedBy?: string;
+  requestReceivedDate?: string;
+  
+  // New Dynamic Table for R-MANT-05
+  failuresAndActivities?: {
+    cause: string;
+    activity: string;
+  }[];
+
+  // R-MANT-05 Section 3 Supervision
+  closingImage?: string; // Image URL/Path
+  closingFile?: string; // File URL/Path
+  supervisorId?: string; // User ID of the supervisor accepting the work
+  closingDate?: string; // Date/Time when the work was accepted/closed
 
   // Signatures
   signatureExecutor?: string; // Name of executor
