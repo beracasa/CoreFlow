@@ -233,7 +233,7 @@ const translations: Translations = {
     'sidebar.hours': 'Registro de Horas',
     'sidebar.biAnalytics': 'BI y Analítica',
     'sidebar.kardex': 'Kardex 4.0',
-    'sidebar.masterData': 'Datos Maestros',
+    'sidebar.masterData': 'Configuración',
     'sidebar.role': 'AdminSis',
     'sidebar.plan': 'Plan Empresarial',
 
@@ -378,13 +378,17 @@ const translations: Translations = {
     'map.layer.efficiency.desc': 'Mapa de calor de productividad basado en consumo y salida.',
 
     // Configuration Module
-    'config.title': 'Núcleo de Datos Maestros',
+    'config.title': 'Configuración',
     'config.subtitle': 'Configuración del Sistema y Gestión de Recursos',
     'config.export': 'Exportar Config',
     'config.save': 'Guardar Cambios',
     'config.tab.assets': 'Equipos (Registro de Activos)',
     'config.tab.workforce': 'Fuerza Laboral (RH)',
-    'config.tab.settings': 'Configuración de Planta',
+    'config.tab.settings': 'Datos Generales',
+    'config.tab.roles': 'Roles y Permisos',
+    'config.tab.zones': 'Zonas y Líneas',
+    'config.tab.equipment': 'Equipos',
+    'config.tab.inventory': 'Repuestos',
 
     // Config - Assets
     'assets.title': 'Equipos',
@@ -412,7 +416,7 @@ const translations: Translations = {
     'assets.docs': 'Documentos',
 
     // Config - Workforce
-    'workforce.title': 'Técnicos y Operarios',
+    'workforce.title': 'Usuarios',
     'workforce.add': '+ Agregar Personal',
     'workforce.role': 'Rol',
     'workforce.shift': 'Turno',

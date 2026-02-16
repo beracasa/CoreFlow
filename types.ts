@@ -29,12 +29,24 @@ export interface Permission {
 }
 
 export interface RoleDefinition {
-  id: string; // e.g. 'custom-supervisor'
+  id: string; // e.g. 'custom-supervisor' or UUID
   name: string; // e.g. 'Line Supervisor'
   description: string;
-  isSystem: boolean; // If true, cannot be deleted (only edited)
-  permissions: string[]; // Array of Permission IDs
-  usersCount?: number;
+  
+  // Jerarquía
+  parentRoleId?: string | null; // ID del rol superior (Reporta a)
+  children?: RoleDefinition[]; // Roles hijos (calculado en frontend para tree view)
+  level?: number; // Nivel en la jerarquía (0 = raíz, calculado en frontend)
+  
+  // Permisos
+  permissions: string[] | Record<string, boolean>; // Soportar ambos formatos
+  
+  // Configuración
+  shareDataWithPeers?: boolean; // Compartir datos con colegas del mismo nivel
+  isSystem: boolean; // Si true, no puede ser eliminado (solo editado)
+  
+  // Metadata
+  usersCount?: number; // Número de usuarios con este rol
 }
 
 export interface UserProfile {

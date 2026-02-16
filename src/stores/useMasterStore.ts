@@ -1,25 +1,11 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import { Machine, Technician, SparePart, MachineStatus, PlanTier, ZoneStructure } from '../../types';
-
-// ... (retain existing initial data constants: INITIAL_MACHINES, INITIAL_PARTS, INITIAL_ZONES, INITIAL_TECHNICIANS)
-// To keep the file clean, I'll rely on the existing constants being there. 
-// However, replace_file_content replaces a block. 
-// I need to import persist and wrap the create call.
-
-// Let's target the imports first.
-import { create } from 'zustand';
 import { Machine, Technician, SparePart, ZoneStructure, MaintenancePlan, PlanTier } from '../../types';
 import { MasterDataService } from '../services/masterDataService';
 import { inventoryService } from '../services'; // For parts
+import { SettingsSupabaseService, GeneralSettings } from '../services/implementations/SettingsSupabase';
 
-interface PlantSettings {
-    plantName: string;
-    rnc: string;
-    timezone: string;
-    currency: string;
-    logoUrl: string;
-}
+// Re-export GeneralSettings as PlantSettings for backward compatibility
+type PlantSettings = GeneralSettings;
 
 interface MasterState {
     machines: Machine[];
@@ -49,16 +35,16 @@ interface MasterState {
     fetchMasterData: () => Promise<void>;
     
     updateMachine: (updatedMachine: Machine) => Promise<void>;
-    addMachine: (machine: Machine) => Promise<void>;
+    addMachine: (machine: Omit<Machine, 'id'>) => Promise<void>;
     addTechnician: (tech: Technician) => Promise<void>;
-    addPart: (part: SparePart) => Promise<void>;
+    addPart: (part: Omit<SparePart, 'id'>) => Promise<void>;
     
     addZone: (zone: ZoneStructure) => Promise<void>;
     updateZone: (zone: ZoneStructure) => Promise<void>;
     removeZone: (id: string) => Promise<void>;
 
     // Config Actions (Keep local for now or TODO: move to DB)
-    updateSettings: (settings: PlantSettings) => void;
+    updateSettings: (settings: PlantSettings) => Promise<void>;
     
     addBranch: (branch: string) => void;
     removeBranch: (branch: string) => void;
@@ -73,16 +59,16 @@ interface MasterState {
     updateAssetType: (oldVal: string, newVal: string) => void;
 
     // Spare Parts Config Actions
-    addPartCategory: (category: string) => void;
-    removePartCategory: (category: string) => void;
+    addPartCategory: (category: string) => Promise<void>;
+    removePartCategory: (category: string) => Promise<void>;
     updatePartCategory: (oldVal: string, newVal: string) => void;
 
-    addPartLocation: (location: string) => void;
-    removePartLocation: (location: string) => void;
+    addPartLocation: (location: string) => Promise<void>;
+    removePartLocation: (location: string) => Promise<void>;
     updatePartLocation: (oldVal: string, newVal: string) => void;
 
-    addPartUnit: (unit: string) => void;
-    removePartUnit: (unit: string) => void;
+    addPartUnit: (unit: string) => Promise<void>;
+    removePartUnit: (unit: string) => Promise<void>;
     updatePartUnit: (oldVal: string, newVal: string) => void;
 }
 
@@ -94,11 +80,12 @@ export const useMasterStore = create<MasterState>((set, get) => ({
     
     // Default Settings
     plantSettings: {
-        plantName: 'Sede Principal - Rep. Dom.',
-        rnc: '131-23456-9',
+        plantName: '',
+        taxId: '',
+        address: '',
+        logoUrl: '',
         timezone: 'AST',
-        currency: 'DOP',
-        logoUrl: ''
+        currency: 'DOP'
     },
     currentPlan: PlanTier.BUSINESS,
     maintenancePlans: [], // TODO: Migrate to DB
@@ -107,29 +94,46 @@ export const useMasterStore = create<MasterState>((set, get) => ({
     error: null,
 
     // Shared Configuration Lists (Defaults)
-    branches: ['Planta Principal', 'Planta Secundaria'],
-    categories: ['Producción', 'Empaque', 'Servicios'],
-    assetTypes: ['GENERIC', 'CONVEYOR', 'MIXER', 'OVEN', 'SENSOR'],
-    maintenanceSchedules: ['250 Horas', '500 Horas', '1000 Horas'],
-    partCategories: ['Rodamientos', 'Hidráulica', 'Electrónica', 'Neumática', 'Consumibles', 'Mecánica'],
-    partLocations: ['Estante A', 'Estante B', 'Estante C', 'Almacén Central'],
-    partUnits: ['PCS', 'M', 'KG', 'L', 'SET'],
+    // Shared Configuration Lists (Defaults)
+    branches: [],
+    categories: [],
+    assetTypes: [],
+    maintenanceSchedules: [],
+    partCategories: [],
+    partLocations: [],
+    partUnits: [],
 
     fetchMasterData: async () => {
         set({ isLoading: true, error: null });
         try {
-            const [machines, technicians, zones, parts] = await Promise.all([
+            const [machines, technicians, zones, parts, branches, categories, assetTypes, plantSettings, partCategories, partLocations, partUnits] = await Promise.all([
                 MasterDataService.getMachines(),
                 MasterDataService.getTechnicians(),
                 MasterDataService.getZones(),
-                inventoryService.getAllParts()
+                inventoryService.getAllParts(),
+                MasterDataService.getBranches(),
+                MasterDataService.getCategories(),
+                MasterDataService.getAssetTypes(),
+                SettingsSupabaseService.getSettings(),
+                MasterDataService.getPartCategories(),
+                MasterDataService.getPartLocations(),
+                MasterDataService.getPartUnits()
             ]);
             
+            const currentState = get();
             set({
                 machines,
                 technicians,
                 zones,
                 parts,
+                // Only override defaults if we have data, otherwise use defaults
+                branches: branches.length > 0 ? branches : currentState.branches,
+                categories: categories.length > 0 ? categories : currentState.categories,
+                assetTypes: assetTypes.length > 0 ? assetTypes : currentState.assetTypes,
+                partCategories: partCategories.length > 0 ? partCategories : currentState.partCategories,
+                partLocations: partLocations.length > 0 ? partLocations : currentState.partLocations,
+                partUnits: partUnits.length > 0 ? partUnits : currentState.partUnits,
+                plantSettings: plantSettings, // Always use fetched settings (service returns defaults if empty)
                 isLoading: false
             });
         } catch (error: any) {
@@ -146,6 +150,7 @@ export const useMasterStore = create<MasterState>((set, get) => ({
             }));
         } catch (error: any) {
             set({ error: error.message });
+            throw error; // Re-throw so component can handle it
         }
     },
 
@@ -157,6 +162,7 @@ export const useMasterStore = create<MasterState>((set, get) => ({
             }));
         } catch (error: any) {
              set({ error: error.message });
+             throw error; // Re-throw so component can handle it
         }
     },
 
@@ -216,35 +222,139 @@ export const useMasterStore = create<MasterState>((set, get) => ({
     },
 
     // Sync Actions (Config)
-    updateSettings: (settings) => set({ plantSettings: settings }),
+    // Sync Actions (Config)
+    updateSettings: async (settings) => {
+        try {
+            await SettingsSupabaseService.updateSettings(settings); // Persist to singleton table
+            set({ plantSettings: settings });
+        } catch (error: any) {
+            console.error("Failed to save settings:", error);
+            set({ error: error.message });
+            throw error; // Re-throw so component knows it failed
+        }
+    },
 
     // Branches
-    addBranch: (branch) => set((state) => ({ branches: [...state.branches, branch] })),
-    removeBranch: (branch) => set((state) => ({ branches: state.branches.filter(b => b !== branch) })),
+    addBranch: async (branch) => {
+        try {
+            const newBranch = await MasterDataService.createBranch(branch);
+            set((state) => ({ branches: [...state.branches, newBranch] }));
+        } catch (error: any) {
+            set({ error: error.message });
+            throw error;
+        }
+    },
+    removeBranch: async (branch) => {
+        try {
+            await MasterDataService.removeBranch(branch);
+            set((state) => ({ branches: state.branches.filter(b => b !== branch) }));
+        } catch (error: any) {
+            set({ error: error.message });
+            throw error;
+        }
+    },
     updateBranch: (oldVal, newVal) => set((state) => ({ branches: state.branches.map(b => b === oldVal ? newVal : b) })),
 
     // Categories
-    addCategory: (category) => set((state) => ({ categories: [...state.categories, category] })),
-    removeCategory: (category) => set((state) => ({ categories: state.categories.filter(c => c !== category) })),
+    addCategory: async (category) => {
+        try {
+            const newCategory = await MasterDataService.createCategory(category);
+            set((state) => ({ categories: [...state.categories, newCategory] }));
+        } catch (error: any) {
+            set({ error: error.message });
+            throw error;
+        }
+    },
+    removeCategory: async (category) => {
+        try {
+            await MasterDataService.removeCategory(category);
+            set((state) => ({ categories: state.categories.filter(c => c !== category) }));
+        } catch (error: any) {
+            set({ error: error.message });
+            throw error;
+        }
+    },
     updateCategory: (oldVal, newVal) => set((state) => ({ categories: state.categories.map(c => c === oldVal ? newVal : c) })),
 
     // Asset Types
-    addAssetType: (type) => set((state) => ({ assetTypes: [...state.assetTypes, type] })),
-    removeAssetType: (type) => set((state) => ({ assetTypes: state.assetTypes.filter(t => t !== type) })),
+    addAssetType: async (type) => {
+        try {
+            const newType = await MasterDataService.createAssetType(type);
+            set((state) => ({ assetTypes: [...state.assetTypes, newType] }));
+        } catch (error: any) {
+            set({ error: error.message });
+            throw error;
+        }
+    },
+    removeAssetType: async (type) => {
+        try {
+            await MasterDataService.removeAssetType(type);
+            set((state) => ({ assetTypes: state.assetTypes.filter(t => t !== type) }));
+        } catch (error: any) {
+            set({ error: error.message });
+            throw error;
+        }
+    },
     updateAssetType: (oldVal, newVal) => set((state) => ({ assetTypes: state.assetTypes.map(t => t === oldVal ? newVal : t) })),
 
-    // Part Categories
-    addPartCategory: (category) => set((state) => ({ partCategories: [...state.partCategories, category] })),
-    removePartCategory: (category) => set((state) => ({ partCategories: state.partCategories.filter(c => c !== category) })),
+    // Spare Parts Configuration (Async with Supabase)
+    addPartCategory: async (category) => {
+        try {
+            const newCategory = await MasterDataService.createPartCategory(category);
+            set((state) => ({ partCategories: [...state.partCategories, newCategory] }));
+        } catch (error: any) {
+            set({ error: error.message });
+            throw error;
+        }
+    },
+    removePartCategory: async (category) => {
+        try {
+            await MasterDataService.removePartCategory(category);
+            set((state) => ({ partCategories: state.partCategories.filter(c => c !== category) }));
+        } catch (error: any) {
+            set({ error: error.message });
+            throw error;
+        }
+    },
     updatePartCategory: (oldVal, newVal) => set((state) => ({ partCategories: state.partCategories.map(c => c === oldVal ? newVal : c) })),
 
-    // Part Locations
-    addPartLocation: (location) => set((state) => ({ partLocations: [...state.partLocations, location] })),
-    removePartLocation: (location) => set((state) => ({ partLocations: state.partLocations.filter(l => l !== location) })),
+    addPartLocation: async (location) => {
+        try {
+            const newLocation = await MasterDataService.createPartLocation(location);
+            set((state) => ({ partLocations: [...state.partLocations, newLocation] }));
+        } catch (error: any) {
+            set({ error: error.message });
+            throw error;
+        }
+    },
+    removePartLocation: async (location) => {
+        try {
+            await MasterDataService.removePartLocation(location);
+            set((state) => ({ partLocations: state.partLocations.filter(l => l !== location) }));
+        } catch (error: any) {
+            set({ error: error.message });
+            throw error;
+        }
+    },
     updatePartLocation: (oldVal, newVal) => set((state) => ({ partLocations: state.partLocations.map(l => l === oldVal ? newVal : l) })),
 
-    // Part Units
-    addPartUnit: (unit) => set((state) => ({ partUnits: [...state.partUnits, unit] })),
-    removePartUnit: (unit) => set((state) => ({ partUnits: state.partUnits.filter(u => u !== unit) })),
+    addPartUnit: async (unit) => {
+        try {
+            const newUnit = await MasterDataService.createPartUnit(unit);
+            set((state) => ({ partUnits: [...state.partUnits, newUnit] }));
+        } catch (error: any) {
+            set({ error: error.message });
+            throw error;
+        }
+    },
+    removePartUnit: async (unit) => {
+        try {
+            await MasterDataService.removePartUnit(unit);
+            set((state) => ({ partUnits: state.partUnits.filter(u => u !== unit) }));
+        } catch (error: any) {
+            set({ error: error.message });
+            throw error;
+        }
+    },
     updatePartUnit: (oldVal, newVal) => set((state) => ({ partUnits: state.partUnits.map(u => u === oldVal ? newVal : u) })),
 }));

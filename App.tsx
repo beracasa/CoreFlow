@@ -23,7 +23,8 @@ import { UserProfileView } from './components/user/UserProfile';
 import { useLanguage } from './contexts/LanguageContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Login } from './components/Login';
-import { Clock, LogOut, Shield, User, Hexagon } from 'lucide-react';
+import { Clock, LogOut, Shield, User, Hexagon, Server } from 'lucide-react';
+import { MachinesList } from './components/MachinesList';
 import { useWorkOrderStore } from './src/stores/useWorkOrderStore';
 import { useMasterStore } from './src/stores/useMasterStore';
 
@@ -85,13 +86,17 @@ const InventoryPage = () => {
   return <Inventory parts={parts} onAddPart={addPart} />;
 };
 
+const MachinesPage = () => {
+  return <MachinesList />;
+};
+
 const MachineHoursPage = () => {
   const { machines } = useMasterStore();
   return <MachineHoursLog machines={machines} />;
 };
 
 const ConfigurationPage = () => {
-  const { machines, technicians, plantSettings, addMachine, updateMachine, addTechnician, updateSettings, zones, addZone, updateZone, removeZone } = useMasterStore();
+  const { technicians, plantSettings, addTechnician, updateSettings, zones, addZone, updateZone, removeZone } = useMasterStore();
   const { hasRole } = useAuth();
 
   if (!hasRole([UserRole.ADMIN_SOLICITANTE])) {
@@ -99,11 +104,8 @@ const ConfigurationPage = () => {
   }
   return (
     <Configuration
-      machines={machines}
       technicians={technicians}
       settings={plantSettings}
-      onAddMachine={addMachine}
-      onUpdateMachine={updateMachine}
       onAddTechnician={addTechnician}
       onUpdateSettings={updateSettings}
       zoneStructures={zones} // Pass store 'zones' to prop 'zoneStructures'
@@ -207,7 +209,7 @@ const AppLayout = () => {
           <div className="p-6">
             <div className="mb-4 flex items-center gap-3">
               <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center shadow-lg shadow-blue-500/20 border border-blue-500/30 overflow-hidden">
-                {plantSettings.logoUrl ? <img src={plantSettings.logoUrl} alt="Logo" className="w-full h-full object-cover" /> : <Hexagon size={24} className="text-white" strokeWidth={2.5} />}
+                {plantSettings.logoUrl ? <img src={plantSettings.logoUrl} alt="Logo" className="w-full h-full object-contain p-0.5" /> : <Hexagon size={24} className="text-white" strokeWidth={2.5} />}
               </div>
               <div>
                 <h1 className="text-xl font-bold text-white tracking-tight leading-none">CoreFlow</h1>
@@ -238,6 +240,9 @@ const AppLayout = () => {
 
             <div className="my-2 border-t border-industrial-800 mx-4"></div>
 
+
+            <SidebarItem label="Equipos" icon={<Server className="w-5 h-5" />}
+              active={path === '/machines'} onClick={() => navigate('/machines')} />
 
             <SidebarItem label="Repuestos" icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>}
               active={path === '/inventory'} onClick={() => navigate('/inventory')} />
@@ -334,6 +339,7 @@ export default function App() {
             <Route path="orders/:id" element={<MaintenanceFormPage />} />
 
             <Route path="logs" element={<MachineHoursPage />} />
+            <Route path="machines" element={<MachinesPage />} />
             <Route path="inventory" element={<InventoryPage />} />
             <Route path="stats" element={<AnalyticsPage />} />
             <Route path="settings" element={<ConfigurationPage />} />

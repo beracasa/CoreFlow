@@ -3,16 +3,15 @@ import React, { useState } from 'react';
 import { UserProfile, UserRole } from '../../types';
 import { Plus, Mail, Shield, UserCheck, MoreVertical, Search, CheckCircle, Pencil, X, Trash2, BadgeCheck, Briefcase } from 'lucide-react';
 
-// MOCK DATA FOR DEMO
-const MOCK_DB_USERS: UserProfile[] = [
-    { id: '1', full_name: 'Carlos Rivera', email: 'admin@coreflow.io', role: UserRole.ADMIN_SOLICITANTE, job_title: 'Plant Manager', tenant_id: 't1', status: 'ACTIVE', specialties: ['Management', 'Lean Six Sigma'] },
-    { id: '2', full_name: 'Sarah Connor', email: 'tech@coreflow.io', role: UserRole.TECNICO_MANT, job_title: 'Senior Mechanic', tenant_id: 't1', status: 'ACTIVE', specialties: ['Robotics', 'Hydraulics'] },
-    { id: '3', full_name: 'Mike Ross', email: 'auditor@coreflow.io', role: UserRole.AUDITOR, job_title: 'Safety Inspector', tenant_id: 't1', status: 'ACTIVE', specialties: ['OSHA', 'ISO 9001'] },
-    { id: '4', full_name: 'John Doe', email: 'john.d@coreflow.io', role: UserRole.TECNICO_MANT, job_title: 'Junior Tech', tenant_id: 't1', status: 'INVITED', specialties: [] },
-];
+import { useUserStore } from '../../src/stores/useUserStore';
 
 export const UserManagement: React.FC = () => {
-    const [users, setUsers] = useState<UserProfile[]>(MOCK_DB_USERS);
+    const { users, roles, fetchUsers, addUser, updateUser, deleteUser, isLoading } = useUserStore();
+
+    // Fetch on mount
+    React.useEffect(() => {
+        fetchUsers();
+    }, []);
 
     // Invite Modal State
     const [showInviteModal, setShowInviteModal] = useState(false);
@@ -26,27 +25,17 @@ export const UserManagement: React.FC = () => {
 
     const handleInvite = (e: React.FormEvent) => {
         e.preventDefault();
-        const invitedUser: UserProfile = {
-            id: `u-${Date.now()}`,
-            full_name: newUser.fullName,
-            email: newUser.email,
-            role: newUser.role,
-            job_title: newUser.title,
-            tenant_id: 't1',
-            status: 'INVITED',
-            specialties: []
-        };
-
-        setUsers([...users, invitedUser]);
-        setShowInviteModal(false);
-        setNewUser({ email: '', role: UserRole.TECNICO_MANT, fullName: '', title: '' });
+        if (newUser.email && newUser.fullName) {
+             addUser(newUser.email, newUser.fullName, newUser.role as UserRole, newUser.title);
+             setShowInviteModal(false);
+             setNewUser({ email: '', role: UserRole.TECNICO_MANT, fullName: '', title: '' });
+        }
     };
 
     const handleUpdateUser = (e: React.FormEvent) => {
         e.preventDefault();
         if (!editingUser) return;
-
-        setUsers(prev => prev.map(u => u.id === editingUser.id ? editingUser : u));
+        updateUser(editingUser);
         setEditingUser(null);
     };
 
@@ -163,6 +152,20 @@ export const UserManagement: React.FC = () => {
                                 </td>
                             </tr>
                         ))}
+                        {users.length === 0 && !isLoading && (
+                            <tr>
+                                <td colSpan={5} className="px-6 py-8 text-center text-industrial-500 italic">
+                                    No hay usuarios registrados. Invita a alguien para comenzar.
+                                </td>
+                            </tr>
+                        )}
+                        {isLoading && (
+                            <tr>
+                                <td colSpan={5} className="px-6 py-8 text-center text-industrial-500 italic">
+                                    Cargando usuarios...
+                                </td>
+                            </tr>
+                        )}
                     </tbody>
                 </table>
             </div>

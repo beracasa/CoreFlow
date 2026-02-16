@@ -1,100 +1,19 @@
 import { supabase } from './supabaseClient';
 import { Machine, Technician, ZoneStructure } from '../../types';
+import { MachineSupabaseService } from './implementations/machineSupabase';
 
 export const MasterDataService = {
   // MACHINES
   async getMachines(): Promise<Machine[]> {
-    const { data, error } = await supabase
-      .from('machines')
-      .select('*')
-      .order('created_at', { ascending: false });
-
-    if (error) {
-        console.error('Error fetching machines:', error);
-        throw error;
-    }
-    
-    // Minimal mapping needed since DB columns match types (mostly).
-    // Adjust if needed based on snake_case vs camelCase if not handled automatically
-    // or if we need to parse JSON fields.
-    // Assuming simple mapping for now, but really we should map explicitly like other services.
-    return data.map((record: any) => ({
-        ...record,
-        // Map snake_case to camelCase
-        location: { x: record.location_x, y: record.location_y },
-        runningHours: record.running_hours,
-        lastMaintenance: record.last_maintenance,
-        nextMaintenance: record.next_maintenance,
-        isIot: record.is_iot,
-        imageUrl: record.image_url,
-        // Ensure arrays are arrays
-        intervals: record.maintenance_intervals || [],
-        history: [], // Not yet in DB or handled separately
-        telemetry: {
-             timestamp: new Date().toISOString(),
-             temperature: 0,
-             vibration: 0,
-             pressure: 0,
-             powerConsumption: 0
-        } 
-    })) as Machine[];
+    return MachineSupabaseService.getMachines();
   },
 
-  async createMachine(machine: Machine): Promise<Machine> {
-    const { data, error } = await supabase
-      .from('machines')
-      .insert({
-        id: machine.id,
-        name: machine.name,
-        plate: machine.plate,
-        type: machine.type,
-        status: machine.status,
-        location_x: machine.location.x,
-        location_y: machine.location.y,
-        branch: machine.branch,
-        category: machine.category,
-        brand: machine.brand,
-        model: machine.model,
-        year: machine.year,
-        is_iot: machine.isIot,
-        running_hours: machine.runningHours,
-        last_maintenance: machine.lastMaintenance,
-        next_maintenance: machine.nextMaintenance,
-        maintenance_intervals: machine.intervals,
-        image_url: machine.imageUrl
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data; // Should map back ideally
+  async createMachine(machine: Omit<Machine, 'id'>): Promise<Machine> {
+    return MachineSupabaseService.createMachine(machine);
   },
 
   async updateMachine(machine: Machine): Promise<void> {
-    const { error } = await supabase
-      .from('machines')
-      .update({
-        name: machine.name,
-        plate: machine.plate,
-        type: machine.type,
-        status: machine.status,
-        location_x: machine.location.x,
-        location_y: machine.location.y,
-        branch: machine.branch,
-        category: machine.category,
-        brand: machine.brand,
-        model: machine.model,
-        year: machine.year,
-        is_iot: machine.isIot,
-        running_hours: machine.runningHours,
-        last_maintenance: machine.lastMaintenance,
-        next_maintenance: machine.nextMaintenance,
-        maintenance_intervals: machine.intervals,
-        image_url: machine.imageUrl
-      })
-      .eq('id', machine.id);
-
-    if (error) throw error;
+    return MachineSupabaseService.updateMachine(machine);
   },
 
   // TECHNICIANS
@@ -147,6 +66,134 @@ export const MasterDataService = {
 
   async removeZone(id: string): Promise<void> {
     const { error } = await supabase.from('zones').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  // BRANCHES
+  async getBranches(): Promise<string[]> {
+    const { data, error } = await supabase.from('branches').select('name').order('name');
+    if (error) throw error;
+    return data.map((b: any) => b.name);
+  },
+  async createBranch(name: string): Promise<string> {
+    const { data, error } = await supabase.from('branches').insert({ name }).select('name').single();
+    if (error) throw error;
+    return data.name;
+  },
+  async removeBranch(name: string): Promise<void> {
+    const { error } = await supabase.from('branches').delete().eq('name', name);
+    if (error) throw error;
+  },
+
+  // CATEGORIES
+  async getCategories(): Promise<string[]> {
+    const { data, error } = await supabase.from('asset_categories').select('name').order('name');
+    if (error) throw error;
+    return data.map((c: any) => c.name);
+  },
+  async createCategory(name: string): Promise<string> {
+    const { data, error } = await supabase.from('asset_categories').insert({ name }).select('name').single();
+    if (error) throw error;
+    return data.name;
+  },
+  async removeCategory(name: string): Promise<void> {
+    const { error } = await supabase.from('asset_categories').delete().eq('name', name);
+    if (error) throw error;
+  },
+
+  // ASSET TYPES
+  async getAssetTypes(): Promise<string[]> {
+    const { data, error } = await supabase.from('asset_types').select('name').order('name');
+    if (error) throw error;
+    return data.map((t: any) => t.name);
+  },
+  async createAssetType(name: string): Promise<string> {
+    const { data, error } = await supabase.from('asset_types').insert({ name }).select('name').single();
+    if (error) throw error;
+    return data.name;
+  },
+  async removeAssetType(name: string): Promise<void> {
+    const { error } = await supabase.from('asset_types').delete().eq('name', name);
+    if (error) throw error;
+  },
+
+  // SETTINGS (Metadata)
+  async getPlantSettings(): Promise<any> {
+    const { data, error } = await supabase.from('plant_settings').select('*').single();
+    if (error) {
+       // If no row exists (e.g. before running script), return null or throw. 
+       // Ideally the script inserts row 1.
+       console.warn("Could not fetch plant settings:", error.message);
+       return null; 
+    }
+    return {
+        plantName: data.plant_name,
+        rnc: data.rnc,
+        timezone: data.timezone,
+        currency: data.currency,
+        logoUrl: data.logo_url
+    };
+  },
+
+  async updatePlantSettings(settings: any): Promise<void> {
+    const { error } = await supabase.from('plant_settings').upsert({
+        id: 1, // Force singleton
+        plant_name: settings.plantName,
+        rnc: settings.rnc,
+        timezone: settings.timezone,
+        currency: settings.currency,
+        logo_url: settings.logoUrl,
+        updated_at: new Date()
+    });
+    if (error) throw error;
+  },
+
+  // SPARE PARTS CONFIGURATION
+  // Categories
+  async getPartCategories(): Promise<string[]> {
+    const { data, error } = await supabase.from('spare_part_categories').select('name').order('name');
+    if (error) throw error;
+    return data.map((c: any) => c.name);
+  },
+  async createPartCategory(name: string): Promise<string> {
+    const { data, error } = await supabase.from('spare_part_categories').insert({ name }).select('name').single();
+    if (error) throw error;
+    return data.name;
+  },
+  async removePartCategory(name: string): Promise<void> {
+    const { error } = await supabase.from('spare_part_categories').delete().eq('name', name);
+    if (error) throw error;
+  },
+
+  // Locations
+  async getPartLocations(): Promise<string[]> {
+    const { data, error } = await supabase.from('spare_part_locations').select('name').order('name');
+    if (error) throw error;
+    return data.map((l: any) => l.name);
+  },
+  async createPartLocation(name: string): Promise<string> {
+    const { data, error } = await supabase.from('spare_part_locations').insert({ name }).select('name').single();
+    if (error) throw error;
+    return data.name;
+  },
+  async removePartLocation(name: string): Promise<void> {
+    const { error } = await supabase.from('spare_part_locations').delete().eq('name', name);
+    if (error) throw error;
+  },
+
+  // Units
+  async getPartUnits(): Promise<string[]> {
+    const { data, error } = await supabase.from('spare_part_units').select('name').order('name');
+    if (error) throw error;
+    return data.map((u: any) => u.name);
+  },
+  async createPartUnit(name: string): Promise<string> {
+    const { data, error } = await supabase.from('spare_part_units').insert({ name }).select('name').single();
+    if (error) throw error;
+    return data.name;
+  },
+  async removePartUnit(name: string): Promise<void> {
+    const { error } = await supabase.from('spare_part_units').delete().eq('name', name);
     if (error) throw error;
   }
 };
