@@ -100,7 +100,19 @@ export interface Machine {
   voltage?: number;       // V. 3PH (VAC)
   power?: number;         // P (KVA)
   imageUrl?: string;      // Imagen del Equipo
-  documents?: string[];   // Documentos adjuntos
+  documents?: MachineDocument[] | string[];   // Documentos adjuntos (soporta ambos formatos)
+}
+
+/**
+ * Interfaz para documentos de máquinas con metadata completa
+ */
+export interface MachineDocument {
+  id: string;
+  name: string;
+  url: string;
+  uploadedAt: string;
+  size: number;
+  type: string;
 }
 
 export enum WorkOrderStatus {

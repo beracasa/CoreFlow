@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Machine, MachineStatus } from '../types';
+import { Machine, MachineStatus, MachineDocument } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useMasterStore } from '../src/stores/useMasterStore';
+import { DocumentService } from '../src/services/documentService';
 import { 
-  Box, Wifi, Plus, X, Camera, FileText, Server, Clock, Calendar, Pencil 
+  Box, Wifi, Plus, X, Camera, FileText, Server, Clock, Calendar, Pencil, Eye, Download
 } from 'lucide-react';
 
 export const MachinesList: React.FC = () => {
@@ -553,6 +554,73 @@ export const MachinesList: React.FC = () => {
                       </div>
                     </div>
                   </div>
+
+                  {/* Documents Section */}
+                  {viewingMachine.documents && viewingMachine.documents.length > 0 && (
+                    <div>
+                      <h4 className="text-xs font-bold text-industrial-400 uppercase border-b border-industrial-700 pb-2 mb-3">
+                        Documentos Adjuntos
+                      </h4>
+                      <div className="space-y-2">
+                        {viewingMachine.documents.map((doc, idx) => {
+                          // Soportar tanto formato nuevo (MachineDocument) como legacy (string)
+                          const isLegacyFormat = typeof doc === 'string';
+                          const docName = isLegacyFormat ? doc : doc.name;
+                          const docUrl = isLegacyFormat ? '#' : doc.url;
+                          const docSize = isLegacyFormat ? 0 : doc.size;
+                          const docDate = isLegacyFormat ? null : doc.uploadedAt;
+
+                          return (
+                            <div 
+                              key={idx}
+                              className="bg-industrial-900/30 p-3 rounded border border-industrial-700/50 flex items-center justify-between group hover:bg-industrial-900/50 transition-colors"
+                            >
+                              <div className="flex items-center gap-3 flex-1 min-w-0">
+                                <FileText className="text-industrial-500 flex-shrink-0" size={20} />
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-sm text-white font-medium truncate">{docName}</p>
+                                  {!isLegacyFormat && docSize > 0 && (
+                                    <p className="text-xs text-industrial-500">
+                                      {DocumentService.formatFileSize(docSize)}
+                                      {docDate && ` • ${new Date(docDate).toLocaleDateString()}`}
+                                    </p>
+                                  )}
+                                  {isLegacyFormat && (
+                                    <p className="text-xs text-industrial-500 italic">Formato legacy - sin metadata</p>
+                                  )}
+                                </div>
+                              </div>
+                              {!isLegacyFormat && (
+                                <div className="flex gap-2 flex-shrink-0">
+                                  <button
+                                    onClick={() => window.open(docUrl, '_blank')}
+                                    className="p-2 bg-industrial-700 hover:bg-industrial-600 rounded text-white transition-colors"
+                                    title="Ver documento"
+                                  >
+                                    <Eye size={16} />
+                                  </button>
+                                  <button
+                                    onClick={async () => {
+                                      try {
+                                        await DocumentService.downloadDocument(docUrl, docName);
+                                      } catch (error) {
+                                        console.error('Error downloading document:', error);
+                                        alert('Error al descargar el documento');
+                                      }
+                                    }}
+                                    className="p-2 bg-industrial-700 hover:bg-industrial-600 rounded text-white transition-colors"
+                                    title="Descargar"
+                                  >
+                                    <Download size={16} />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Footer Actions */}
@@ -798,12 +866,26 @@ export const MachinesList: React.FC = () => {
                     <label className="mt-2 flex items-center justify-center gap-1 text-xs text-blue-400 cursor-pointer hover:underline">
                       <Plus size={10} /> Agregar Documento
                       <input type="file" className="hidden"
-                        onChange={(e) => {
+                        onChange={async (e) => {
                           if (e.target.files && e.target.files[0]) {
-                            setNewMachine(prev => ({
-                              ...prev,
-                              documents: [...(prev.documents || []), e.target.files![0].name]
-                            }));
+                            const file = e.target.files[0];
+                            
+                            try {
+                              // Subir archivo a Supabase Storage
+                              const document = await DocumentService.uploadDocument(
+                                newMachine.id || 'temp',
+                                file
+                              );
+                              
+                              // Agregar documento con metadata completa
+                              setNewMachine(prev => ({
+                                ...prev,
+                                documents: [...(prev.documents || []), document]
+                              }));
+                            } catch (error) {
+                              console.error('Error uploading document:', error);
+                              alert('Error al subir el archivo. Verifica que el bucket "machine-documents" esté configurado en Supabase.');
+                            }
                           }
                         }}
                       />
