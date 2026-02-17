@@ -1,7 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Machine, MachineHourLog } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
-import { Clock, History, Save } from 'lucide-react';
+import { useAuth } from "../contexts/AuthContext";
+import { MachineSupabaseService } from "../src/services/implementations/machineSupabase";
+import { Clock, History, Save, FileDown, Filter, X } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface MachineHoursLogProps {
     machines: Machine[];
@@ -9,69 +13,134 @@ interface MachineHoursLogProps {
 
 export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) => {
     const { t } = useLanguage();
+    const { user } = useAuth();
     const [selectedMachineId, setSelectedMachineId] = useState<string>('');
     const [currentReading, setCurrentReading] = useState<number>(0);
     const [displayReading, setDisplayReading] = useState<string>('');
+    const [isLoading, setIsLoading] = useState(false);
+
+    // Filters
+    const [startDate, setStartDate] = useState<string>('');
+    const [endDate, setEndDate] = useState<string>('');
 
     // Searchable Dropdown State
     const [searchTerm, setSearchTerm] = useState('');
     const [showDropdown, setShowDropdown] = useState(false);
 
-    // Mock history
-    const [history, setHistory] = useState<MachineHourLog[]>([
-        { id: '1', machineId: 'm1', date: '2023-10-20', hoursLogged: 12400, operator: 'John Doe' },
-        { id: '2', machineId: 'm1', date: '2023-10-15', hoursLogged: 12350, operator: 'Jane Smith' },
-    ]);
+    // History from Backend
+    const [history, setHistory] = useState<MachineHourLog[]>([]);
 
     const selectedMachine = machines.find(m => m.id === selectedMachineId);
 
-    const handleLog = (e: React.FormEvent) => {
+    // Load logs when filters change
+    useEffect(() => {
+        const fetchLogs = async () => {
+            try {
+                const logs = await MachineSupabaseService.getFilteredMachineHourLogs({
+                    machineId: selectedMachineId || undefined,
+                    startDate: startDate || undefined,
+                    endDate: endDate || undefined
+                });
+                setHistory(logs);
+            } catch (err) {
+                console.error("Error fetching logs:", err);
+            }
+        };
+        fetchLogs();
+    }, [selectedMachineId, startDate, endDate]);
+
+    const handleLog = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedMachine) return;
 
-        // Validate that we have a reading
         if (currentReading <= 0) {
             alert("Please enter a valid reading.");
             return;
         }
 
-        const newLog: MachineHourLog = {
-            id: Date.now().toString(),
-            machineId: selectedMachine.id,
-            date: new Date().toISOString().split('T')[0],
-            hoursLogged: currentReading,
-            operator: 'Current User' // Auth context would go here
-        };
+        try {
+            setIsLoading(true);
+            const newLog = await MachineSupabaseService.logMachineHours({
+                machineId: selectedMachine.id,
+                hoursLogged: currentReading,
+                operator: user?.full_name || 'Unknown Operator'
+            });
 
-        setHistory([newLog, ...history]);
-        setCurrentReading(0);
-        setDisplayReading('');
-        setSearchTerm('');
-        setSelectedMachineId('');
-        alert("Hours logged successfully. Maintenance schedule updated.");
+            // Update history locally if it matches current filters (simplified: just prepend if no date filter or within range)
+            // Ideally, re-fetch to be safe, but prepending is faster feedback.
+            // For now, let's re-fetch to ensure sort order and consistency
+            const logs = await MachineSupabaseService.getFilteredMachineHourLogs({
+                machineId: selectedMachineId || undefined,
+                startDate: startDate || undefined,
+                endDate: endDate || undefined
+            });
+            setHistory(logs);
+
+            // Update local machine running hours immediately for UI feedback
+            selectedMachine.runningHours = currentReading;
+
+            setCurrentReading(0);
+            setDisplayReading('');
+
+            alert("Hours logged successfully. Maintenance schedule updated.");
+        } catch (error) {
+            console.error(error);
+            alert("Error logging hours.");
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const handleReadingChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const val = e.target.value;
-
-        // Remove existing commas
         const rawValue = val.replace(/,/g, '');
 
-        // Check if it's a valid number or empty
         if (rawValue === '') {
             setCurrentReading(0);
             setDisplayReading('');
             return;
         }
 
-        // Validate strictly digits
         if (!/^\d+$/.test(rawValue)) return;
 
         const numValue = parseInt(rawValue, 10);
         setCurrentReading(numValue);
-
-        // Format back to string with commas
         setDisplayReading(new Intl.NumberFormat('en-US').format(numValue));
+    };
+
+    const generatePDF = () => {
+        const doc = new jsPDF();
+
+        doc.setFontSize(18);
+        doc.text('Reporte de Horas de Máquina', 14, 22);
+
+        doc.setFontSize(11);
+        doc.setTextColor(100);
+        const dateStr = startDate && endDate ? `${startDate} to ${endDate}` : 'Todos los registros';
+        const machineStr = selectedMachine ? `Máquina: ${selectedMachine.name}` : 'Todas las máquinas';
+        doc.text(`${machineStr} | ${dateStr}`, 14, 30);
+
+        const tableColumn = ["Fecha", "Máquina", "Horas", "Operador"];
+        const tableRows: any[] = [];
+
+        history.forEach(log => {
+            const machineName = machines.find(m => m.id === log.machineId)?.name || 'Unknown';
+            const logData = [
+                log.date,
+                machineName,
+                new Intl.NumberFormat('en-US').format(log.hoursLogged),
+                log.operator,
+            ];
+            tableRows.push(logData);
+        });
+
+        autoTable(doc, {
+            head: [tableColumn],
+            body: tableRows,
+            startY: 40,
+        });
+
+        doc.save(`reporte_horas_${new Date().toISOString().split('T')[0]}.pdf`);
     };
 
     return (
@@ -107,6 +176,18 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
                                     // Delay blur to allow click on dropdown items
                                     onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
                                 />
+                                {searchTerm && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setSearchTerm('');
+                                            setSelectedMachineId('');
+                                        }}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-industrial-400 hover:text-white"
+                                    >
+                                        <X size={16} />
+                                    </button>
+                                )}
                                 {showDropdown && (
                                     <div className="absolute z-10 w-full mt-1 bg-industrial-800 border border-industrial-600 rounded shadow-xl max-h-60 overflow-y-auto">
                                         {machines.filter(m =>
@@ -163,38 +244,87 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
 
                         <button
                             type="submit"
-                            className="w-full bg-industrial-accent hover:bg-blue-600 text-white py-2 rounded font-bold transition-colors flex items-center justify-center gap-2"
+                            disabled={isLoading}
+                            className="w-full bg-industrial-accent hover:bg-blue-600 text-white py-2 rounded font-bold transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                         >
-                            <Save size={16} /> {t('form.save')}
+                            {isLoading ? 'Saving...' : <><Save size={16} /> {t('form.save')}</>}
                         </button>
                     </form>
                 </div>
 
                 {/* History List */}
                 <div className="lg:col-span-2 bg-industrial-800 rounded-lg border border-industrial-700 shadow-xl flex flex-col">
-                    <div className="p-4 border-b border-industrial-700">
+                    <div className="p-4 border-b border-industrial-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                         <h3 className="text-white font-bold flex items-center gap-2">
-                            <History size={16} /> History Log
+                            <History size={16} /> Historial de Registros (Registros Recientes)
                         </h3>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={generatePDF}
+                                className="bg-industrial-700 hover:bg-industrial-600 text-white px-3 py-1.5 rounded text-xs flex items-center gap-2 transition-colors border border-industrial-600"
+                            >
+                                <FileDown size={14} /> Reporte PDF
+                            </button>
+                        </div>
                     </div>
+
+                    {/* Filters Toolbar */}
+                    <div className="p-3 bg-industrial-900/50 border-b border-industrial-700 flex flex-wrap gap-3 items-center">
+                        <div className="flex items-center gap-2 text-industrial-400 text-xs">
+                            <Filter size={14} /> <span className="font-bold uppercase">Filtros:</span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <label className="text-xs text-industrial-500">Desde:</label>
+                            <input
+                                type="date"
+                                className="bg-industrial-900 border border-industrial-600 text-white text-xs rounded px-2 py-1 outline-none focus:border-emerald-500"
+                                value={startDate}
+                                onChange={e => setStartDate(e.target.value)}
+                            />
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <label className="text-xs text-industrial-500">Hasta:</label>
+                            <input
+                                type="date"
+                                className="bg-industrial-900 border border-industrial-600 text-white text-xs rounded px-2 py-1 outline-none focus:border-emerald-500"
+                                value={endDate}
+                                onChange={e => setEndDate(e.target.value)}
+                            />
+                        </div>
+
+                        {(startDate || endDate) && (
+                            <button
+                                onClick={() => { setStartDate(''); setEndDate(''); }}
+                                className="text-xs text-red-400 hover:text-red-300 underline ml-auto"
+                            >
+                                Limpiar Filtros
+                            </button>
+                        )}
+                    </div>
+
                     <div className="flex-1 overflow-auto p-0">
-                        <table className="w-full text-left text-sm text-industrial-400">
-                            <thead className="bg-industrial-900 text-xs uppercase font-bold text-industrial-500 sticky top-0">
-                                <tr>
-                                    <th className="px-6 py-3">{t('form.date')}</th>
-                                    <th className="px-6 py-3">{t('form.machine')}</th>
-                                    <th className="px-6 py-3">Reading</th>
-                                    <th className="px-6 py-3">Operator</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-industrial-700">
-                                {history
-                                    .filter(log => !selectedMachineId || log.machineId === selectedMachineId)
-                                    .map(log => (
+                        {history.length === 0 ? (
+                            <div className="p-6 text-center text-industrial-500">
+                                No se encontraron registros con los filtros seleccionados.
+                            </div>
+                        ) : (
+                            <table className="w-full text-left text-sm text-industrial-400">
+                                <thead className="bg-industrial-900 text-xs uppercase font-bold text-industrial-500 sticky top-0">
+                                    <tr>
+                                        <th className="px-6 py-3">{t('form.date')}</th>
+                                        <th className="px-6 py-3">{t('form.machine')}</th>
+                                        <th className="px-6 py-3">Reading</th>
+                                        <th className="px-6 py-3">Operator</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-industrial-700">
+                                    {history.map(log => (
                                         <tr key={log.id} className="hover:bg-industrial-700/30">
                                             <td className="px-6 py-3">{log.date}</td>
                                             <td className="px-6 py-3 text-white">
-                                                {machines.find(m => m.id === log.machineId)?.name || log.machineId}
+                                                {machines.find(m => m.id === log.machineId)?.name || 'Unknown Log'}
                                             </td>
                                             <td className="px-6 py-3 font-mono text-industrial-accent">
                                                 {new Intl.NumberFormat('en-US').format(log.hoursLogged)} h
@@ -202,8 +332,9 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
                                             <td className="px-6 py-3">{log.operator}</td>
                                         </tr>
                                     ))}
-                            </tbody>
-                        </table>
+                                </tbody>
+                            </table>
+                        )}
                     </div>
                 </div>
             </div>

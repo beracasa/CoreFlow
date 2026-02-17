@@ -143,6 +143,138 @@ export const MachineSupabaseService = {
     if (error) throw error;
   },
 
+  async getRecentMachineHourLogs(limit: number = 50): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('machine_hour_logs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+
+    if (error) {
+      console.error('Error fetching recent logs:', error);
+      return [];
+    }
+
+    return data.map((log: any) => ({
+      id: log.id,
+      machineId: log.machine_id,
+      date: log.date,
+      hoursLogged: log.hours_logged,
+      operator: log.operator || 'Unknown',
+      comments: log.comments
+    }));
+  },
+
+  async getMachineHourLogs(machineId: string): Promise<any[]> {
+    console.log("Service: getMachineHourLogs called for:", machineId);
+    const { data, error } = await supabase
+      .from('machine_hour_logs')
+      .select('*')
+      .eq('machine_id', machineId)
+      .order('date', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching machine logs:', error);
+      return [];
+    }
+
+    console.log("Service: getMachineHourLogs data:", data);
+
+    // Map snake_case to camelCase
+    return data.map((log: any) => ({
+      id: log.id,
+      machineId: log.machine_id,
+      date: log.date,
+      hoursLogged: log.hours_logged,
+      operator: log.operator || 'Unknown',
+      comments: log.comments
+    }));
+  },
+
+  async getFilteredMachineHourLogs(filters: { machineId?: string, startDate?: string, endDate?: string }): Promise<any[]> {
+    let query = supabase
+      .from('machine_hour_logs')
+      .select('*')
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: false });
+
+    if (filters.machineId) {
+      query = query.eq('machine_id', filters.machineId);
+    }
+    if (filters.startDate) {
+      query = query.gte('date', filters.startDate);
+    }
+    if (filters.endDate) {
+      query = query.lte('date', filters.endDate);
+    }
+
+    if (!filters.machineId && !filters.startDate && !filters.endDate) {
+      query = query.limit(50);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching filtered logs:', error);
+      return [];
+    }
+
+    return data.map((log: any) => ({
+      id: log.id,
+      machineId: log.machine_id,
+      date: log.date,
+      hoursLogged: log.hours_logged,
+      operator: log.operator || 'Unknown',
+      comments: log.comments
+    }));
+  },
+
+  async logMachineHours(log: { machineId: string, hoursLogged: number, operator: string, comments?: string }): Promise<any> {
+    // 1. Log the hours
+    const { data, error } = await supabase
+      .from('machine_hour_logs')
+      .insert({
+        machine_id: log.machineId,
+        date: new Date().toISOString().split('T')[0], // Current date YYYY-MM-DD
+        hours_logged: log.hoursLogged,
+        operator: log.operator,
+        comments: log.comments
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    // 2. Sync with Machine (if not IoT)
+    try {
+      const { data: machineData, error: machineError } = await supabase
+        .from('machines')
+        .select('is_iot')
+        .eq('id', log.machineId)
+        .single();
+
+      if (!machineError && machineData && !machineData.is_iot) {
+        await supabase
+          .from('machines')
+          .update({ running_hours: log.hoursLogged })
+          .eq('id', log.machineId);
+      }
+    } catch (syncError) {
+      console.error("Failed to sync machine running hours:", syncError);
+      // Do not fail the main request if sync fails, just log it
+    }
+
+    // Return mapped object
+    return {
+      id: data.id,
+      machineId: data.machine_id,
+      date: data.date,
+      hoursLogged: data.hours_logged,
+      operator: data.operator,
+      comments: data.comments
+    };
+  },
+
   async deleteMachine(id: string): Promise<void> { // Optional
     const { error } = await supabase.from('machines').delete().eq('id', id);
     if (error) throw error;
