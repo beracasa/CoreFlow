@@ -5,6 +5,7 @@ import { AssetDrawer } from './AssetDrawer';
 import { Machine, ZoneStructure } from '../../types';
 import { analyzeMachineHealth, PredictiveAnalysis } from '../../services/geminiService';
 import { useLanguage } from '../../contexts/LanguageContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface PlantMapContainerProps {
   machines: Machine[];
@@ -17,6 +18,7 @@ interface PlantMapContainerProps {
 
 export const PlantMapContainer: React.FC<PlantMapContainerProps> = ({ machines, zones, onCreateWorkOrder, onMoveMachine, onUpdateZone, onAddMachine }) => {
   const { t } = useLanguage();
+  const { hasPermission } = useAuth();
   const [activeLayer, setActiveLayer] = useState<MapLayer>('OPERATIONAL');
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -197,19 +199,21 @@ export const PlantMapContainer: React.FC<PlantMapContainerProps> = ({ machines, 
               <p className="text-[10px] text-industrial-400">{zones.length} {t('map.zone')}</p>
             </div>
 
-            {/* Edit Layout Button */}
-            <div className="bg-industrial-800/90 backdrop-blur p-1 rounded-xl border border-industrial-600 shadow-xl">
-              <button
-                onClick={() => {
-                  setIsEditMode(!isEditMode);
-                  setSelectedMachine(null);
-                }}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${isEditMode ? 'bg-yellow-500 text-black shadow-[0_0_15px_rgba(234,179,8,0.4)]' : 'bg-industrial-700 text-white hover:bg-industrial-600'}`}
-              >
-                {isEditMode ? <Save size={14} /> : <Edit3 size={14} />}
-                {isEditMode ? 'Save Layout' : 'Edit Layout'}
-              </button>
-            </div>
+            {/* Edit Layout Button - Protected by Permission */}
+            {hasPermission('edit_dashboard_map') && (
+              <div className="bg-industrial-800/90 backdrop-blur p-1 rounded-xl border border-industrial-600 shadow-xl">
+                <button
+                  onClick={() => {
+                    setIsEditMode(!isEditMode);
+                    setSelectedMachine(null);
+                  }}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${isEditMode ? 'bg-yellow-500 text-black shadow-[0_0_15px_rgba(234,179,8,0.4)]' : 'bg-industrial-700 text-white hover:bg-industrial-600'}`}
+                >
+                  {isEditMode ? <Save size={14} /> : <Edit3 size={14} />}
+                  {isEditMode ? 'Save Layout' : 'Edit Layout'}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Right: Layer Switcher (Horizontal) */}

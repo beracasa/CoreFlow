@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { UserProfile, UserRole } from '../types';
 import { supabase } from '../src/services/supabaseClient';
+import { useUserStore } from '../src/stores/useUserStore';
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -9,6 +10,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   hasRole: (allowedRoles: UserRole[]) => boolean;
+  hasPermission: (permissionId: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -89,8 +91,31 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return allowedRoles.includes(user.role as UserRole);
   };
 
+  const hasPermission = (permissionId: string) => {
+    if (!user) return false;
+    
+    // 1. Super Admin Bypass (optional, but good for dev)
+    if (user.role === UserRole.ADMIN_SOLICITANTE) return true;
+
+    // 2. Check Dynamic Roles
+    // We need access to the roles list regarding the user's role ID.
+    // Since we are inside a hook, we can use the store directly (it's external state).
+    const roles = useUserStore.getState().roles; 
+    const userRoleDef = roles.find(r => r.id === user.role);
+    
+    if (!userRoleDef) return false;
+
+    // 3. Check specific permission
+    if (Array.isArray(userRoleDef.permissions)) {
+        return userRoleDef.permissions.includes(permissionId);
+    } else {
+        // Object format { [id]: boolean }
+        return !!userRoleDef.permissions[permissionId];
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, logout, hasRole }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, logout, hasRole, hasPermission }}>
       {children}
     </AuthContext.Provider>
   );

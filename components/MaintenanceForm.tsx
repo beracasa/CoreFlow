@@ -127,7 +127,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
    initialData
 }) => {
    const { t } = useLanguage();
-   const { user, hasRole } = useAuth(); // RBAC Context
+   const { user, hasRole, hasPermission } = useAuth(); // RBAC Context
 
    // -- STATE MANAGEMENT --
    const [formData, setFormData] = useState<Partial<WorkOrder>>({
@@ -162,7 +162,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
       tasksCount: formData.tasks?.length
    });
 
-   const isSection3Editable = (formData.currentStage === WorkOrderStage.HANDOVER || editingSection === 3) && hasRole([UserRole.ADMIN_SOLICITANTE]);
+   const isSection3Editable = (formData.currentStage === WorkOrderStage.HANDOVER || editingSection === 3) && (hasRole([UserRole.ADMIN_SOLICITANTE]) || hasPermission('supervise_order'));
 
 
    // -- INITIALIZATION EFFECT --
@@ -1069,6 +1069,8 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                               </div>
                            </div>
 
+
+
                            {/* 3. Spare Parts (Dynamic Table) */}
                            <div className="border-t border-industrial-700 pt-6">
                               <h4 className="text-sm font-bold text-white mb-4">Repuestos Utilizados</h4>
@@ -1088,33 +1090,64 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                        {(formData.consumedParts || []).map((part, idx) => (
                                           <tr key={idx} className="border-b border-industrial-800 last:border-0 hover:bg-industrial-800/30 transition-colors">
                                              <td className="p-2">
-                                                 {/* Custom Part Selector could go here, simplified logic for now */}
-                                                 <select
-                                                   disabled={!isSection2Editable}
-                                                   className="w-full bg-industrial-900 border border-industrial-600 rounded p-1 text-white text-xs focus:border-pink-500 outline-none"
-                                                   value={part.partId || ''}
-                                                   onChange={(e) => {
-                                                      const selected = MOCK_SPARE_PARTS.find(p => p.id === e.target.value);
-                                                      if (selected) {
-                                                         const updated = [...(formData.consumedParts || [])];
-                                                         updated[idx] = {
-                                                            ...updated[idx],
-                                                            partId: selected.id,
-                                                            partName: selected.name,
-                                                            sku: selected.sku,
-                                                            unitCost: selected.unitCost, // In prod fetch real cost
-                                                            totalCost: selected.unitCost * updated[idx].quantity,
-                                                            unit: 'Unidad' // Default or fetch
-                                                         };
-                                                         setFormData({ ...formData, consumedParts: updated });
-                                                      }
-                                                   }}
-                                                 >
-                                                    <option value="">- Seleccionar Repuesto -</option>
-                                                    {MOCK_SPARE_PARTS.map(sp => (
-                                                       <option key={sp.id} value={sp.id}>{sp.sku} - {sp.name} (${sp.unitCost})</option>
-                                                    ))}
-                                                 </select>
+                                                 <div className="relative group">
+                                                     <input
+                                                         type="text"
+                                                         disabled={!isSection2Editable}
+                                                         className={`w-full bg-industrial-900 border ${!part.partId && part.partName ? 'border-pink-500' : 'border-industrial-600'} rounded p-1 text-white text-xs focus:border-pink-500 outline-none placeholder-industrial-600`}
+                                                         placeholder="Buscar repuesto..."
+                                                         value={part.partName || ''}
+                                                         onChange={(e) => {
+                                                             const val = e.target.value;
+                                                             const updated = [...(formData.consumedParts || [])];
+                                                             // Updates name for search, clears ID to show it's not selected yet
+                                                             updated[idx] = { ...updated[idx], partName: val, partId: '', unitCost: 0, totalCost: 0 };
+                                                             setFormData({ ...formData, consumedParts: updated });
+                                                         }}
+                                                     />
+                                                     {/* Custom Dropdown Results */}
+                                                     {!part.partId && part.partName && (
+                                                         <div className="absolute left-0 top-full mt-1 w-[300px] z-50 bg-industrial-800 border border-industrial-600 rounded-md shadow-xl max-h-60 overflow-y-auto">
+                                                             {MOCK_SPARE_PARTS.filter(p => 
+                                                                 p.name.toLowerCase().includes(part.partName.toLowerCase()) || 
+                                                                 p.sku.includes(part.partName)
+                                                             ).length > 0 ? (
+                                                                 MOCK_SPARE_PARTS.filter(p => 
+                                                                    p.name.toLowerCase().includes(part.partName.toLowerCase()) || 
+                                                                    p.sku.includes(part.partName)
+                                                                 ).map(sp => (
+                                                                     <div 
+                                                                         key={sp.id}
+                                                                         className="p-2 hover:bg-industrial-700 cursor-pointer border-b border-industrial-700/50 last:border-0 flex justify-between items-center group/item"
+                                                                         onClick={() => {
+                                                                             const updated = [...(formData.consumedParts || [])];
+                                                                             updated[idx] = {
+                                                                                ...updated[idx],
+                                                                                partId: sp.id,
+                                                                                partName: `${sp.sku} - ${sp.name}`,
+                                                                                sku: sp.sku,
+                                                                                unitCost: sp.unitCost,
+                                                                                totalCost: sp.unitCost * updated[idx].quantity,
+                                                                                unit: 'Unidad'
+                                                                             };
+                                                                             setFormData({ ...formData, consumedParts: updated });
+                                                                         }}
+                                                                     >
+                                                                         <div className="flex flex-col">
+                                                                             <span className="text-white text-xs font-bold">{sp.sku} - {sp.name}</span>
+                                                                             <span className="text-industrial-400 text-[10px]">RD${sp.unitCost.toFixed(2)}</span>
+                                                                         </div>
+                                                                         <div className={`text-[10px] px-2 py-0.5 rounded font-bold ${sp.currentStock < sp.minimumStock ? 'bg-red-900/50 text-red-400 border border-red-500/30' : 'bg-emerald-900/50 text-emerald-400 border border-emerald-500/30'}`}>
+                                                                             Stock: {sp.currentStock}
+                                                                         </div>
+                                                                     </div>
+                                                                 ))
+                                                             ) : (
+                                                                 <div className="p-2 text-industrial-500 text-xs italic text-center">No results found</div>
+                                                             )}
+                                                         </div>
+                                                     )}
+                                                 </div>
                                              </td>
                                              <td className="p-2">
                                                 <input type="text" readOnly className="w-full bg-industrial-900/50 border border-industrial-800 rounded p-1 text-xs text-industrial-400" value={part.unit || 'Unidad'} />
@@ -1138,10 +1171,10 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                                 />
                                              </td>
                                              <td className="p-2 text-right font-mono text-xs">
-                                                ${part.unitCost.toFixed(2)}
+                                                RD${part.unitCost.toFixed(2)}
                                              </td>
                                              <td className="p-2 text-right font-mono text-xs font-bold text-emerald-400">
-                                                ${part.totalCost.toFixed(2)}
+                                                RD${part.totalCost.toFixed(2)}
                                              </td>
                                              {isSection2Editable && (
                                                 <td className="p-2 text-center">
@@ -1179,14 +1212,13 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                               {/* Total Cost Summary */}
                               <div className="flex justify-end">
                                  <div className="bg-industrial-900 p-3 rounded border border-industrial-700 min-w-[200px]">
-                                    <span className="text-xs text-industrial-500 block">Costo Total de Mantenimiento</span>
+                                    <span className="text-xs text-industrial-500 block">Costo Total Repuestos</span>
                                     <span className="text-xl font-mono text-emerald-400 font-bold">
-                                       ${(formData.consumedParts?.reduce((sum, p) => sum + p.totalCost, 0) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                       RD${(formData.consumedParts?.reduce((sum, p) => sum + p.totalCost, 0) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                                     </span>
                                  </div>
                               </div>
                            </div>
-
                         </div>
                      ) : (
                         /* --- R-MANT-02 EXECUTION LAYOUT (Existing) --- */

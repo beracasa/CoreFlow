@@ -7,9 +7,12 @@ import { Shield, Lock, CheckSquare, Square, Save, Plus, Trash2, ChevronDown, Che
 const SYSTEM_PERMISSIONS: Permission[] = [
     // Operativos
     { id: 'view_dashboard', category: 'OPERATIONAL', label: 'Ver Dashboard y Mapa', description: 'Acceso a Planta Visual y monitoreo.' },
+    { id: 'edit_dashboard_map', category: 'OPERATIONAL', label: 'Editar Dashboard y Mapa', description: 'Permiso de Edición a Planta Visual y Monitoreo.' },
     { id: 'view_kanban', category: 'OPERATIONAL', label: 'Ver Tablero Kanban', description: 'Ver estado de tickets de mantenimiento.' },
+    { id: 'edit_kanban', category: 'OPERATIONAL', label: 'Editar Tablero Kanban', description: 'Permiso de Edición de la Tabla Kanban.' },
     { id: 'create_wo', category: 'OPERATIONAL', label: 'Crear Órdenes de Trabajo', description: 'Generar nuevos tickets R-MANT-02/05.' },
     { id: 'execute_wo', category: 'OPERATIONAL', label: 'Ejecutar Órdenes', description: 'Llenar checklists y consumir repuestos.' },
+    { id: 'supervise_order', category: 'OPERATIONAL', label: 'Supervisar y Recibir Ordenes', description: 'Llenar checklists y recepción de una orden.' },
     { id: 'log_hours', category: 'OPERATIONAL', label: 'Registrar Horas', description: 'Actualizar contadores de horas de máquinas.' },
     
     // Administrativos

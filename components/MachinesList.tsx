@@ -3,23 +3,23 @@ import { Machine, MachineStatus, MachineDocument } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useMasterStore } from '../src/stores/useMasterStore';
 import { DocumentService } from '../src/services/documentService';
-import { 
-  Box, Wifi, Plus, X, Camera, FileText, Server, Clock, Calendar, Pencil, Eye, Download
+import {
+  Box, Wifi, Plus, X, Camera, FileText, Server, Clock, Calendar, Pencil, Eye, Download, Trash2
 } from 'lucide-react';
 
 export const MachinesList: React.FC = () => {
-  const { 
-    machines, addMachine, updateMachine, 
+  const {
+    machines, addMachine, updateMachine,
     branches, categories, assetTypes, zones: zoneStructures,
-    maintenancePlans 
+    maintenancePlans
   } = useMasterStore();
-  
+
   const { t } = useLanguage();
 
   // Flatten Zones for Selection
-  const zones = zoneStructures.flatMap(z => 
-    z.lines && z.lines.length > 0 
-      ? z.lines.map(l => `${z.name} - ${l}`) 
+  const zones = zoneStructures.flatMap(z =>
+    z.lines && z.lines.length > 0
+      ? z.lines.map(l => `${z.name} - ${l}`)
       : [z.name]
   );
 
@@ -309,27 +309,27 @@ export const MachinesList: React.FC = () => {
   return (
     <div className="h-full bg-industrial-900 flex flex-col overflow-hidden relative">
       <div className="p-6 border-b border-industrial-800 bg-industrial-900">
-         <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-2xl font-bold text-white mb-1">{t('assets.title')}</h2>
-              <p className="text-industrial-500 text-sm">{t('config.subtitle')}</p>
-            </div>
-            <div className="flex gap-3">
-              <button
-                onClick={openAddManual}
-                className="bg-industrial-800 hover:bg-industrial-700 text-white border border-industrial-600 px-3 py-1.5 rounded text-xs transition-colors flex items-center gap-2"
-              >
-                <Box className="w-3 h-3" />
-                Agregar Equipo
-              </button>
-              <button
-                onClick={openAddGateway}
-                className="bg-industrial-accent hover:bg-blue-600 text-white px-3 py-1.5 rounded text-xs font-medium shadow-lg transition-colors flex items-center gap-2"
-              >
-                <Wifi className="w-3 h-3" /> {t('assets.provision')}
-              </button>
-            </div>
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-2xl font-bold text-white mb-1">{t('assets.title')}</h2>
+            <p className="text-industrial-500 text-sm">{t('config.subtitle')}</p>
           </div>
+          <div className="flex gap-3">
+            <button
+              onClick={openAddManual}
+              className="bg-industrial-800 hover:bg-industrial-700 text-white border border-industrial-600 px-3 py-1.5 rounded text-xs transition-colors flex items-center gap-2"
+            >
+              <Box className="w-3 h-3" />
+              Agregar Equipo
+            </button>
+            <button
+              onClick={openAddGateway}
+              className="bg-industrial-accent hover:bg-blue-600 text-white px-3 py-1.5 rounded text-xs font-medium shadow-lg transition-colors flex items-center gap-2"
+            >
+              <Wifi className="w-3 h-3" /> {t('assets.provision')}
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-6 bg-industrial-900/50">
@@ -571,7 +571,7 @@ export const MachinesList: React.FC = () => {
                           const docDate = isLegacyFormat ? null : doc.uploadedAt;
 
                           return (
-                            <div 
+                            <div
                               key={idx}
                               className="bg-industrial-900/30 p-3 rounded border border-industrial-700/50 flex items-center justify-between group hover:bg-industrial-900/50 transition-colors"
                             >
@@ -612,6 +612,61 @@ export const MachinesList: React.FC = () => {
                                     title="Descargar"
                                   >
                                     <Download size={16} />
+                                  </button>
+                                    <button
+                                    onClick={async (e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      if (!window.confirm('¿Estás seguro de eliminar este documento?')) return;
+
+                                      try {
+                                        console.log('Attempting to delete document:', docName);
+
+                                        // 1. Delete from Storage (if applicable)
+                                        // Only attempt storage deletion for non-legacy files
+                                        if (!isLegacyFormat && docUrl) {
+                                          const filePath = DocumentService.extractFilePathFromUrl(docUrl);
+                                          console.log('Extracted file path for deletion:', filePath);
+
+                                          if (filePath) {
+                                            await DocumentService.deleteDocument(filePath);
+                                            console.log('Document deleted from storage successfully');
+                                          } else {
+                                            console.warn('Could not extract file path from URL, skipping storage deletion:', docUrl);
+                                          }
+                                        }
+
+                                        // 2. Remove from Machine State - Handle both array types safely
+                                        const currentDocs = viewingMachine.documents || [];
+                                        const updatedDocuments = currentDocs.filter((_, i) => i !== idx);
+
+                                        // 3. Prepare updated machine object
+                                        const updatedMachine = {
+                                          ...viewingMachine,
+                                          documents: updatedDocuments
+                                        };
+
+                                        console.log('Updating machine state with new documents list:', updatedDocuments);
+
+                                        // 4. Update Database
+                                        await updateMachine(updatedMachine);
+                                        console.log('Database updated successfully');
+
+                                        // 5. Update Viewing State
+                                        // Ensure we don't set to null if the component is still mounted
+                                        setViewingMachine(prev => prev ? ({ ...prev, documents: updatedDocuments }) : null);
+
+                                      } catch (error: any) {
+                                        console.error('Error deleting document:', error);
+                                        // Still try to update UI if it was just a storage error? Maybe risky.
+                                        alert(`Error al eliminar el documento: ${error.message || 'Error desconocido'}`);
+                                      }
+                                    }}
+                                    type="button" // Prevent form submission
+                                    className="p-2 bg-red-900/50 hover:bg-red-900 text-red-200 rounded transition-colors"
+                                    title="Eliminar"
+                                  >
+                                    <Trash2 size={16} />
                                   </button>
                                 </div>
                               )}
@@ -869,14 +924,14 @@ export const MachinesList: React.FC = () => {
                         onChange={async (e) => {
                           if (e.target.files && e.target.files[0]) {
                             const file = e.target.files[0];
-                            
+
                             try {
                               // Subir archivo a Supabase Storage
                               const document = await DocumentService.uploadDocument(
                                 newMachine.id || 'temp',
                                 file
                               );
-                              
+
                               // Agregar documento con metadata completa
                               setNewMachine(prev => ({
                                 ...prev,
@@ -1064,7 +1119,7 @@ export const MachinesList: React.FC = () => {
                       <div className="flex flex-wrap gap-2">
                         {maintenancePlans.find(p => p.machineId === editingId)?.intervals.map(i => (
                           <span key={i.id} className="bg-blue-900/50 text-blue-200 px-2 py-0.5 rounded text-xs border border-blue-800">
-                             {i.label || `${i.hours.toLocaleString()} Horas`}
+                            {i.label || `${i.hours.toLocaleString()} Horas`}
                           </span>
                         ))}
                       </div>
@@ -1114,23 +1169,39 @@ export const MachinesList: React.FC = () => {
                   <div className="bg-industrial-900 border border-industrial-600 rounded p-2 h-32 overflow-y-auto">
                     {newManualAsset.documents && newManualAsset.documents.length > 0 ? (
                       <ul className="text-xs space-y-1">
-                        {newManualAsset.documents.map((doc, idx) => (
-                          <li key={idx} className="flex items-center gap-2 text-industrial-300">
-                            <FileText size={10} /> Doc {idx + 1}
-                          </li>
-                        ))}
+                        {newManualAsset.documents.map((doc, idx) => {
+                          const docName = typeof doc === 'string' ? doc : doc.name;
+                          return (
+                            <li key={idx} className="flex items-center gap-2 text-industrial-300">
+                              <FileText size={10} /> {docName}
+                            </li>
+                          );
+                        })}
                       </ul>
                     ) : <span className="text-xs text-industrial-500 italic">Sin documentos</span>}
 
                     <label className="mt-2 flex items-center justify-center gap-1 text-xs text-blue-400 cursor-pointer hover:underline">
                       <Plus size={10} /> Agregar Documento
                       <input type="file" className="hidden"
-                        onChange={(e) => {
+                        onChange={async (e) => {
                           if (e.target.files && e.target.files[0]) {
-                            setNewManualAsset(prev => ({
-                              ...prev,
-                              documents: [...(prev.documents || []), e.target.files![0].name]
-                            }));
+                            const file = e.target.files[0];
+                            try {
+                              // Subir archivo a Supabase Storage
+                              const document = await DocumentService.uploadDocument(
+                                newManualAsset.id || 'temp', // Use temp ID if new, will need to handle this
+                                file
+                              );
+
+                              // Agregar documento con metadata completa
+                              setNewManualAsset(prev => ({
+                                ...prev,
+                                documents: [...(prev.documents || []), document]
+                              }));
+                            } catch (error) {
+                              console.error('Error uploading document:', error);
+                              alert('Error al subir el archivo. Verifica que el bucket "machine-documents" esté configurado en Supabase.');
+                            }
                           }
                         }}
                       />

@@ -321,6 +321,7 @@ export interface ZoneStructure {
   y?: number;
   width?: number; // Optional layout (percent 0-100)
   height?: number;
+  orderIndex?: number; // For manual sorting
 }
 
 export enum AppView {

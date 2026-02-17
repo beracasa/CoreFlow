@@ -46,7 +46,7 @@ export const Configuration: React.FC<ConfigurationProps> = ({
     machines, addMachine, updateMachine,
     technicians, addTechnician,
     parts, addPart,
-    zones: storeZoneStructures, addZone: storeAddZone, updateZone: storeUpdateZone, removeZone: storeRemoveZone,
+    zones: storeZoneStructures, addZone: storeAddZone, updateZone: storeUpdateZone, removeZone: storeRemoveZone, reorderZones,
     plantSettings, updateSettings,
     // Protocol Actions
     maintenancePlans, addMaintenancePlan, updateMaintenancePlan,
@@ -300,6 +300,18 @@ export const Configuration: React.FC<ConfigurationProps> = ({
 
   const handleDeleteZone = (id: string) => {
     onRemoveZone(id);
+  };
+
+  const handleMoveZone = (zoneId: string, direction: 'up' | 'down') => {
+    const currentIndex = zoneStructures.findIndex(z => z.id === zoneId);
+    if (currentIndex === -1) return;
+
+    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    
+    // Bounds check handled by store, but good to check here too
+    if (newIndex >= 0 && newIndex < zoneStructures.length) {
+        reorderZones(currentIndex, newIndex);
+    }
   };
 
   const handleAddLine = (zoneId: string) => {
@@ -934,13 +946,30 @@ export const Configuration: React.FC<ConfigurationProps> = ({
                               </div>
                             )}
 
-                            <button
+                              <button
                               onClick={() => handleDeleteZone(zone.id)}
                               className="text-industrial-500 hover:text-red-500 transition-colors bg-industrial-900 p-1 rounded border border-industrial-800 hover:border-red-500/50"
                               title="Eliminar Zona completa"
                             >
                               <Trash2 size={14} />
                             </button>
+                            {/* Reorder Controls */}
+                            <div className="flex flex-col gap-0.5 ml-1">
+                                <button 
+                                    onClick={() => handleMoveZone(zone.id, 'up')}
+                                    className="text-industrial-500 hover:text-white hover:bg-industrial-700 rounded p-0.5"
+                                    title="Mover Arriba"
+                                >
+                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+                                </button>
+                                <button 
+                                    onClick={() => handleMoveZone(zone.id, 'down')}
+                                    className="text-industrial-500 hover:text-white hover:bg-industrial-700 rounded p-0.5"
+                                    title="Mover Abajo"
+                                >
+                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                                </button>
+                            </div>
                           </div>
 
                           <div className="space-y-2 pl-4 border-l-2 border-industrial-800 ml-1">

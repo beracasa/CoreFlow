@@ -27,6 +27,7 @@ import { Clock, LogOut, Shield, User, Hexagon, Server } from 'lucide-react';
 import { MachinesList } from './components/MachinesList';
 import { useWorkOrderStore } from './src/stores/useWorkOrderStore';
 import { useMasterStore } from './src/stores/useMasterStore';
+import { useUserStore } from './src/stores/useUserStore';
 
 // --- SIDEBAR ITEM ---
 const SidebarItem = ({ icon, label, active, onClick, restricted = false }: { icon: React.ReactNode, label: string, active: boolean, onClick: () => void, restricted?: boolean }) => {
@@ -287,9 +288,22 @@ const AppLayout = () => {
 };
 
 // --- AUTH GUARD ---
+// --- AUTH GUARD ---
 const RequireAuth = ({ children }: { children: JSX.Element }) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
+
+  if (isLoading) {
+    return (
+      <div className="h-screen w-screen bg-industrial-900 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+          <p className="text-industrial-400 text-sm animate-pulse">Initializing Secure Session...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
@@ -298,20 +312,33 @@ const RequireAuth = ({ children }: { children: JSX.Element }) => {
 
 // --- INITIALIZER ---
 const AppInitializer = () => {
-  const { fetchOrders, workOrders } = useWorkOrderStore();
-  const { fetchMasterData, machines } = useMasterStore();
+  const { fetchOrders, isInitialized: ordersInitialized } = useWorkOrderStore();
+  const { fetchMasterData, isInitialized: masterInitialized } = useMasterStore();
+  const { fetchRoles, roles } = useUserStore(); // roles needed for dependency check? or just run once?
 
   React.useEffect(() => {
-    if (workOrders.length === 0) {
+    // Only fetch if not initialized
+    if (!ordersInitialized) {
+      console.log('AppInitializer: Fetching Orders...');
       fetchOrders();
     }
-  }, [fetchOrders, workOrders.length]);
+  }, [fetchOrders, ordersInitialized]);
 
   React.useEffect(() => {
-    if (machines.length === 0) {
+    // Prevent infinite loop: only fetch if not initialized
+    if (!masterInitialized) {
+        console.log('AppInitializer: Fetching Master Data...');
         fetchMasterData();
     }
-  }, [fetchMasterData, machines.length]);
+  }, [fetchMasterData, masterInitialized]);
+
+  React.useEffect(() => {
+    // Load Roles for RBAC
+    if (roles.length === 0) {
+        console.log('AppInitializer: Fetching Roles...');
+        fetchRoles();
+    }
+  }, [fetchRoles, roles.length]);
 
   return null;
 }

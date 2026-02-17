@@ -6,6 +6,7 @@ import { workOrderService } from '../services';
 interface WorkOrderState {
     workOrders: WorkOrder[];
     loading: boolean;
+    isInitialized: boolean;
     error: string | null;
 
     fetchOrders: () => Promise<void>;
@@ -17,15 +18,19 @@ interface WorkOrderState {
 export const useWorkOrderStore = create<WorkOrderState>((set, get) => ({
     workOrders: [],
     loading: false,
+    isInitialized: false, // Add flag
     error: null,
 
     fetchOrders: async () => {
+        const state = get();
+        if (state.loading || state.isInitialized) return;
+
         set({ loading: true, error: null });
         try {
             const orders = await workOrderService.getAll();
-            set({ workOrders: orders, loading: false });
+            set({ workOrders: orders, loading: false, isInitialized: true });
         } catch (err: any) {
-            set({ error: err.message || 'Failed to fetch orders', loading: false });
+            set({ error: err.message || 'Failed to fetch orders', loading: false, isInitialized: true });
         }
     },
 

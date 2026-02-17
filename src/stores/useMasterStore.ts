@@ -16,8 +16,9 @@ interface MasterState {
     currentPlan: PlanTier;
     maintenancePlans: MaintenancePlan[];
 
-    // Loading & Error
+    // State flags
     isLoading: boolean;
+    isInitialized: boolean;
     error: string | null;
 
     // Configuration Lists
@@ -41,6 +42,7 @@ interface MasterState {
     
     addZone: (zone: ZoneStructure) => Promise<void>;
     updateZone: (zone: ZoneStructure) => Promise<void>;
+    reorderZones: (sourceIndex: number, destinationIndex: number) => Promise<void>;
     removeZone: (id: string) => Promise<void>;
 
     // Config Actions (Keep local for now or TODO: move to DB)
@@ -91,9 +93,9 @@ export const useMasterStore = create<MasterState>((set, get) => ({
     maintenancePlans: [], // TODO: Migrate to DB
 
     isLoading: false,
+    isInitialized: false,
     error: null,
 
-    // Shared Configuration Lists (Defaults)
     // Shared Configuration Lists (Defaults)
     branches: [],
     categories: [],
@@ -104,41 +106,69 @@ export const useMasterStore = create<MasterState>((set, get) => ({
     partUnits: [],
 
     fetchMasterData: async () => {
+        const state = get();
+        if (state.isLoading || state.isInitialized) return; // Prevent re-entry
+
         set({ isLoading: true, error: null });
+        
+        // Helper to safely fetch data or return a default value
+        const safeFetch = async <T>(promise: Promise<T>, fallback: T, name: string): Promise<T> => {
+            try {
+                return await promise;
+            } catch (error: any) {
+                console.error(`Failed to fetch ${name}:`, error);
+                return fallback;
+            }
+        };
+
         try {
-            const [machines, technicians, zones, parts, branches, categories, assetTypes, plantSettings, partCategories, partLocations, partUnits] = await Promise.all([
-                MasterDataService.getMachines(),
-                MasterDataService.getTechnicians(),
-                MasterDataService.getZones(),
-                inventoryService.getAllParts(),
-                MasterDataService.getBranches(),
-                MasterDataService.getCategories(),
-                MasterDataService.getAssetTypes(),
-                SettingsSupabaseService.getSettings(),
-                MasterDataService.getPartCategories(),
-                MasterDataService.getPartLocations(),
-                MasterDataService.getPartUnits()
+            // Execute all fetches in parallel, each handling its own errors
+            const [
+                machines, 
+                technicians, 
+                zones, 
+                parts, 
+                branches, 
+                categories, 
+                assetTypes, 
+                plantSettings, 
+                partCategories, 
+                partLocations, 
+                partUnits
+            ] = await Promise.all([
+                safeFetch(MasterDataService.getMachines(), [], 'machines'),
+                safeFetch(MasterDataService.getTechnicians(), [], 'technicians'),
+                safeFetch(MasterDataService.getZones(), [], 'zones'),
+                safeFetch(inventoryService.getAllParts(), [], 'parts'),
+                safeFetch(MasterDataService.getBranches(), [], 'branches'),
+                safeFetch(MasterDataService.getCategories(), [], 'categories'),
+                safeFetch(MasterDataService.getAssetTypes(), [], 'assetTypes'),
+                safeFetch(SettingsSupabaseService.getSettings(), get().plantSettings, 'plantSettings'),
+                safeFetch(MasterDataService.getPartCategories(), [], 'partCategories'),
+                safeFetch(MasterDataService.getPartLocations(), [], 'partLocations'),
+                safeFetch(MasterDataService.getPartUnits(), [], 'partUnits')
             ]);
             
             const currentState = get();
+            
             set({
                 machines,
                 technicians,
-                zones,
+                zones: zones.sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0)),
                 parts,
-                // Only override defaults if we have data, otherwise use defaults
                 branches: branches.length > 0 ? branches : currentState.branches,
                 categories: categories.length > 0 ? categories : currentState.categories,
                 assetTypes: assetTypes.length > 0 ? assetTypes : currentState.assetTypes,
                 partCategories: partCategories.length > 0 ? partCategories : currentState.partCategories,
                 partLocations: partLocations.length > 0 ? partLocations : currentState.partLocations,
                 partUnits: partUnits.length > 0 ? partUnits : currentState.partUnits,
-                plantSettings: plantSettings, // Always use fetched settings (service returns defaults if empty)
-                isLoading: false
+                plantSettings: plantSettings, 
+                isLoading: false,
+                isInitialized: true // Mark as initialized
             });
         } catch (error: any) {
-            console.error('Failed to fetch master data:', error);
-            set({ error: error.message, isLoading: false });
+            console.error('Critical error in fetchMasterData:', error);
+            set({ error: error.message, isLoading: false, isInitialized: true }); // Prevent infinite retry even on error
         }
     },
 
@@ -190,9 +220,17 @@ export const useMasterStore = create<MasterState>((set, get) => ({
 
     addZone: async (zone) => {
         try {
-            const newZone = (await MasterDataService.createZone(zone)) as any; // Cast if array returned
+            const state = get();
+            // Auto-assign orderIndex if not present
+            const nextIndex = state.zones.length > 0 
+                ? Math.max(...state.zones.map(z => z.orderIndex || 0)) + 1 
+                : 0;
+
+            const zoneWithOrder = { ...zone, orderIndex: zone.orderIndex ?? nextIndex };
+            const newZone = (await MasterDataService.createZone(zoneWithOrder)) as any;
+            
             set((state) => ({
-                zones: [...state.zones, newZone] // Ensure implementation returns single or array
+                zones: [...state.zones, newZone].sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0))
             }));
         } catch (error: any) {
              set({ error: error.message });
@@ -204,9 +242,44 @@ export const useMasterStore = create<MasterState>((set, get) => ({
             await MasterDataService.updateZone(updatedZone);
             set((state) => ({
                 zones: state.zones.map(z => z.id === updatedZone.id ? updatedZone : z)
+                            .sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0))
             }));
         } catch (error: any) {
              set({ error: error.message });
+        }
+    },
+
+    reorderZones: async (sourceIndex: number, destinationIndex: number) => {
+        const state = get();
+        const zones = [...state.zones];
+        
+        // Validation
+        if (sourceIndex < 0 || sourceIndex >= zones.length || destinationIndex < 0 || destinationIndex >= zones.length) return;
+
+        // Swap in local state for optimistic UI
+        const [movedZone] = zones.splice(sourceIndex, 1);
+        zones.splice(destinationIndex, 0, movedZone);
+
+        // Update order indexes
+        const updatedZones = zones.map((zone, index) => ({
+            ...zone,
+            orderIndex: index
+        }));
+
+        set({ zones: updatedZones });
+
+        try {
+            // Persist order to backend (Batch update ideally, or loop for now)
+            // For efficiency with small lists, loop is acceptable. 
+            // Better: MasterDataService.updateZoneOrder(updatedZones);
+            // We will add updateZoneOrder to service next.
+            await MasterDataService.updateZoneOrder(updatedZones);
+
+        } catch (error: any) {
+            console.error("Failed to reorder zones:", error);
+            // Revert on failure?
+            set({ error: "Failed to save new order." });
+             // Could revert state here by fetching again
         }
     },
 
@@ -221,7 +294,6 @@ export const useMasterStore = create<MasterState>((set, get) => ({
         }
     },
 
-    // Sync Actions (Config)
     // Sync Actions (Config)
     updateSettings: async (settings) => {
         try {

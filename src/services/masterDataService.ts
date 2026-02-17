@@ -31,9 +31,12 @@ export const MasterDataService = {
 
   // ZONES
   async getZones(): Promise<ZoneStructure[]> {
-    const { data, error } = await supabase.from('zones').select('*');
+    const { data, error } = await supabase.from('zones').select('*').order('order_index', { ascending: true });
     if (error) throw error;
-    return data as ZoneStructure[];
+    return data.map((z: any) => ({
+        ...z,
+        orderIndex: z.order_index
+    })) as ZoneStructure[];
   },
 
   async createZone(zone: ZoneStructure): Promise<ZoneStructure> {
@@ -45,10 +48,12 @@ export const MasterDataService = {
         y: zone.y,
         width: zone.width,
         height: zone.height,
-        color: zone.color
+        color: zone.color,
+        order_index: zone.orderIndex || 0
     }).select().single();
     if (error) throw error;
-    return data as ZoneStructure[];
+    // Map back to camelCase
+    return { ...data, orderIndex: data.order_index } as ZoneStructure;
   },
 
   async updateZone(zone: ZoneStructure): Promise<void> {
@@ -59,8 +64,28 @@ export const MasterDataService = {
         y: zone.y,
         width: zone.width,
         height: zone.height,
-        color: zone.color
+        color: zone.color,
+        order_index: zone.orderIndex
     }).eq('id', zone.id);
+    if (error) throw error;
+  },
+
+  async updateZoneOrder(zones: ZoneStructure[]): Promise<void> {
+    // Upsert all zones with new order_index
+    // Prepare payload
+    const updates = zones.map(z => ({
+        id: z.id,
+        name: z.name,
+        lines: z.lines,
+        x: z.x,
+        y: z.y,
+        width: z.width,
+        height: z.height,
+        color: z.color,
+        order_index: z.orderIndex
+    }));
+
+    const { error } = await supabase.from('zones').upsert(updates);
     if (error) throw error;
   },
 

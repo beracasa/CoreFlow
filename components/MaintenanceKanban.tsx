@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { WorkOrderStatus, Priority } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
 import { useWorkOrderStore } from '../src/stores/useWorkOrderStore';
 
 // Simple calc helpers (moved back or imported if desired, keeping local)
@@ -14,6 +15,7 @@ const calculateMTBF = () => 148.5;
 
 export const MaintenanceKanban: React.FC = () => {
   const { t } = useLanguage();
+  const { hasPermission } = useAuth();
   const { workOrders, updateOrder } = useWorkOrderStore();
   const [draggingId, setDraggingId] = useState<string | null>(null);
 
@@ -91,9 +93,9 @@ export const MaintenanceKanban: React.FC = () => {
                 .map(order => (
                   <div
                     key={order.id}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, order.id)}
-                    className="bg-industrial-700 p-3 rounded border border-industrial-600 shadow-sm hover:border-industrial-500 cursor-move active:cursor-grabbing transition-colors"
+                    draggable={hasPermission('edit_kanban')}
+                    onDragStart={(e) => hasPermission('edit_kanban') && handleDragStart(e, order.id)}
+                    className={`bg-industrial-700 p-3 rounded border border-industrial-600 shadow-sm transition-colors ${hasPermission('edit_kanban') ? 'hover:border-industrial-500 cursor-move active:cursor-grabbing' : 'opacity-80 cursor-not-allowed'}`}
                   >
                     <div className="flex justify-between items-start mb-2">
                       <span className={`text-[10px] px-1.5 py-0.5 rounded border ${getPriorityColor(order.priority)} font-mono`}>
