@@ -36,25 +36,25 @@ export const Login: React.FC = () => {
       if (isSignUp) {
         // Handle Sign Up
         const { data, error } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-                data: {
-                    full_name: fullName,
-                    role: UserRole.ADMIN_SOLICITANTE, // Default role for first user
-                    job_title: 'Manager' // Default
-                }
+          email,
+          password,
+          options: {
+            data: {
+              full_name: fullName,
+              // role: UserRole.ADMIN_SOLICITANTE, // Let trigger handle default role ('Nuevo Usuario')
+              job_title: 'Manager' // Default
             }
+          }
         });
-        
+
         if (error) throw error;
 
         if (data.user && data.session) {
-             // Auto logged in
-             navigate(from, { replace: true });
+          // Auto logged in
+          navigate(from, { replace: true });
         } else {
-             setMessage('Account created! Please check your email to confirm.');
-             setIsSignUp(false);
+          setMessage('Account created! Please check your email to confirm.');
+          setIsSignUp(false);
         }
 
       } else {
@@ -102,20 +102,20 @@ export const Login: React.FC = () => {
           <form onSubmit={handleSubmit} className="space-y-6">
 
             {isSignUp && (
-                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-industrial-400 uppercase tracking-wider ml-1">Full Name</label>
-                  <div className="relative group">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 text-industrial-500 group-focus-within:text-industrial-accent transition-colors w-5 h-5" />
-                    <input
-                      type="text"
-                      required
-                      className="w-full bg-industrial-900 border border-industrial-600 rounded-lg py-3 pl-10 pr-4 text-white placeholder-industrial-600 focus:border-industrial-accent focus:ring-1 focus:ring-industrial-accent outline-none transition-all"
-                      placeholder="John Doe"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                    />
-                  </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-industrial-400 uppercase tracking-wider ml-1">Full Name</label>
+                <div className="relative group">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 text-industrial-500 group-focus-within:text-industrial-accent transition-colors w-5 h-5" />
+                  <input
+                    type="text"
+                    required
+                    className="w-full bg-industrial-900 border border-industrial-600 rounded-lg py-3 pl-10 pr-4 text-white placeholder-industrial-600 focus:border-industrial-accent focus:ring-1 focus:ring-industrial-accent outline-none transition-all"
+                    placeholder="John Doe"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                  />
                 </div>
+              </div>
             )}
 
             <div className="space-y-2">
@@ -154,7 +154,7 @@ export const Login: React.FC = () => {
                 <p className="text-sm text-red-200">{error}</p>
               </div>
             )}
-            
+
             {message && (
               <div className="bg-green-900/20 border border-green-500/50 rounded-lg p-3 flex items-start gap-3">
                 <ShieldCheck className="w-5 h-5 text-green-400 shrink-0 mt-0.5" />
@@ -172,24 +172,24 @@ export const Login: React.FC = () => {
             </button>
           </form>
 
-            <div className="mt-4 text-center">
-                <button 
-                    onClick={() => { setIsSignUp(!isSignUp); setError(''); setMessage(''); }}
-                    className="text-sm text-industrial-400 hover:text-industrial-accent transition-colors"
-                >
-                    {isSignUp ? 'Already have an account? Sign In' : 'Need an account? Sign Up'}
-                </button>
-            </div>
+          <div className="mt-4 text-center">
+            <button
+              onClick={() => { setIsSignUp(!isSignUp); setError(''); setMessage(''); }}
+              className="text-sm text-industrial-400 hover:text-industrial-accent transition-colors"
+            >
+              {isSignUp ? 'Already have an account? Sign In' : 'Need an account? Sign Up'}
+            </button>
+          </div>
 
           {/* Demo Hint (Only show on Sign In) */}
           {!isSignUp && (
-          <div className="mt-8 pt-6 border-t border-industrial-700/50">
-            <p className="text-xs text-center text-industrial-500 mb-3">Demo Credentials (Will fail if not in Supabase)</p>
-            <div className="flex gap-2 justify-center flex-wrap">
-              <button onClick={() => { setEmail('admin@coreflow.io'); setPassword('1234'); }} className="px-2 py-1 bg-industrial-900 border border-industrial-700 rounded text-[10px] text-industrial-400 hover:text-white hover:border-industrial-500 transition-colors">Admin</button>
-              <button onClick={() => { setEmail('tech@coreflow.io'); setPassword('1234'); }} className="px-2 py-1 bg-industrial-900 border border-industrial-700 rounded text-[10px] text-industrial-400 hover:text-white hover:border-industrial-500 transition-colors">Tech</button>
+            <div className="mt-8 pt-6 border-t border-industrial-700/50">
+              <p className="text-xs text-center text-industrial-500 mb-3">Demo Credentials (Will fail if not in Supabase)</p>
+              <div className="flex gap-2 justify-center flex-wrap">
+                <button onClick={() => { setEmail('admin@coreflow.io'); setPassword('1234'); }} className="px-2 py-1 bg-industrial-900 border border-industrial-700 rounded text-[10px] text-industrial-400 hover:text-white hover:border-industrial-500 transition-colors">Admin</button>
+                <button onClick={() => { setEmail('tech@coreflow.io'); setPassword('1234'); }} className="px-2 py-1 bg-industrial-900 border border-industrial-700 rounded text-[10px] text-industrial-400 hover:text-white hover:border-industrial-500 transition-colors">Tech</button>
+              </div>
             </div>
-          </div>
           )}
         </div>
       </div>

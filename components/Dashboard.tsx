@@ -7,7 +7,7 @@ import { UserRole, Machine, MachineStatus } from '../types';
 import { MachineModal } from './modals/MachineModal';
 
 export const Dashboard: React.FC = () => {
-  const { machines, updateMachine, addMachine, zones, updateZone } = useMasterStore();
+  const { machines, updateMachine, addMachine, removeMachine, zones, updateZone, addZone, removeZone } = useMasterStore();
   const { hasRole } = useAuth();
   const navigate = useNavigate();
 
@@ -59,7 +59,7 @@ export const Dashboard: React.FC = () => {
       brand: machine.brand || '',
       model: machine.model || '',
       plate: machine.plate || '',
-      location: machine.location || { x: 50, y: 50 },
+      location: machine.location || { x: 0, y: 0 },
       zone: machine.zone || 'Unassigned',
       isIot: false, // Default for manual add
       runningHours: 0,
@@ -84,6 +84,9 @@ export const Dashboard: React.FC = () => {
         onMoveMachine={handleMoveMachine}
         onUpdateZone={updateZone}
         onAddMachine={handleOpenAddMachineInfo}
+        onAddZone={addZone}
+        onRemoveZone={removeZone}
+        onRemoveMachine={removeMachine}
       />
 
       <MachineModal

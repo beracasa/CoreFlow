@@ -6,16 +6,17 @@ import { Plus, Mail, Shield, UserCheck, MoreVertical, Search, CheckCircle, Penci
 import { useUserStore } from '../../src/stores/useUserStore';
 
 export const UserManagement: React.FC = () => {
-    const { users, roles, fetchUsers, addUser, updateUser, deleteUser, isLoading } = useUserStore();
+    const { users, roles, fetchUsers, fetchRoles, addUser, updateUser, deleteUser, isLoading } = useUserStore();
 
     // Fetch on mount
     React.useEffect(() => {
         fetchUsers();
+        fetchRoles(); // Ensure roles are loaded
     }, []);
 
     // Invite Modal State
     const [showInviteModal, setShowInviteModal] = useState(false);
-    const [newUser, setNewUser] = useState({ email: '', role: UserRole.TECNICO_MANT, fullName: '', title: '' });
+    const [newUser, setNewUser] = useState({ email: '', role: '', fullName: '', title: '', companyCode: '' });
 
     // Edit Modal State
     const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
@@ -26,9 +27,11 @@ export const UserManagement: React.FC = () => {
     const handleInvite = (e: React.FormEvent) => {
         e.preventDefault();
         if (newUser.email && newUser.fullName) {
-             addUser(newUser.email, newUser.fullName, newUser.role as UserRole, newUser.title);
-             setShowInviteModal(false);
-             setNewUser({ email: '', role: UserRole.TECNICO_MANT, fullName: '', title: '' });
+            if (newUser.email && newUser.fullName) {
+                addUser(newUser.email, newUser.fullName, newUser.role, newUser.title, newUser.companyCode);
+                setShowInviteModal(false);
+                setNewUser({ email: '', role: '', fullName: '', title: '', companyCode: '' });
+            }
         }
     };
 
@@ -106,8 +109,8 @@ export const UserManagement: React.FC = () => {
                                         <span className="text-white text-xs font-medium flex items-center gap-1">
                                             <Briefcase size={10} className="text-industrial-500" /> {user.job_title}
                                         </span>
-                                        <span className={`text-[10px] uppercase font-bold mt-1 ${user.role === UserRole.ADMIN_SOLICITANTE ? 'text-red-400' : 'text-blue-400'}`}>
-                                            {user.role.replace('_', ' ')}
+                                        <span className={`text-[10px] uppercase font-bold mt-1 ${roles.find(r => r.id === user.role || r.name === user.role)?.name === 'Administrador' ? 'text-red-400' : 'text-blue-400'}`}>
+                                            {roles.find(r => r.id === user.role || r.name === user.role)?.name || user.role}
                                         </span>
                                     </div>
                                 </td>
@@ -196,11 +199,17 @@ export const UserManagement: React.FC = () => {
                             <div className="space-y-1">
                                 <label className="text-xs text-industrial-400 font-bold uppercase">Rol en Sistema</label>
                                 <select className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm focus:border-industrial-accent outline-none"
-                                    value={newUser.role} onChange={e => setNewUser({ ...newUser, role: e.target.value as UserRole })}>
-                                    <option value={UserRole.TECNICO_MANT}>Technician (Standard)</option>
-                                    <option value={UserRole.ADMIN_SOLICITANTE}>Admin / Manager</option>
-                                    <option value={UserRole.AUDITOR}>Auditor (Read Only)</option>
+                                    value={newUser.role} onChange={e => setNewUser({ ...newUser, role: e.target.value })}>
+                                    <option value="">-- Seleccionar Rol --</option>
+                                    {roles.map(role => (
+                                        <option key={role.id} value={role.id}>{role.name}</option>
+                                    ))}
                                 </select>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-xs text-industrial-400 font-bold uppercase">Código de Empresa</label>
+                                <input type="text" className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm focus:border-industrial-accent outline-none"
+                                    value={newUser.companyCode} onChange={e => setNewUser({ ...newUser, companyCode: e.target.value })} placeholder="e.g. EMP-001" />
                             </div>
                             <div className="flex justify-end gap-3 pt-4 border-t border-industrial-700">
                                 <button type="button" onClick={() => setShowInviteModal(false)} className="px-4 py-2 text-sm text-industrial-400 hover:text-white">Cancelar</button>
@@ -259,12 +268,22 @@ export const UserManagement: React.FC = () => {
                                     <select
                                         className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm focus:border-industrial-accent outline-none"
                                         value={editingUser.role}
-                                        onChange={e => setEditingUser({ ...editingUser, role: e.target.value as UserRole })}
+                                        onChange={e => setEditingUser({ ...editingUser, role: e.target.value })}
                                     >
-                                        <option value={UserRole.ADMIN_SOLICITANTE}>Admin (Full Access)</option>
-                                        <option value={UserRole.TECNICO_MANT}>Technician (Execution)</option>
-                                        <option value={UserRole.AUDITOR}>Auditor (Read Only)</option>
+                                        {roles.map(role => (
+                                            <option key={role.id} value={role.id}>{role.name}</option>
+                                        ))}
                                     </select>
+                                </div>
+                                <div className="space-y-1 col-span-2">
+                                    <label className="text-xs text-industrial-400 font-bold uppercase">Código de Empresa</label>
+                                    <input
+                                        type="text"
+                                        className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm focus:border-industrial-accent outline-none"
+                                        value={editingUser.company_code || ''}
+                                        onChange={e => setEditingUser({ ...editingUser, company_code: e.target.value })}
+                                        placeholder="Código de Empresa"
+                                    />
                                 </div>
                             </div>
 

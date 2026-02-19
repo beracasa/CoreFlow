@@ -1,7 +1,6 @@
-import { createClient } from '@supabase/supabase-js';
-import fs from 'fs';
-import path from 'path';
-
+const { createClient } = require('@supabase/supabase-js');
+const fs = require('fs');
+const path = require('path');
 
 console.log('✅ Script started');
 
@@ -10,6 +9,10 @@ async function verifyConnection() {
     console.log('📂 Reading .env.local...');
     // Read .env.local manually since we don't have dotenv
     const envPath = path.resolve(process.cwd(), '.env.local');
+    if (!fs.existsSync(envPath)) {
+      console.error('❌ .env.local not found!');
+      return;
+    }
     const envContent = fs.readFileSync(envPath, 'utf-8');
 
     const envVars = {};
@@ -27,18 +30,21 @@ async function verifyConnection() {
 
     if (!supabaseUrl || !supabaseKey) {
       console.error('❌ Missing Supabase credentials in .env.local');
+      console.log('Found keys:', Object.keys(envVars));
       return;
     }
 
     console.log(`Connecting to Supabase at ${supabaseUrl}...`);
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { count, error } = await supabase
+    // Try a simple health check or public table query
+    const { data, count, error } = await supabase
       .from('work_orders')
       .select('*', { count: 'exact', head: true });
 
     if (error) {
       console.error('❌ Connection failed:', error.message);
+      if (error.code) console.error('Error Code:', error.code);
     } else {
       console.log('✅ Connection successful!');
       console.log(`✅ Current work_orders count: ${count}`);

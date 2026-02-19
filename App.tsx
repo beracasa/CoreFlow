@@ -197,6 +197,7 @@ const MaintenanceFormPage = () => {
 const AppLayout = () => {
   const { user, logout, hasRole } = useAuth();
   const { plantSettings } = useMasterStore();
+  const { roles } = useUserStore(); // Get roles for lookup
   const { language, setLanguage, t } = useLanguage();
   const location = useLocation();
   const navigate = useNavigate();
@@ -263,7 +264,9 @@ const AppLayout = () => {
                 <p className="text-sm font-medium text-white truncate w-32">{user?.full_name}</p>
                 <div className="flex items-center gap-1.5">
                   <span className={`w-1.5 h-1.5 rounded-full ${user?.role === 'ADMIN_SOLICITANTE' ? 'bg-red-500' : 'bg-emerald-500'}`}></span>
-                  <p className="text-[10px] text-industrial-400 uppercase tracking-wider">{user?.role.replace('_', ' ')}</p>
+                  <p className="text-[10px] text-industrial-400 uppercase tracking-wider">
+                    {roles.find(r => r.id === user?.role || r.name === user?.role)?.name || user?.role?.replace('_', ' ')}
+                  </p>
                 </div>
               </div>
             </div>
@@ -278,6 +281,7 @@ const AppLayout = () => {
         </aside>
 
         <main className="flex-1 overflow-hidden relative">
+          <AppInitializer />
           {/* <ErrorBoundary> Removed inner boundary */}
           <Outlet />
           {/* </ErrorBoundary> */}
@@ -327,16 +331,16 @@ const AppInitializer = () => {
   React.useEffect(() => {
     // Prevent infinite loop: only fetch if not initialized
     if (!masterInitialized) {
-        console.log('AppInitializer: Fetching Master Data...');
-        fetchMasterData();
+      console.log('AppInitializer: Fetching Master Data...');
+      fetchMasterData();
     }
   }, [fetchMasterData, masterInitialized]);
 
   React.useEffect(() => {
     // Load Roles for RBAC
     if (roles.length === 0) {
-        console.log('AppInitializer: Fetching Roles...');
-        fetchRoles();
+      console.log('AppInitializer: Fetching Roles...');
+      fetchRoles();
     }
   }, [fetchRoles, roles.length]);
 
@@ -349,31 +353,62 @@ const ProfilePage = () => {
 };
 
 // --- MAIN COMPONENT ---
+const AppRoutes = () => {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="h-screen w-screen bg-industrial-900 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+          <p className="text-industrial-400 text-sm animate-pulse">Initializing Secure Session...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    );
+  }
+
+  return (
+    <Routes>
+      <Route path="/login" element={<Navigate to="/" replace />} />
+      <Route path="/" element={
+        <AppLayout>
+          <AppInitializer />
+          <Outlet />
+        </AppLayout>
+      }>
+        <Route index element={<Dashboard />} />
+        <Route path="kanban" element={<MaintenanceKanban />} />
+        <Route path="orders/preventive" element={<MaintenanceList type="R-MANT-02" />} />
+        <Route path="orders/corrective" element={<MaintenanceList type="R-MANT-05" />} />
+        <Route path="orders/new" element={<MaintenanceFormPage />} />
+        <Route path="orders/:id" element={<MaintenanceFormPage />} />
+
+        <Route path="logs" element={<MachineHoursPage />} />
+        <Route path="machines" element={<MachinesPage />} />
+        <Route path="inventory" element={<InventoryPage />} />
+        <Route path="stats" element={<AnalyticsPage />} />
+        <Route path="settings" element={<ConfigurationPage />} />
+
+        <Route path="profile" element={<ProfilePage />} />
+      </Route>
+    </Routes>
+  );
+};
+
 export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppInitializer />
-        <Routes>
-          <Route path="/login" element={<Login />} />
-
-          <Route path="/" element={<RequireAuth><AppLayout /></RequireAuth>}>
-            <Route index element={<Dashboard />} />
-            <Route path="kanban" element={<MaintenanceKanban />} />
-            <Route path="orders/preventive" element={<MaintenanceList type="R-MANT-02" />} />
-            <Route path="orders/corrective" element={<MaintenanceList type="R-MANT-05" />} />
-            <Route path="orders/new" element={<MaintenanceFormPage />} />
-            <Route path="orders/:id" element={<MaintenanceFormPage />} />
-
-            <Route path="logs" element={<MachineHoursPage />} />
-            <Route path="machines" element={<MachinesPage />} />
-            <Route path="inventory" element={<InventoryPage />} />
-            <Route path="stats" element={<AnalyticsPage />} />
-            <Route path="settings" element={<ConfigurationPage />} />
-
-            <Route path="profile" element={<ProfilePage />} />
-          </Route>
-        </Routes>
+        <AppRoutes />
       </AuthProvider>
     </BrowserRouter>
   );

@@ -212,7 +212,7 @@ export const MachinesList: React.FC = () => {
       const machine: Machine = {
         id: crypto.randomUUID(),
         status: MachineStatus.IDLE,
-        location: { x: Math.floor(Math.random() * 80) + 10, y: Math.floor(Math.random() * 80) + 10 },
+        location: { x: 0, y: 0 },
         zone: zones[0],
         isIot: true,
         lastMaintenance: new Date().toISOString(),
@@ -234,16 +234,6 @@ export const MachinesList: React.FC = () => {
     if (!newManualAsset.name) {
       alert("Falta el nombre del equipo");
       return;
-    }
-
-    let baseX = 50, baseY = 50;
-    if (newManualAsset.zone && newManualAsset.zone.includes("Zone A")) {
-      baseX = 20 + Math.random() * 20; baseY = 20 + Math.random() * 60;
-    } else if (newManualAsset.zone && newManualAsset.zone.includes("Zone B")) {
-      baseX = 60 + Math.random() * 20;
-      baseY = 20 + Math.random() * 60;
-    } else {
-      baseX = Math.random() * 80 + 10; baseY = Math.random() * 80 + 10;
     }
 
     const intervals = newManualAsset.customIntervals
@@ -285,7 +275,7 @@ export const MachinesList: React.FC = () => {
         const machine: Machine = {
           id: crypto.randomUUID(),
           status: MachineStatus.IDLE,
-          location: { x: baseX, y: baseY },
+          location: { x: 0, y: 0 },
           isIot: false,
           runningHours: 0,
           lastMaintenance: new Date().toISOString(),
@@ -613,7 +603,7 @@ export const MachinesList: React.FC = () => {
                                   >
                                     <Download size={16} />
                                   </button>
-                                    <button
+                                  <button
                                     onClick={async (e) => {
                                       e.preventDefault();
                                       e.stopPropagation();

@@ -32,19 +32,19 @@ export interface RoleDefinition {
   id: string; // e.g. 'custom-supervisor' or UUID
   name: string; // e.g. 'Line Supervisor'
   description: string;
-  
+
   // Jerarquía
   parentRoleId?: string | null; // ID del rol superior (Reporta a)
   children?: RoleDefinition[]; // Roles hijos (calculado en frontend para tree view)
   level?: number; // Nivel en la jerarquía (0 = raíz, calculado en frontend)
-  
+
   // Permisos
   permissions: string[] | Record<string, boolean>; // Soportar ambos formatos
-  
+
   // Configuración
   shareDataWithPeers?: boolean; // Compartir datos con colegas del mismo nivel
   isSystem: boolean; // Si true, no puede ser eliminado (solo editado)
-  
+
   // Metadata
   usersCount?: number; // Número de usuarios con este rol
 }
@@ -60,6 +60,7 @@ export interface UserProfile {
   signature_url?: string; // Base64 or URL from Storage
   specialties?: string[]; // Array of tags e.g. ["SACMI", "Hydraulics"]
   status: 'ACTIVE' | 'INVITED' | 'INACTIVE';
+  company_code?: string; // New field: Código de Empresa
 }
 
 export interface TelemetryData {
@@ -250,7 +251,7 @@ export interface WorkOrder {
   // R-MANT-05 Specifics
   department?: 'Mantenimiento' | 'Almacén' | 'Calidad' | 'Producción' | 'Servicios Generales' | 'Administración';
   equipmentType?: 'Mantenimiento Maquinaria' | 'Mantenimiento Elemento Auxiliar';
-  failureType?: 'Mecánica' | 'Eléctrica' | 'Electrónica' | 'Plomería'; 
+  failureType?: 'Mecánica' | 'Eléctrica' | 'Electrónica' | 'Plomería';
   condition?: 'Crítica' | 'Media' | 'Normal';
   frequency?: 'Primera vez' | 'Ocasional' | 'Frecuente' | 'Muy frecuente';
   consequence?: 'Ninguna' | 'Bajo Rendimiento' | 'Parada';
@@ -259,7 +260,7 @@ export interface WorkOrder {
 
   requestReceivedBy?: string;
   requestReceivedDate?: string;
-  
+
   // New Dynamic Table for R-MANT-05
   failuresAndActivities?: {
     cause: string;

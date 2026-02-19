@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Settings, Cpu, AlertTriangle, Battery, Gauge, Move } from 'lucide-react';
+import { Settings, Cpu, AlertTriangle, Battery, Gauge, Move, Trash2 } from 'lucide-react';
 import { Machine, MachineStatus } from '../../types';
 
 export type MapLayer = 'OPERATIONAL' | 'MAINTENANCE' | 'INVENTORY' | 'EFFICIENCY';
@@ -12,10 +12,11 @@ interface AssetNodeProps {
   isSelected: boolean;
   isEditMode?: boolean;
   onMouseDown?: (e: React.MouseEvent, machine: Machine) => void;
+  onDelete?: () => void;
 }
 
-export const AssetNode: React.FC<AssetNodeProps> = ({ machine, layer, onClick, isSelected, isEditMode, onMouseDown }) => {
-  
+export const AssetNode: React.FC<AssetNodeProps> = ({ machine, layer, onClick, isSelected, isEditMode, onMouseDown, onDelete }) => {
+
   // Logic to determine color state based on Active Layer
   const getStateColor = () => {
     if (isEditMode) return 'bg-industrial-700 border-dashed border-2 border-industrial-400 opacity-90';
@@ -30,7 +31,7 @@ export const AssetNode: React.FC<AssetNodeProps> = ({ machine, layer, onClick, i
 
       case 'INVENTORY':
         // Mock logic: Spare parts availability (Random for demo)
-        if (machine.status === MachineStatus.WARNING) return 'bg-orange-500 border-orange-400'; 
+        if (machine.status === MachineStatus.WARNING) return 'bg-orange-500 border-orange-400';
         return 'bg-blue-600 border-blue-400';
 
       case 'EFFICIENCY':
@@ -79,7 +80,7 @@ export const AssetNode: React.FC<AssetNodeProps> = ({ machine, layer, onClick, i
       </div>
 
       {/* Main Node Shape */}
-      <div 
+      <div
         className={`
           w-16 h-16 md:w-20 md:h-20 rounded-xl flex flex-col items-center justify-center 
           border-2 transition-colors duration-500
@@ -89,17 +90,29 @@ export const AssetNode: React.FC<AssetNodeProps> = ({ machine, layer, onClick, i
       >
         {getIcon()}
         {!isEditMode && (
-            <span className="mt-1 text-[10px] font-bold text-white drop-shadow-md">
+          <span className="mt-1 text-[10px] font-bold text-white drop-shadow-md">
             {layer === 'EFFICIENCY' ? 'OEE' : 'STAT'}
-            </span>
+          </span>
         )}
       </div>
 
       {/* Telemetry Badge (Hidden in Edit Mode) */}
       {!isEditMode && (
         <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-industrial-900 text-white text-[9px] px-2 py-0.5 rounded-full border border-industrial-700 shadow-lg font-mono">
-            {layer === 'EFFICIENCY' ? '88%' : `${machine.telemetry.temperature}°C`}
+          {layer === 'EFFICIENCY' ? '88%' : `${machine.telemetry.temperature}°C`}
         </div>
+      )}
+      {/* Delete Button (Edit Mode) */}
+      {isEditMode && onDelete && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          className="absolute -top-2 -right-2 p-1.5 bg-red-500 rounded-full text-white shadow-lg hover:bg-red-600 transition-colors z-50 hover:scale-110"
+        >
+          <Trash2 size={12} />
+        </button>
       )}
     </motion.div>
   );

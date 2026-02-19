@@ -16,6 +16,10 @@ export const MasterDataService = {
     return MachineSupabaseService.updateMachine(machine);
   },
 
+  async deleteMachine(id: string): Promise<void> {
+    return MachineSupabaseService.deleteMachine(id);
+  },
+
   // TECHNICIANS
   async getTechnicians(): Promise<Technician[]> {
     const { data, error } = await supabase.from('technicians').select('*');
@@ -34,22 +38,22 @@ export const MasterDataService = {
     const { data, error } = await supabase.from('zones').select('*').order('order_index', { ascending: true });
     if (error) throw error;
     return data.map((z: any) => ({
-        ...z,
-        orderIndex: z.order_index
+      ...z,
+      orderIndex: z.order_index
     })) as ZoneStructure[];
   },
 
   async createZone(zone: ZoneStructure): Promise<ZoneStructure> {
     const { data, error } = await supabase.from('zones').insert({
-        id: zone.id,
-        name: zone.name,
-        lines: zone.lines,
-        x: zone.x,
-        y: zone.y,
-        width: zone.width,
-        height: zone.height,
-        color: zone.color,
-        order_index: zone.orderIndex || 0
+      id: zone.id,
+      name: zone.name,
+      lines: zone.lines,
+      x: zone.x,
+      y: zone.y,
+      width: zone.width,
+      height: zone.height,
+      color: zone.color,
+      order_index: zone.orderIndex || 0
     }).select().single();
     if (error) throw error;
     // Map back to camelCase
@@ -58,14 +62,14 @@ export const MasterDataService = {
 
   async updateZone(zone: ZoneStructure): Promise<void> {
     const { error } = await supabase.from('zones').update({
-        name: zone.name,
-        lines: zone.lines,
-        x: zone.x,
-        y: zone.y,
-        width: zone.width,
-        height: zone.height,
-        color: zone.color,
-        order_index: zone.orderIndex
+      name: zone.name,
+      lines: zone.lines,
+      x: zone.x,
+      y: zone.y,
+      width: zone.width,
+      height: zone.height,
+      color: zone.color,
+      order_index: zone.orderIndex
     }).eq('id', zone.id);
     if (error) throw error;
   },
@@ -74,15 +78,15 @@ export const MasterDataService = {
     // Upsert all zones with new order_index
     // Prepare payload
     const updates = zones.map(z => ({
-        id: z.id,
-        name: z.name,
-        lines: z.lines,
-        x: z.x,
-        y: z.y,
-        width: z.width,
-        height: z.height,
-        color: z.color,
-        order_index: z.orderIndex
+      id: z.id,
+      name: z.name,
+      lines: z.lines,
+      x: z.x,
+      y: z.y,
+      width: z.width,
+      height: z.height,
+      color: z.color,
+      order_index: z.orderIndex
     }));
 
     const { error } = await supabase.from('zones').upsert(updates);
@@ -146,29 +150,29 @@ export const MasterDataService = {
   async getPlantSettings(): Promise<any> {
     const { data, error } = await supabase.from('plant_settings').select('*').single();
     if (error) {
-       // If no row exists (e.g. before running script), return null or throw. 
-       // Ideally the script inserts row 1.
-       console.warn("Could not fetch plant settings:", error.message);
-       return null; 
+      // If no row exists (e.g. before running script), return null or throw. 
+      // Ideally the script inserts row 1.
+      console.warn("Could not fetch plant settings:", error.message);
+      return null;
     }
     return {
-        plantName: data.plant_name,
-        rnc: data.rnc,
-        timezone: data.timezone,
-        currency: data.currency,
-        logoUrl: data.logo_url
+      plantName: data.plant_name,
+      rnc: data.rnc,
+      timezone: data.timezone,
+      currency: data.currency,
+      logoUrl: data.logo_url
     };
   },
 
   async updatePlantSettings(settings: any): Promise<void> {
     const { error } = await supabase.from('plant_settings').upsert({
-        id: 1, // Force singleton
-        plant_name: settings.plantName,
-        rnc: settings.rnc,
-        timezone: settings.timezone,
-        currency: settings.currency,
-        logo_url: settings.logoUrl,
-        updated_at: new Date()
+      id: 1, // Force singleton
+      plant_name: settings.plantName,
+      rnc: settings.rnc,
+      timezone: settings.timezone,
+      currency: settings.currency,
+      logo_url: settings.logoUrl,
+      updated_at: new Date()
     });
     if (error) throw error;
   },

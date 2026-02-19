@@ -19,69 +19,167 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Map Supabase User to UserProfile
-  const mapSupabaseUser = (sbUser: any): UserProfile | null => {
-    if (!sbUser) return null;
-    
-    // In a real app, user meta would come from a 'profiles' table or user_metadata
-    // For now, we fallback to defaults if metadata is missing/incomplete
+  // Helper: Map Supabase User to UserProfile (Fallback)
+  const mapSupabaseUser = (sbUser: any): UserProfile => {
     const metadata = sbUser.user_metadata || {};
-    
     return {
-        id: sbUser.id,
-        email: sbUser.email || '',
-        full_name: metadata.full_name || 'Agente Supabase',
-        role: metadata.role || UserRole.ADMIN_SOLICITANTE, // Default until roles logic is hardened
-        tenant_id: metadata.tenant_id || 'default-tenant',
-        status: 'ACTIVE',
-        job_title: metadata.job_title || 'Operator'
+      id: sbUser.id,
+      email: sbUser.email || '',
+      full_name: metadata.full_name || 'Usuario',
+      role: metadata.role || UserRole.ADMIN_SOLICITANTE,
+      tenant_id: metadata.tenant_id || 'default-tenant',
+      status: 'ACTIVE',
+      job_title: metadata.job_title || 'N/A',
+      // Preserve existing if possible, otherwise empty
+      specialties: [],
+      company_code: metadata.company_code
+    };
+  };
+
+  // Fetch profile from DB to ensure fresh data (Role, Company Code)
+  const fetchProfile = async (userId: string): Promise<UserProfile | null> => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (error || !data) {
+      console.error("Error fetching profile:", error);
+      return null;
+    }
+
+    return {
+      id: data.id,
+      email: data.email,
+      full_name: data.full_name,
+      role: data.role, // Source of truth
+      company_code: data.company_code,
+      job_title: data.job_title,
+      status: data.status,
+      specialties: data.specialties || [],
+      tenant_id: data.tenant_id,
+      avatar_url: data.avatar_url
     };
   };
 
   useEffect(() => {
-    // 1. Check active session
+    let mounted = true;
+
+    // 1. Initial Session Check with Timeout Race
     const checkSession = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-            setUser(mapSupabaseUser(session.user));
+      console.log("AuthContext: Starting session check...");
+
+      const sessionPromise = (async () => {
+        try {
+          const { data: { session }, error } = await supabase.auth.getSession();
+
+          if (mounted) {
+            if (error) {
+              console.error("AuthContext: Session error:", error);
+            }
+
+            if (session?.user) {
+              console.log("AuthContext: Session found for", session.user.email);
+              try {
+                const profile = await fetchProfile(session.user.id);
+                if (mounted) {
+                  if (profile) {
+                    setUser(profile);
+                  } else {
+                    console.warn("AuthContext: Using metadata fallback.");
+                    setUser(mapSupabaseUser(session.user));
+                  }
+                }
+              } catch (err) {
+                console.error("AuthContext: Profile fetch error:", err);
+                if (mounted) setUser(mapSupabaseUser(session.user));
+              }
+            } else {
+              console.log("AuthContext: No active session.");
+            }
+          }
+        } catch (err) {
+          console.error("AuthContext: Unexpected error:", err);
         }
+      })();
+
+      // Force timeout after 5 seconds to clear loading state
+      const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 5000));
+
+      await Promise.race([sessionPromise, timeoutPromise]);
+
+      if (mounted) {
+        console.log("AuthContext: Session check complete (or timed out). Clearing loading state.");
         setIsLoading(false);
+      }
     };
-    
+
     checkSession();
 
-    // 2. Listen for changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    // 2. Auth State Listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log("AuthContext: Auth event:", event);
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'SIGNED_OUT') {
+        if (mounted) setIsLoading(true);
+      }
+
+      try {
         if (session?.user) {
-            setUser(mapSupabaseUser(session.user));
+          // Profile Fetch with Timeout
+          const fetchPromise = (async () => {
+            try {
+              const profile = await fetchProfile(session.user.id);
+              if (mounted) {
+                if (profile) setUser(profile);
+                else setUser(mapSupabaseUser(session.user));
+              }
+            } catch (err) {
+              console.error("AuthContext: Profile fetch error in listener:", err);
+              if (mounted) setUser(mapSupabaseUser(session.user));
+            }
+          })();
+
+          const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 5000));
+
+          await Promise.race([fetchPromise, timeoutPromise]);
+
         } else {
-            setUser(null);
+          if (mounted) setUser(null);
         }
-        setIsLoading(false);
+      } catch (err) {
+        console.error("Auth state change error:", err);
+      } finally {
+        if (mounted) setIsLoading(false);
+      }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const login = async (email: string, password: string) => {
-    setIsLoading(true);
+    // Do not set global loading here. Let the UI handle its own loading state.
+    // setIsLoading(true); 
     const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password
+      email,
+      password
     });
 
     if (error) {
-        setIsLoading(false);
-        throw error;
+      // setIsLoading(false);
+      throw error;
     }
-    // onAuthStateChange will handle setting user
+    // onAuthStateChange will handle setting user and eventually loading state if needed
   };
 
   const logout = async () => {
-    setIsLoading(true);
+    // setIsLoading(true);
     await supabase.auth.signOut();
     setUser(null);
-    setIsLoading(false);
+    // setIsLoading(false);
   };
 
   const hasRole = (allowedRoles: UserRole[]) => {
@@ -93,24 +191,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const hasPermission = (permissionId: string) => {
     if (!user) return false;
-    
+
     // 1. Super Admin Bypass (optional, but good for dev)
     if (user.role === UserRole.ADMIN_SOLICITANTE) return true;
 
     // 2. Check Dynamic Roles
     // We need access to the roles list regarding the user's role ID.
     // Since we are inside a hook, we can use the store directly (it's external state).
-    const roles = useUserStore.getState().roles; 
+    const roles = useUserStore.getState().roles;
     const userRoleDef = roles.find(r => r.id === user.role);
-    
+
     if (!userRoleDef) return false;
 
     // 3. Check specific permission
     if (Array.isArray(userRoleDef.permissions)) {
-        return userRoleDef.permissions.includes(permissionId);
+      return userRoleDef.permissions.includes(permissionId);
     } else {
-        // Object format { [id]: boolean }
-        return !!userRoleDef.permissions[permissionId];
+      // Object format { [id]: boolean }
+      return !!userRoleDef.permissions[permissionId];
     }
   };
 

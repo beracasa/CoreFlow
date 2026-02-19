@@ -1,7 +1,8 @@
 import React, { useState, useRef } from 'react';
-import { Layers, Activity, Wrench, Battery, Gauge, ZoomIn, ZoomOut, Maximize, Edit3, Save, Plus, Move } from 'lucide-react';
+import { Layers, Activity, Wrench, Battery, Gauge, ZoomIn, ZoomOut, Maximize, Edit3, Save, Plus, Move, Trash2 } from 'lucide-react';
 import { AssetNode, MapLayer } from './AssetNode';
 import { AssetDrawer } from './AssetDrawer';
+import { AssetSelectionModal } from '../modals/AssetSelectionModal';
 import { Machine, ZoneStructure } from '../../types';
 import { analyzeMachineHealth, PredictiveAnalysis } from '../../services/geminiService';
 import { useLanguage } from '../../contexts/LanguageContext';
@@ -14,9 +15,12 @@ interface PlantMapContainerProps {
   onMoveMachine?: (id: string, x: number, y: number) => void;
   onUpdateZone?: (zone: ZoneStructure) => void;
   onAddMachine?: (zoneId: string, lineName: string) => void;
+  onAddZone?: (zone: ZoneStructure) => void;
+  onRemoveZone?: (id: string) => void;
+  onRemoveMachine?: (id: string) => void;
 }
 
-export const PlantMapContainer: React.FC<PlantMapContainerProps> = ({ machines, zones, onCreateWorkOrder, onMoveMachine, onUpdateZone, onAddMachine }) => {
+export const PlantMapContainer: React.FC<PlantMapContainerProps> = ({ machines, zones, onCreateWorkOrder, onMoveMachine, onUpdateZone, onAddMachine, onAddZone, onRemoveZone, onRemoveMachine }) => {
   const { t } = useLanguage();
   const { hasPermission } = useAuth();
   const [activeLayer, setActiveLayer] = useState<MapLayer>('OPERATIONAL');
@@ -36,10 +40,56 @@ export const PlantMapContainer: React.FC<PlantMapContainerProps> = ({ machines, 
   const [analysis, setAnalysis] = useState<PredictiveAnalysis | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
 
+  // Asset Selection State
+  const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
+  const [assetModalType, setAssetModalType] = useState<'MACHINE' | 'ZONE'>('ZONE');
+  const [targetZoneForMachine, setTargetZoneForMachine] = useState<{ id: string, line: string } | null>(null);
+
   const handleMachineClick = (machine: Machine) => {
     if (isEditMode) return;
     setSelectedMachine(machine);
     setAnalysis(null);
+  };
+
+  // Filter Placed/Unplaced Items
+  const placedZones = zones.filter(z => (z.x !== undefined && z.y !== undefined && (z.x > 0 || z.y > 0)));
+  const unplacedZones = zones.filter(z => !z.x && !z.y || (z.x === 0 && z.y === 0));
+
+  const placedMachines = machines.filter(m => (m.location?.x !== undefined && m.location?.y !== undefined && (m.location.x > 0 || m.location.y > 0)));
+  const unplacedMachines = machines.filter(m => !m.location || (m.location.x === 0 && m.location.y === 0));
+
+  const handleOpenAssetModal = (type: 'MACHINE' | 'ZONE', zoneInfo?: { id: string, line: string }) => {
+    setAssetModalType(type);
+    if (zoneInfo) setTargetZoneForMachine(zoneInfo);
+    else setTargetZoneForMachine(null);
+    setIsAssetModalOpen(true);
+  };
+
+  const handleSelectAsset = (item: Machine | ZoneStructure) => {
+    if (assetModalType === 'ZONE' && onUpdateZone) {
+      // Place Zone in center (simplification)
+      onUpdateZone({ ...item as ZoneStructure, x: 10, y: 10, width: 20, height: 20 });
+    } else if (assetModalType === 'MACHINE' && onMoveMachine) {
+      // If adding to specific line in zone
+      if (targetZoneForMachine) {
+        // Logic to place inside zone would be ideal, for now default to near top-left of zone?
+        // Or just center screen if generic add.
+        // For now, let's place it at 50, 50 if generic, or try to find zone center.
+        const zone = zones.find(z => z.id === targetZoneForMachine.id);
+        const x = zone ? (zone.x || 0) + 5 : 50;
+        const y = zone ? (zone.y || 0) + 5 : 50;
+        onMoveMachine(item.id, x, y);
+
+        // Also update machine zone/line metadata if needed?
+        // The visual editor mainly handles position. 
+        // The backend should ideally update the machine's zone field if we are dragging it into a zone.
+        // But for "Add to Line" button, we definitely want to association.
+        // FOR NOW: Visual Placement Only.
+      } else {
+        onMoveMachine(item.id, 50, 50);
+      }
+    }
+    setIsAssetModalOpen(false);
   };
 
   const runAnalysis = async () => {
@@ -201,7 +251,23 @@ export const PlantMapContainer: React.FC<PlantMapContainerProps> = ({ machines, 
 
             {/* Edit Layout Button - Protected by Permission */}
             {hasPermission('edit_dashboard_map') && (
-              <div className="bg-industrial-800/90 backdrop-blur p-1 rounded-xl border border-industrial-600 shadow-xl">
+              <div className="bg-industrial-800/90 backdrop-blur p-1 rounded-xl border border-industrial-600 shadow-xl flex gap-1">
+                {isEditMode && (
+                  <button
+                    onClick={() => handleOpenAssetModal('ZONE')}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold bg-industrial-700 text-industrial-300 hover:bg-industrial-600 hover:text-white transition-colors border-r border-industrial-600/50"
+                  >
+                    <Plus size={14} /> Agregar Zona
+                  </button>
+                )}
+                {isEditMode && (
+                  <button
+                    onClick={() => handleOpenAssetModal('MACHINE')}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold bg-industrial-700 text-industrial-300 hover:bg-industrial-600 hover:text-white transition-colors border-r border-industrial-600/50"
+                  >
+                    <Plus size={14} /> Agregar Equipo
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     setIsEditMode(!isEditMode);
@@ -210,7 +276,7 @@ export const PlantMapContainer: React.FC<PlantMapContainerProps> = ({ machines, 
                   className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${isEditMode ? 'bg-yellow-500 text-black shadow-[0_0_15px_rgba(234,179,8,0.4)]' : 'bg-industrial-700 text-white hover:bg-industrial-600'}`}
                 >
                   {isEditMode ? <Save size={14} /> : <Edit3 size={14} />}
-                  {isEditMode ? 'Save Layout' : 'Edit Layout'}
+                  {isEditMode ? 'Guardar Diseño' : 'Editar Diseño'}
                 </button>
               </div>
             )}
@@ -257,7 +323,7 @@ export const PlantMapContainer: React.FC<PlantMapContainerProps> = ({ machines, 
           style={{ transform: `scale(${zoomLevel})` }}
         >
           {/* --- DYNAMIC ZONES --- */}
-          {zones.map(zone => (
+          {placedZones.map(zone => (
             <div
               key={zone.id}
               className={`absolute transition-all duration-75 group ${isEditMode ? 'cursor-move' : 'pointer-events-none'}`}
@@ -285,6 +351,24 @@ export const PlantMapContainer: React.FC<PlantMapContainerProps> = ({ machines, 
                 </div>
               )}
 
+
+
+              {/* Delete Zone Button (Edit Mode) */}
+              {isEditMode && onRemoveZone && (
+                <button
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    if (window.confirm(`Remove zone ${zone.name} from map?`)) {
+                      onRemoveZone(zone.id);
+                    }
+                  }}
+                  className="absolute top-0 left-0 p-1.5 bg-red-500/80 hover:bg-red-500 text-white rounded-br-lg opacity-0 group-hover:opacity-100 transition-opacity z-40 cursor-pointer"
+                  title="Remove Zone"
+                >
+                  <Trash2 size={12} />
+                </button>
+              )}
+
               {/* Drag Handle Indicator (Center) - Only in Edit Mode */}
               {isEditMode && (
                 <div className="absolute top-2 right-2 p-1 bg-yellow-500/20 rounded opacity-0 group-hover:opacity-100 transition-opacity">
@@ -305,9 +389,11 @@ export const PlantMapContainer: React.FC<PlantMapContainerProps> = ({ machines, 
                         {line}
                       </p>
 
-                      {/* Add Machine Button */}
                       <button
-                        onClick={(e) => handleAddEquipmentToLine(e, zone.id, line)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenAssetModal('MACHINE', { id: zone.id, line });
+                        }}
                         className="p-1 rounded bg-industrial-800 hover:bg-industrial-accent text-industrial-400 hover:text-white transition-colors border border-industrial-700 opacity-0 group-hover/line:opacity-100"
                         title="Agregar Equipo a esta Línea"
                       >
@@ -322,7 +408,7 @@ export const PlantMapContainer: React.FC<PlantMapContainerProps> = ({ machines, 
           ))}
 
           {/* --- MACHINES --- */}
-          {machines.map((machine) => (
+          {placedMachines.map((machine) => (
             <AssetNode
               key={machine.id}
               machine={machine}
@@ -331,6 +417,11 @@ export const PlantMapContainer: React.FC<PlantMapContainerProps> = ({ machines, 
               isSelected={selectedMachine?.id === machine.id}
               isEditMode={isEditMode}
               onMouseDown={handleDragStart}
+              onDelete={() => {
+                if (window.confirm(`Remove machine ${machine.name} from map?`)) {
+                  onRemoveMachine && onRemoveMachine(machine.id);
+                }
+              }}
             />
           ))}
         </div>
@@ -338,7 +429,7 @@ export const PlantMapContainer: React.FC<PlantMapContainerProps> = ({ machines, 
         {/* Editing Overlay Indicator */}
         {isEditMode && (
           <div className="absolute top-0 w-full bg-yellow-500/10 border-b border-yellow-500/50 text-yellow-500 text-center py-1 text-xs font-bold pointer-events-none z-20">
-            LAYOUT EDITING MODE ACTIVE - DRAG ZONES & ASSETS TO REPOSITION - RESIZE ZONES FROM BOTTOM-RIGHT
+            MODO EDICIÓN ACTIVO - ARRASTRA ZONAS Y EQUIPOS PARA REUBICAR - REDIMENSIONA ZONAS DESDE LA ESQUINA INFERIOR DERECHA
           </div>
         )}
       </div>
@@ -353,6 +444,15 @@ export const PlantMapContainer: React.FC<PlantMapContainerProps> = ({ machines, 
         onCreateWorkOrder={() => selectedMachine && onCreateWorkOrder(selectedMachine.id)}
       />
 
-    </div>
+      <AssetSelectionModal
+        isOpen={isAssetModalOpen}
+        onClose={() => setIsAssetModalOpen(false)}
+        title={assetModalType === 'MACHINE' ? 'Select Machine to Place' : 'Select Zone to Place'}
+        items={assetModalType === 'MACHINE' ? unplacedMachines : unplacedZones}
+        onSelect={handleSelectAsset}
+        type={assetModalType}
+      />
+
+    </div >
   );
 };
