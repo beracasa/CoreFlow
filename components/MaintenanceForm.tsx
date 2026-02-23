@@ -34,6 +34,21 @@ const MAINTENANCE_PROTOCOLS: Record<string, Record<string, MaintenanceTask[]>> =
             id: 't3', sequence: 3, group: 'Carrusel de Introducción', component: 'Cuchilla de corte', activity: 'Afilado / Regulado',
             referenceCode: '8.1.2.3.1', estimatedTime: 45,
             actionFlags: { ...MOCK_FLAGS, adjust: true, replace: true }
+         },
+         {
+            id: 't4_add', sequence: 4, group: 'Carrusel de Introducción', component: 'Rodillos guía', activity: 'Control de desgaste',
+            referenceCode: '8.1.2.3.2', estimatedTime: 15,
+            actionFlags: { ...MOCK_FLAGS, inspect: true }
+         },
+         {
+            id: 't5_add', sequence: 5, group: 'Sistema Neumático', component: 'Filtro regulador lubricador', activity: 'Drenaje y Llenado',
+            referenceCode: '8.1.2.4.1', estimatedTime: 20,
+            actionFlags: { ...MOCK_FLAGS, clean: true, refill: true }
+         },
+         {
+            id: 't6_add', sequence: 6, group: 'Sistema Neumático', component: 'Válvulas direccionales', activity: 'Prueba de funcionamiento',
+            referenceCode: '8.1.2.4.2', estimatedTime: 10,
+            actionFlags: { ...MOCK_FLAGS, inspect: true }
          }
       ],
       '1080 Hours': [
@@ -145,6 +160,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
    });
 
    const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
+   const [machineSearchTerm, setMachineSearchTerm] = useState('');
    const [validationError, setValidationError] = useState<string | null>(null);
    const [invalidFields, setInvalidFields] = useState<Set<string>>(new Set());
    const [duration, setDuration] = useState<string>('0h 0m');
@@ -174,7 +190,14 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
          }
       }
       if (initialData) {
-         setFormData(prev => ({ ...prev, ...initialData, formType: type }));
+         setFormData(prev => {
+            const nextData = { ...prev, ...initialData, formType: type };
+            // Deep check to prevent infinite React render loops if initialData reference keeps changing from parent
+            if (JSON.stringify(prev) === JSON.stringify(nextData)) {
+               return prev;
+            }
+            return nextData;
+         });
 
          // If it's a new form coming from Map but with machine ID, we might need logic.
          // But if it's an existing order (has ID), we just load it.
@@ -182,7 +205,8 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
 
          if (machineIdToUse) {
             const machine = machines.find(m => m.id === machineIdToUse);
-            setSelectedMachine(machine);
+            setSelectedMachine(machine || null);
+            if (machine) setMachineSearchTerm(`${machine.name} (Alias: ${machine.alias || 'N/A'})`);
 
             // If we have an interval but NO tasks (e.g. fresh from map), generate tasks.
             // If we are editing an existing record, tasks should already be in initialData.
@@ -200,7 +224,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
 
    // Access store
    // Access store
-   const { maintenancePlans } = useMasterStore();
+   const { maintenancePlans, categories } = useMasterStore();
 
    // -- LOGIC ENGINE: Cumulative Tasks --
    const generateCumulativeTasks = (machineId: string, machineType: string, selectedInterval: string): MaintenanceTask[] => {
@@ -246,7 +270,19 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
 
          for (let i = 0; i <= selectedIndex; i++) {
             const intervalLabel = INTERVAL_HIERARCHY[i];
-            const protocolSet = MAINTENANCE_PROTOCOLS[machineType] || MAINTENANCE_PROTOCOLS['GENERIC'];
+
+            // Resolve category name safely (handles both string[] and object[] in store)
+            const categoryMatch = categories.find(c => typeof c === 'string' ? c === machineType : c.id === machineType);
+            const actualMachineType = categoryMatch
+               ? (typeof categoryMatch === 'string' ? categoryMatch : categoryMatch.name)
+               : machineType;
+
+            // Find protocol set flexibly
+            const mtUpper = (actualMachineType || '').toUpperCase();
+            // Default to SACMI to show a rich example table instead of the single-row GENERIC
+            const matchingKey = Object.keys(MAINTENANCE_PROTOCOLS).find(k => mtUpper.includes(k) && k !== 'GENERIC') || 'SACMI';
+
+            const protocolSet = MAINTENANCE_PROTOCOLS[matchingKey];
             const sourceTasks = protocolSet[intervalLabel] || [];
 
             const newTasks = sourceTasks.map(t => ({
@@ -313,7 +349,8 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
 
    const handleMachineChange = (machineId: string) => {
       const machine = machines.find(m => m.id === machineId);
-      setSelectedMachine(machine);
+      setSelectedMachine(machine || null);
+      setMachineSearchTerm(machine ? `${machine.name} (Alias: ${machine.alias || 'N/A'})` : '');
       // Don't overwrite ID if we are just changing machine on a draft, but typically we shouldn't change machine on existing order.
       setFormData(prev => ({
          ...prev,
@@ -337,7 +374,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
    };
 
    const handleInternalSave = (order: WorkOrder, stay: boolean = false) => {
-      const orderToSave = { ...order };
+      const orderToSave = { ...order, type: order.type || type };
       if (!orderToSave.title || orderToSave.title.trim() === '') {
          const machine = machines.find(m => m.id === orderToSave.machineId);
          const machineName = machine ? (machine.alias || machine.name) : 'Unknown Machine';
@@ -378,10 +415,10 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
       // Validation
       const Schema = type === 'R-MANT-05' ? SchemaStage1_RMANT05 : SchemaStage1;
       const result = Schema.safeParse(formData);
-      
+
       if (!result.success) {
          setValidationError("Por favor complete todos los campos obligatorios de la Sección 1.");
-         
+
          const fieldErrors = new Set<string>();
          result.error.issues.forEach(issue => {
             fieldErrors.add(issue.path[0] as string);
@@ -472,8 +509,8 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
          <div className="p-4 border-b border-industrial-800 bg-industrial-900 flex justify-between items-center shrink-0">
             <div>
                <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  {type === 'R-MANT-02' 
-                     ? t('mant02.formTitle') 
+                  {type === 'R-MANT-02'
+                     ? t('mant02.formTitle')
                      : 'SOLICITUD, ANÁLISIS Y EJECUCIÓN DE AVERÍAS DE MAQUINARIAS / EQUIPOS AUXILIARES E INFRAESTRUCTURA'}
                   <span className="text-sm font-mono text-industrial-500 ml-2">{formData.id ? `ID: ${formData.id}` : '(New)'}</span>
                </h2>
@@ -565,15 +602,15 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                  <input
                                     type="date"
                                     disabled={!isSection1Editable}
-                                    className={`flex-1 bg-industrial-900 border rounded p-2 text-white text-sm focus:border-emerald-500 outline-none ${invalidFields.has('createdDate') ? 'border-red-500 bg-red-900/10' : 'border-industrial-600'}`}
+                                    className={`flex-1 bg-industrial-900 border rounded p-2 text-white text-sm focus:border-emerald-500 outline-none [color-scheme:dark] ${invalidFields.has('createdDate') ? 'border-red-500 bg-red-900/10' : 'border-industrial-600'}`}
                                     value={formData.createdDate?.split('T')[0] || new Date().toISOString().split('T')[0]}
                                     onChange={(e) => setFormData({ ...formData, createdDate: `${e.target.value}T${new Date().toLocaleTimeString()}` })}
                                  />
                                  <input
                                     type="time"
                                     disabled
-                                    className="w-32 bg-industrial-900/50 border border-industrial-700 rounded p-2 text-industrial-400 text-sm text-center"
-                                    value={new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false})}
+                                    className="w-32 bg-industrial-900/50 border border-industrial-700 rounded p-2 text-industrial-400 text-sm text-center [color-scheme:dark]"
+                                    value={new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
                                  />
                               </div>
                            </div>
@@ -607,7 +644,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                               </select>
                            </div>
 
-                            {/* 6. Equipment for Maintenance */}
+                           {/* 6. Equipment for Maintenance */}
                            <div className="space-y-1">
                               <label className="text-xs text-industrial-400 font-bold">Equipo para Mantenimiento</label>
                               <select disabled={!isSection1Editable}
@@ -622,15 +659,32 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                            {/* 7. Machine / Accessory */}
                            <div className="space-y-1">
                               <label className="text-xs text-industrial-400 font-bold">Máquina / Accesorio</label>
-                              <select disabled={!isSection1Editable}
-                                 className={`w-full bg-industrial-900 border rounded p-2 text-white text-sm focus:border-emerald-500 outline-none ${invalidFields.has('machineId') ? 'border-red-500 bg-red-900/10' : 'border-industrial-600'}`}
-                                 value={formData.machineId || ''}
-                                 onChange={e => handleMachineChange(e.target.value)}>
-                                 <option value="">- Seleccionar Equipo -</option>
-                                 {machines.map(m => (
-                                    <option key={m.id} value={m.id}>{m.name} {m.alias ? `(${m.alias})` : ''}</option>
-                                 ))}
-                              </select>
+                              <div className="relative">
+                                 <input
+                                    list="rmant05-machine-list"
+                                    disabled={!isSection1Editable}
+                                    className={`w-full bg-industrial-900 border rounded p-2 text-white text-sm focus:border-emerald-500 outline-none ${invalidFields.has('machineId') ? 'border-red-500 bg-red-900/10' : 'border-industrial-600'}`}
+                                    placeholder="Buscar equipo por nombre, alias o placa..."
+                                    value={machineSearchTerm}
+                                    onChange={(e) => {
+                                       const val = e.target.value;
+                                       setMachineSearchTerm(val);
+                                       if (val === '') {
+                                          handleMachineChange('');
+                                       } else {
+                                          const match = machines.find(m => m.isActive && (`${m.name} (Alias: ${m.alias || 'N/A'})` === val || m.plate === val));
+                                          if (match) handleMachineChange(match.id);
+                                       }
+                                    }}
+                                 />
+                                 <datalist id="rmant05-machine-list">
+                                    {machines.filter(m => m.isActive).map(m => (
+                                       <option key={m.id} value={`${m.name} (Alias: ${m.alias || 'N/A'})`}>
+                                          Placa: {m.plate}
+                                       </option>
+                                    ))}
+                                 </datalist>
+                              </div>
                            </div>
 
                            {/* 8. Maintenance Type */}
@@ -681,7 +735,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                               <span className="bg-industrial-700 text-xs px-2 py-0.5 rounded">Detalles</span>
                               Descripción de la Avería / Solicitud de Servicio
                            </h4>
-                           
+
                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                               {/* Request Details */}
                               <div className="space-y-1 lg:col-span-2">
@@ -760,7 +814,6 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                         </div>
 
                         {/* 3. Machine Search (Alias) */}
-                        {/* ... Existing Fields for R-MANT-02 ... */}
                         <div className="space-y-1">
                            <label className="text-xs text-industrial-400 font-bold">{t('form.machine')} (Nombre o Alias)</label>
                            <div className="relative">
@@ -769,18 +822,20 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                  disabled={!isSection1Editable}
                                  className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm focus:border-emerald-500 outline-none placeholder-industrial-600"
                                  placeholder="Buscar equipo..."
-                                 value={selectedMachine ? `${selectedMachine.name} (Alias: ${selectedMachine.alias || 'N/A'})` : ''}
+                                 value={machineSearchTerm}
                                  onChange={(e) => {
-                                    if (e.target.value === '') handleMachineChange('');
-                                 }}
-                                 onInput={(e: React.ChangeEvent<HTMLInputElement>) => {
                                     const val = e.target.value;
-                                    const match = machines.find(m => `${m.name} (Alias: ${m.alias || 'N/A'})` === val || m.plate === val);
-                                    if (match) handleMachineChange(match.id);
+                                    setMachineSearchTerm(val);
+                                    if (val === '') {
+                                       handleMachineChange('');
+                                    } else {
+                                       const match = machines.find(m => m.isActive && (`${m.name} (Alias: ${m.alias || 'N/A'})` === val || m.plate === val));
+                                       if (match) handleMachineChange(match.id);
+                                    }
                                  }}
                               />
                               <datalist id="machine-list">
-                                 {machines.map(m => (
+                                 {machines.filter(m => m.isActive).map(m => (
                                     <option key={m.id} value={`${m.name} (Alias: ${m.alias || 'N/A'})`}>
                                        Placa: {m.plate}
                                     </option>
@@ -801,7 +856,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                            <input
                               type="date"
                               disabled={!isSection1Editable}
-                              className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm focus:border-emerald-500 outline-none"
+                              className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm focus:border-emerald-500 outline-none [color-scheme:dark]"
                               value={formData.startDate || new Date().toISOString().split('T')[0]}
                               onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
                            />
@@ -941,7 +996,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                      {type === 'R-MANT-05' ? (
                         /* --- R-MANT-05 EXECUTION LAYOUT --- */
                         <div className="space-y-6">
-                           
+
                            {/* 1. Header Fields */}
                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                               {/* Report Received By */}
@@ -973,7 +1028,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                        type="time"
                                        disabled
                                        className="w-32 bg-industrial-900/50 border border-industrial-700 rounded p-2 text-industrial-400 text-sm text-center"
-                                       value={new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false})}
+                                       value={new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
                                     />
                                  </div>
                               </div>
@@ -1090,64 +1145,64 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                        {(formData.consumedParts || []).map((part, idx) => (
                                           <tr key={idx} className="border-b border-industrial-800 last:border-0 hover:bg-industrial-800/30 transition-colors">
                                              <td className="p-2">
-                                                 <div className="relative group">
-                                                     <input
-                                                         type="text"
-                                                         disabled={!isSection2Editable}
-                                                         className={`w-full bg-industrial-900 border ${!part.partId && part.partName ? 'border-pink-500' : 'border-industrial-600'} rounded p-1 text-white text-xs focus:border-pink-500 outline-none placeholder-industrial-600`}
-                                                         placeholder="Buscar repuesto..."
-                                                         value={part.partName || ''}
-                                                         onChange={(e) => {
-                                                             const val = e.target.value;
-                                                             const updated = [...(formData.consumedParts || [])];
-                                                             // Updates name for search, clears ID to show it's not selected yet
-                                                             updated[idx] = { ...updated[idx], partName: val, partId: '', unitCost: 0, totalCost: 0 };
-                                                             setFormData({ ...formData, consumedParts: updated });
-                                                         }}
-                                                     />
-                                                     {/* Custom Dropdown Results */}
-                                                     {!part.partId && part.partName && (
-                                                         <div className="absolute left-0 top-full mt-1 w-[300px] z-50 bg-industrial-800 border border-industrial-600 rounded-md shadow-xl max-h-60 overflow-y-auto">
-                                                             {MOCK_SPARE_PARTS.filter(p => 
-                                                                 p.name.toLowerCase().includes(part.partName.toLowerCase()) || 
-                                                                 p.sku.includes(part.partName)
-                                                             ).length > 0 ? (
-                                                                 MOCK_SPARE_PARTS.filter(p => 
-                                                                    p.name.toLowerCase().includes(part.partName.toLowerCase()) || 
-                                                                    p.sku.includes(part.partName)
-                                                                 ).map(sp => (
-                                                                     <div 
-                                                                         key={sp.id}
-                                                                         className="p-2 hover:bg-industrial-700 cursor-pointer border-b border-industrial-700/50 last:border-0 flex justify-between items-center group/item"
-                                                                         onClick={() => {
-                                                                             const updated = [...(formData.consumedParts || [])];
-                                                                             updated[idx] = {
-                                                                                ...updated[idx],
-                                                                                partId: sp.id,
-                                                                                partName: `${sp.sku} - ${sp.name}`,
-                                                                                sku: sp.sku,
-                                                                                unitCost: sp.unitCost,
-                                                                                totalCost: sp.unitCost * updated[idx].quantity,
-                                                                                unit: 'Unidad'
-                                                                             };
-                                                                             setFormData({ ...formData, consumedParts: updated });
-                                                                         }}
-                                                                     >
-                                                                         <div className="flex flex-col">
-                                                                             <span className="text-white text-xs font-bold">{sp.sku} - {sp.name}</span>
-                                                                             <span className="text-industrial-400 text-[10px]">RD${sp.unitCost.toFixed(2)}</span>
-                                                                         </div>
-                                                                         <div className={`text-[10px] px-2 py-0.5 rounded font-bold ${sp.currentStock < sp.minimumStock ? 'bg-red-900/50 text-red-400 border border-red-500/30' : 'bg-emerald-900/50 text-emerald-400 border border-emerald-500/30'}`}>
-                                                                             Stock: {sp.currentStock}
-                                                                         </div>
-                                                                     </div>
-                                                                 ))
-                                                             ) : (
-                                                                 <div className="p-2 text-industrial-500 text-xs italic text-center">No results found</div>
-                                                             )}
-                                                         </div>
-                                                     )}
-                                                 </div>
+                                                <div className="relative group">
+                                                   <input
+                                                      type="text"
+                                                      disabled={!isSection2Editable}
+                                                      className={`w-full bg-industrial-900 border ${!part.partId && part.partName ? 'border-pink-500' : 'border-industrial-600'} rounded p-1 text-white text-xs focus:border-pink-500 outline-none placeholder-industrial-600`}
+                                                      placeholder="Buscar repuesto..."
+                                                      value={part.partName || ''}
+                                                      onChange={(e) => {
+                                                         const val = e.target.value;
+                                                         const updated = [...(formData.consumedParts || [])];
+                                                         // Updates name for search, clears ID to show it's not selected yet
+                                                         updated[idx] = { ...updated[idx], partName: val, partId: '', unitCost: 0, totalCost: 0 };
+                                                         setFormData({ ...formData, consumedParts: updated });
+                                                      }}
+                                                   />
+                                                   {/* Custom Dropdown Results */}
+                                                   {!part.partId && part.partName && (
+                                                      <div className="absolute left-0 top-full mt-1 w-[300px] z-50 bg-industrial-800 border border-industrial-600 rounded-md shadow-xl max-h-60 overflow-y-auto">
+                                                         {MOCK_SPARE_PARTS.filter(p =>
+                                                            p.name.toLowerCase().includes(part.partName.toLowerCase()) ||
+                                                            p.sku.includes(part.partName)
+                                                         ).length > 0 ? (
+                                                            MOCK_SPARE_PARTS.filter(p =>
+                                                               p.name.toLowerCase().includes(part.partName.toLowerCase()) ||
+                                                               p.sku.includes(part.partName)
+                                                            ).map(sp => (
+                                                               <div
+                                                                  key={sp.id}
+                                                                  className="p-2 hover:bg-industrial-700 cursor-pointer border-b border-industrial-700/50 last:border-0 flex justify-between items-center group/item"
+                                                                  onClick={() => {
+                                                                     const updated = [...(formData.consumedParts || [])];
+                                                                     updated[idx] = {
+                                                                        ...updated[idx],
+                                                                        partId: sp.id,
+                                                                        partName: `${sp.sku} - ${sp.name}`,
+                                                                        sku: sp.sku,
+                                                                        unitCost: sp.unitCost,
+                                                                        totalCost: sp.unitCost * updated[idx].quantity,
+                                                                        unit: 'Unidad'
+                                                                     };
+                                                                     setFormData({ ...formData, consumedParts: updated });
+                                                                  }}
+                                                               >
+                                                                  <div className="flex flex-col">
+                                                                     <span className="text-white text-xs font-bold">{sp.sku} - {sp.name}</span>
+                                                                     <span className="text-industrial-400 text-[10px]">RD${sp.unitCost.toFixed(2)}</span>
+                                                                  </div>
+                                                                  <div className={`text-[10px] px-2 py-0.5 rounded font-bold ${sp.currentStock < sp.minimumStock ? 'bg-red-900/50 text-red-400 border border-red-500/30' : 'bg-emerald-900/50 text-emerald-400 border border-emerald-500/30'}`}>
+                                                                     Stock: {sp.currentStock}
+                                                                  </div>
+                                                               </div>
+                                                            ))
+                                                         ) : (
+                                                            <div className="p-2 text-industrial-500 text-xs italic text-center">No results found</div>
+                                                         )}
+                                                      </div>
+                                                   )}
+                                                </div>
                                              </td>
                                              <td className="p-2">
                                                 <input type="text" readOnly className="w-full bg-industrial-900/50 border border-industrial-800 rounded p-1 text-xs text-industrial-400" value={part.unit || 'Unidad'} />
@@ -1208,7 +1263,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                     </div>
                                  )}
                               </div>
-                              
+
                               {/* Total Cost Summary */}
                               <div className="flex justify-end">
                                  <div className="bg-industrial-900 p-3 rounded border border-industrial-700 min-w-[200px]">
@@ -1244,7 +1299,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                  ) : (
                                     <div className="text-center p-4 text-industrial-500 italic">No tasks generated.</div>
                                  )}
-   
+
                                  {/* Temporary explicit completion override for demo since Viewer is read-only for now */}
                                  {isSection2Editable && formData.tasks && formData.tasks.length > 0 && (
                                     <div className="p-2 bg-industrial-800 border-t border-industrial-700 flex justify-end">
@@ -1261,7 +1316,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                  )}
                               </div>
                            </div>
-   
+
                            {/* Executors (Multiple) */}
                            <div className="mb-6">
                               <h4 className="text-sm font-bold text-white mb-2 flex items-center gap-2"><User size={14} className="text-pink-500" /> Personal Ejecutante</h4>
@@ -1448,10 +1503,10 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                           type="file"
                                           className="absolute inset-0 opacity-0 cursor-pointer"
                                           onChange={(e) => {
-                                              if (e.target.files?.[0]) {
-                                                  const url = URL.createObjectURL(e.target.files[0]);
-                                                  setFormData({ ...formData, closingFile: url });
-                                              }
+                                             if (e.target.files?.[0]) {
+                                                const url = URL.createObjectURL(e.target.files[0]);
+                                                setFormData({ ...formData, closingFile: url });
+                                             }
                                           }}
                                        />
                                     )}
@@ -1463,107 +1518,107 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
 
                      {/* 3. Acceptance & Signatures */}
                      <div className="border-t border-industrial-700 pt-6">
-                         <h4 className="text-sm font-bold text-white mb-4">Aceptación del Trabajo</h4>
-                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            
-                            {/* Supervisor Selection */}
-                            <div className="space-y-1">
-                               <label className="text-xs text-industrial-400 font-bold">Recibido Por (Supervisor)</label>
-                               <select disabled={!isSection3Editable}
-                                  className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm focus:border-emerald-500 outline-none"
-                                  value={formData.supervisorId || ''}
-                                  onChange={e => setFormData({ ...formData, supervisorId: e.target.value })}>
-                                  <option value="">- Seleccionar Supervisor -</option>
-                                  {technicians.filter(t => t.role === UserRole.ADMIN_SOLICITANTE || t.role === UserRole.SUPERVISOR).map(t => (
-                                     <option key={t.id} value={t.id}>{t.name}</option>
-                                  ))}
-                               </select>
-                            </div>
+                        <h4 className="text-sm font-bold text-white mb-4">Aceptación del Trabajo</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 
-                            {/* Date/Time Received */}
-                            <div className="space-y-1">
-                               <label className="text-xs text-industrial-400 font-bold">Fecha y Hora de Recepción</label>
-                               <div className="flex gap-2 items-center">
-                                  <input
-                                     type="date"
-                                     disabled={!isSection3Editable}
-                                     className="flex-1 bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm focus:border-emerald-500 outline-none"
-                                     value={formData.closingDate?.split('T')[0] || new Date().toISOString().split('T')[0]}
-                                     onChange={(e) => {
-                                        const originalTime = formData.closingDate?.split('T')[1] || new Date().toISOString().split('T')[1];
-                                        setFormData({ ...formData, closingDate: `${e.target.value}T${originalTime}` });
-                                     }}
-                                  />
-                                  <input
-                                     type="time"
-                                     disabled
-                                     readOnly 
-                                     className="w-24 bg-industrial-900/50 border border-industrial-700 rounded p-2 text-industrial-400 text-sm text-center"
-                                     value={formData.closingDate ? new Date(formData.closingDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', hour12: false}) : '--:--'}
-                                  />
-                                  {isSection3Editable && (
-                                     <button
-                                        onClick={() => setFormData({ ...formData, closingDate: new Date().toISOString() })}
-                                        className="bg-industrial-800 hover:bg-emerald-900/50 text-emerald-400 border border-industrial-600 hover:border-emerald-500/50 rounded px-3 py-2 text-xs font-bold transition-all flex items-center gap-1 whitespace-nowrap"
-                                        title="Registrar Hora Actual"
-                                     >
-                                        <Clock size={14} /> Registrar Hora
-                                     </button>
-                                  )}
-                               </div>
-                            </div>
-                         </div>
-                         
-                         {/* Signatures Row */}
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-6">
-                            {/* Executor Signature */}
-                            <div>
-                               <label className="text-xs text-industrial-400 font-bold mb-2 block">Firma Ejecutante</label>
-                               <div
-                                  onClick={() => {
-                                     if (isSection3Editable && !formData.signatureExecutor) {
-                                        setFormData({
-                                           ...formData,
-                                           signatureExecutor: user?.name || 'Executor Name', // Auto-sign with current user generic
-                                           signatureExecutorDate: new Date().toISOString()
-                                        });
-                                     }
-                                  }}
-                                  className={`h-24 bg-white/5 rounded border-2 border-dashed ${isSection3Editable && !formData.signatureExecutor ? 'border-pink-500/50 cursor-pointer hover:bg-white/10' : 'border-industrial-600'} flex items-center justify-center flex-col gap-1 transition-colors`}
-                               >
-                                  {formData.signatureExecutor ? (
-                                     <>
-                                        <span className="text-pink-400 font-script text-xl">{formData.signatureExecutor}</span>
-                                        <span className="text-xs text-industrial-500">{formData.signatureExecutorDate ? new Date(formData.signatureExecutorDate).toLocaleDateString() : ''}</span>
-                                     </>
-                                  ) : (
-                                     <span className="text-xs text-industrial-500">
-                                        {isSection3Editable ? 'Click to Sign (Executor)' : 'Pending Signature'}
-                                     </span>
-                                  )}
-                               </div>
-                            </div>
+                           {/* Supervisor Selection */}
+                           <div className="space-y-1">
+                              <label className="text-xs text-industrial-400 font-bold">Recibido Por (Supervisor)</label>
+                              <select disabled={!isSection3Editable}
+                                 className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm focus:border-emerald-500 outline-none"
+                                 value={formData.supervisorId || ''}
+                                 onChange={e => setFormData({ ...formData, supervisorId: e.target.value })}>
+                                 <option value="">- Seleccionar Supervisor -</option>
+                                 {technicians.filter(t => t.role === UserRole.ADMIN_SOLICITANTE || t.role === UserRole.SUPERVISOR).map(t => (
+                                    <option key={t.id} value={t.id}>{t.name}</option>
+                                 ))}
+                              </select>
+                           </div>
 
-                            {/* Supervisor Signature */}
-                            <div>
-                               <label className="text-xs text-industrial-400 font-bold mb-2 block">Firma Supervisor (Conformidad)</label>
-                               <div
-                                  onClick={signSupervisor}
-                                  className={`h-24 bg-white/5 rounded border-2 border-dashed ${isSection3Editable && !formData.signatureSupervisor ? 'border-emerald-500/50 cursor-pointer hover:bg-white/10' : 'border-industrial-600'} flex items-center justify-center flex-col gap-1 transition-colors`}
-                               >
-                                  {formData.signatureSupervisor ? (
-                                     <>
-                                        <span className="text-emerald-400 font-script text-xl">{formData.signatureSupervisor}</span>
-                                        <span className="text-xs text-industrial-500">{new Date(formData.signatureSupervisorDate!).toLocaleDateString()}</span>
-                                     </>
-                                  ) : (
-                                     <span className="text-xs text-industrial-500">
-                                        {isSection3Editable ? 'Click to Sign (Supervisor)' : 'Pending Signature'}
-                                     </span>
-                                  )}
-                               </div>
-                            </div>
-                         </div>
+                           {/* Date/Time Received */}
+                           <div className="space-y-1">
+                              <label className="text-xs text-industrial-400 font-bold">Fecha y Hora de Recepción</label>
+                              <div className="flex gap-2 items-center">
+                                 <input
+                                    type="date"
+                                    disabled={!isSection3Editable}
+                                    className="flex-1 bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm focus:border-emerald-500 outline-none"
+                                    value={formData.closingDate?.split('T')[0] || new Date().toISOString().split('T')[0]}
+                                    onChange={(e) => {
+                                       const originalTime = formData.closingDate?.split('T')[1] || new Date().toISOString().split('T')[1];
+                                       setFormData({ ...formData, closingDate: `${e.target.value}T${originalTime}` });
+                                    }}
+                                 />
+                                 <input
+                                    type="time"
+                                    disabled
+                                    readOnly
+                                    className="w-24 bg-industrial-900/50 border border-industrial-700 rounded p-2 text-industrial-400 text-sm text-center"
+                                    value={formData.closingDate ? new Date(formData.closingDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : '--:--'}
+                                 />
+                                 {isSection3Editable && (
+                                    <button
+                                       onClick={() => setFormData({ ...formData, closingDate: new Date().toISOString() })}
+                                       className="bg-industrial-800 hover:bg-emerald-900/50 text-emerald-400 border border-industrial-600 hover:border-emerald-500/50 rounded px-3 py-2 text-xs font-bold transition-all flex items-center gap-1 whitespace-nowrap"
+                                       title="Registrar Hora Actual"
+                                    >
+                                       <Clock size={14} /> Registrar Hora
+                                    </button>
+                                 )}
+                              </div>
+                           </div>
+                        </div>
+
+                        {/* Signatures Row */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-6">
+                           {/* Executor Signature */}
+                           <div>
+                              <label className="text-xs text-industrial-400 font-bold mb-2 block">Firma Ejecutante</label>
+                              <div
+                                 onClick={() => {
+                                    if (isSection3Editable && !formData.signatureExecutor) {
+                                       setFormData({
+                                          ...formData,
+                                          signatureExecutor: user?.name || 'Executor Name', // Auto-sign with current user generic
+                                          signatureExecutorDate: new Date().toISOString()
+                                       });
+                                    }
+                                 }}
+                                 className={`h-24 bg-white/5 rounded border-2 border-dashed ${isSection3Editable && !formData.signatureExecutor ? 'border-pink-500/50 cursor-pointer hover:bg-white/10' : 'border-industrial-600'} flex items-center justify-center flex-col gap-1 transition-colors`}
+                              >
+                                 {formData.signatureExecutor ? (
+                                    <>
+                                       <span className="text-pink-400 font-script text-xl">{formData.signatureExecutor}</span>
+                                       <span className="text-xs text-industrial-500">{formData.signatureExecutorDate ? new Date(formData.signatureExecutorDate).toLocaleDateString() : ''}</span>
+                                    </>
+                                 ) : (
+                                    <span className="text-xs text-industrial-500">
+                                       {isSection3Editable ? 'Click to Sign (Executor)' : 'Pending Signature'}
+                                    </span>
+                                 )}
+                              </div>
+                           </div>
+
+                           {/* Supervisor Signature */}
+                           <div>
+                              <label className="text-xs text-industrial-400 font-bold mb-2 block">Firma Supervisor (Conformidad)</label>
+                              <div
+                                 onClick={signSupervisor}
+                                 className={`h-24 bg-white/5 rounded border-2 border-dashed ${isSection3Editable && !formData.signatureSupervisor ? 'border-emerald-500/50 cursor-pointer hover:bg-white/10' : 'border-industrial-600'} flex items-center justify-center flex-col gap-1 transition-colors`}
+                              >
+                                 {formData.signatureSupervisor ? (
+                                    <>
+                                       <span className="text-emerald-400 font-script text-xl">{formData.signatureSupervisor}</span>
+                                       <span className="text-xs text-industrial-500">{new Date(formData.signatureSupervisorDate!).toLocaleDateString()}</span>
+                                    </>
+                                 ) : (
+                                    <span className="text-xs text-industrial-500">
+                                       {isSection3Editable ? 'Click to Sign (Supervisor)' : 'Pending Signature'}
+                                    </span>
+                                 )}
+                              </div>
+                           </div>
+                        </div>
                      </div>
                   </div>
 

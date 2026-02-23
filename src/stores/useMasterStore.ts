@@ -16,6 +16,11 @@ interface MasterState {
     currentPlan: PlanTier;
     maintenancePlans: MaintenancePlan[];
 
+    // Maintenance Plans Actions
+    addMaintenancePlan: (plan: MaintenancePlan) => void;
+    updateMaintenancePlan: (plan: MaintenancePlan) => void;
+    removeMaintenancePlan: (machineId: string) => void;
+
     // State flags
     isLoading: boolean;
     isInitialized: boolean;
@@ -92,7 +97,24 @@ export const useMasterStore = create<MasterState>((set, get) => ({
         currency: 'DOP'
     },
     currentPlan: PlanTier.BUSINESS,
-    maintenancePlans: [], // TODO: Migrate to DB
+    maintenancePlans: typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('coreflow_maintenance_plans') || '[]') : [],
+
+    // Maintenance Plans actions with localStorage persistence
+    addMaintenancePlan: (plan) => set((state) => {
+        const newPlans = [...state.maintenancePlans, plan];
+        if (typeof window !== 'undefined') localStorage.setItem('coreflow_maintenance_plans', JSON.stringify(newPlans));
+        return { maintenancePlans: newPlans };
+    }),
+    updateMaintenancePlan: (plan) => set((state) => {
+        const newPlans = state.maintenancePlans.map(p => p.machineId === plan.machineId ? plan : p);
+        if (typeof window !== 'undefined') localStorage.setItem('coreflow_maintenance_plans', JSON.stringify(newPlans));
+        return { maintenancePlans: newPlans };
+    }),
+    removeMaintenancePlan: (machineId) => set((state) => {
+        const newPlans = state.maintenancePlans.filter(p => p.machineId !== machineId);
+        if (typeof window !== 'undefined') localStorage.setItem('coreflow_maintenance_plans', JSON.stringify(newPlans));
+        return { maintenancePlans: newPlans };
+    }),
 
     isLoading: false,
     isInitialized: false,

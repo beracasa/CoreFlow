@@ -84,6 +84,7 @@ export const useUserStore = create<UserState>((set, get) => ({
       }));
     } catch (error: any) {
       set({ error: error.message, isLoading: false });
+      throw error; // RE-THROW so the UI knows it failed!
     }
   },
 

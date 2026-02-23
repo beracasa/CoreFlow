@@ -21,6 +21,7 @@ export const MachineSupabaseService = {
         id: record.id,
         name: record.name,
         code: record.code || '',
+        alias: record.code || '',
         serialNumber: record.serial_number || '',
         plate: record.serial_number || '', // Map serial_number to plate for component compatibility
         type: record.type || 'GENERIC', // ✅ FIX: Map type field
@@ -54,6 +55,9 @@ export const MachineSupabaseService = {
   },
 
   async createMachine(machine: Omit<Machine, 'id'>): Promise<Machine> {
+    console.log("==> createMachine Payload:", machine);
+    console.log("==> createMachine Category:", machine.category);
+    
     // Build specifications object from individual fields
     const specifications: any = { ...(machine.specifications || {}) };
 
@@ -68,7 +72,7 @@ export const MachineSupabaseService = {
       .from('machines')
       .insert({
         name: machine.name,
-        code: machine.code || (machine as any).alias || null,
+        code: (machine as any).alias || machine.code || null,
         serial_number: (machine as any).plate || machine.serialNumber || null,
         type: machine.type || 'GENERIC', // ✅ FIX: Persist type field
         status: machine.status || 'IDLE',
@@ -102,6 +106,9 @@ export const MachineSupabaseService = {
   },
 
   async updateMachine(machine: Machine): Promise<void> {
+    console.log("==> updateMachine Payload:", machine);
+    console.log("==> updateMachine Category:", machine.category);
+    
     // Build specifications object from individual fields
     const specifications: any = { ...(machine.specifications || {}) };
 
@@ -116,7 +123,7 @@ export const MachineSupabaseService = {
       .from('machines')
       .update({
         name: machine.name,
-        code: machine.code || (machine as any).alias || null,
+        code: (machine as any).alias || machine.code || null,
         serial_number: (machine as any).plate || machine.serialNumber || null,
         type: machine.type || 'GENERIC', // ✅ FIX: Persist type field
         status: machine.status || 'IDLE',

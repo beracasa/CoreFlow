@@ -75,7 +75,7 @@ export const AssetNode: React.FC<AssetNodeProps> = ({ machine, layer, onClick, i
       onMouseDown={(e) => isEditMode && onMouseDown && onMouseDown(e, machine)}
     >
       {/* Label above */}
-      <div className={`absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 rounded bg-industrial-900/80 backdrop-blur border border-industrial-600 text-[10px] font-mono text-white whitespace-nowrap transition-opacity ${isSelected || isEditMode ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+      <div className="absolute -top-8 left-1/2 -translate-x-1/2 px-2 py-1 rounded bg-industrial-900/80 backdrop-blur border border-industrial-600 text-[10px] font-mono text-white whitespace-nowrap opacity-100">
         {machine.name}
       </div>
 

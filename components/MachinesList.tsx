@@ -29,6 +29,7 @@ export const MachinesList: React.FC = () => {
   const [filterCategory, setFilterCategory] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterZone, setFilterZone] = useState('');
+  const [showInactive, setShowInactive] = useState(false);
 
   // Editing State
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -98,15 +99,16 @@ export const MachinesList: React.FC = () => {
     const matchesCategory = filterCategory === '' || machineCategory === filterCategory;
     const matchesType = filterType === '' || machineType === filterType;
     const matchesZone = filterZone === '' || m.zone === filterZone;
+    const matchesActiveStatus = showInactive ? !m.isActive : m.isActive !== false;
 
-    return matchesSearch && matchesBranch && matchesCategory && matchesType && matchesZone;
+    return matchesSearch && matchesBranch && matchesCategory && matchesType && matchesZone && matchesActiveStatus;
   });
 
   const openAddGateway = () => {
     setEditingId(null);
     setNewMachine({
       name: '', plate: '', type: 'GENERIC', runningHours: 0, customIntervals: '',
-      branch: 'Main Branch', category: 'Production', alias: '', isActive: true, brand: '', model: '', year: new Date().getFullYear(),
+      branch: branches[0] || 'Planta Principal', category: categories[0] || 'Producción', alias: '', isActive: true, brand: '', model: '', year: new Date().getFullYear(),
       capacity: '', currentRating: 0, frequency: 60, voltage: 480, power: 0, imageUrl: '', documents: []
     });
     setShowGatewayModal(true);
@@ -116,7 +118,7 @@ export const MachinesList: React.FC = () => {
     setEditingId(null);
     setNewManualAsset({
       name: '', plate: '', type: 'GENERIC', zone: zones[0] || '', customIntervals: '',
-      branch: 'Main Branch', category: 'Production', alias: '', isActive: true, brand: '', model: '', year: new Date().getFullYear(),
+      branch: branches[0] || 'Planta Principal', category: categories[0] || 'Producción', alias: '', isActive: true, brand: '', model: '', year: new Date().getFullYear(),
       capacity: '', currentRating: 0, frequency: 60, voltage: 480, power: 0, imageUrl: '', documents: []
     });
     setShowManualAssetModal(true);
@@ -130,9 +132,14 @@ export const MachinesList: React.FC = () => {
   const handleEditMachine = (m: Machine) => {
     setEditingId(m.id);
     const intervals = m.intervals ? m.intervals.join(', ') : '';
+
+    // Sanitize values against available configurated lists to avoid silent legacy "Production" bugs
+    const validCategory = categories.includes(m.category || '') ? m.category : (categories[0] || 'Producción');
+    const validBranch = branches.includes(m.branch || '') ? m.branch : (branches[0] || 'Planta Principal');
+
     const commonFields = {
-      branch: m.branch || 'Main Branch',
-      category: m.category || 'Production',
+      branch: validBranch,
+      category: validCategory,
       alias: m.alias || '',
       isActive: m.isActive !== undefined ? m.isActive : true,
       brand: m.brand || '',
@@ -152,6 +159,7 @@ export const MachinesList: React.FC = () => {
         name: m.name,
         plate: m.plate,
         type: m.type,
+        zone: m.zone || zones[0],
         runningHours: m.runningHours,
         customIntervals: intervals,
         ...commonFields
@@ -182,6 +190,7 @@ export const MachinesList: React.FC = () => {
       name: newMachine.name!,
       plate: newMachine.plate || 'N/A',
       type: newMachine.type as any,
+      zone: newMachine.zone,
       runningHours: Number(newMachine.runningHours) || 0,
       intervals: intervals,
       branch: newMachine.branch,
@@ -287,7 +296,6 @@ export const MachinesList: React.FC = () => {
         await addMachine(machine);
       }
 
-      alert('✅ Equipo guardado correctamente.');
       setShowManualAssetModal(false);
       setEditingId(null);
     } catch (error: any) {
@@ -339,6 +347,16 @@ export const MachinesList: React.FC = () => {
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
                 </div>
               </div>
+              <button
+                onClick={() => setShowInactive(!showInactive)}
+                className={`px-4 py-2 rounded text-sm font-medium border transition-colors flex items-center gap-2 whitespace-nowrap ${showInactive
+                  ? 'bg-red-900/40 text-red-400 border-red-500/50 hover:bg-red-900/60'
+                  : 'bg-industrial-900 text-industrial-400 border-industrial-600 hover:bg-industrial-800'
+                  }`}
+              >
+                <Eye className="w-4 h-4" />
+                {showInactive ? 'Viendo Inactivos' : 'Ver Inactivos'}
+              </button>
             </div>
             <div className="grid grid-cols-4 gap-4">
               <select
@@ -389,17 +407,25 @@ export const MachinesList: React.FC = () => {
               <thead className="bg-industrial-900 text-xs uppercase font-bold text-industrial-500">
                 <tr>
                   <th className="px-6 py-4">{t('assets.col.name')}</th>
+                  <th className="px-6 py-4">Alias</th>
                   <th className="px-6 py-4">Zone / Line</th>
                   <th className="px-6 py-4">{t('assets.col.type')}</th>
                   <th className="px-6 py-4">{t('assets.col.protocol')}</th>
                   <th className="px-6 py-4">{t('assets.col.schedule')}</th>
-                  <th className="px-6 py-4 text-right">{t('assets.col.actions')}</th>
+                  <th className="px-6 py-4">Categoría</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-industrial-700">
                 {filteredMachines.map((m) => (
-                  <tr key={m.id} className="hover:bg-industrial-700/30 transition-colors">
+                  <tr
+                    key={m.id}
+                    className="hover:bg-industrial-700/30 transition-colors cursor-pointer"
+                    onClick={() => setViewingMachine(m)}
+                  >
                     <td className="px-6 py-4 text-white font-medium">{m.name}</td>
+                    <td className="px-6 py-4">
+                      <span className="text-industrial-300 font-medium">{m.alias || '-'}</span>
+                    </td>
                     <td className="px-6 py-4 text-industrial-300 text-xs">{m.zone || 'Unassigned'}</td>
                     <td className="px-6 py-4">
                       <span className="px-2 py-1 bg-industrial-900 rounded border border-industrial-600 text-xs font-mono">
@@ -426,13 +452,8 @@ export const MachinesList: React.FC = () => {
                         .map(i => i.label || `${i.hours.toLocaleString()} h`)
                         .join(', ') || <span className="text-industrial-600 italic">Sin Programa</span>}
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      <button
-                        onClick={() => setViewingMachine(m)}
-                        className="text-industrial-400 hover:text-white transition-colors flex items-center justify-end gap-1"
-                      >
-                        <FileText size={12} /> Detalles
-                      </button>
+                    <td className="px-6 py-4">
+                      <span className="text-industrial-300 font-medium text-xs bg-industrial-900 px-2 py-1 rounded border border-industrial-700">{m.category || 'Sin Categoría'}</span>
                     </td>
                   </tr>
                 ))}
@@ -725,8 +746,11 @@ export const MachinesList: React.FC = () => {
                   <label className="text-xs text-industrial-400 font-medium">{t('assets.category')}</label>
                   <select
                     className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm"
-                    value={newMachine.category}
-                    onChange={e => setNewMachine({ ...newMachine, category: e.target.value })}
+                    value={newMachine.category || categories[0] || 'Producción'}
+                    onChange={e => {
+                      e.stopPropagation();
+                      setNewMachine(prev => ({ ...prev, category: e.target.value }));
+                    }}
                   >
                     <option value="" disabled>Seleccionar Categoría</option>
                     {categories.map(cat => (
@@ -994,8 +1018,11 @@ export const MachinesList: React.FC = () => {
                   <label className="text-xs text-industrial-400 font-medium">{t('assets.category')}</label>
                   <select
                     className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm"
-                    value={newManualAsset.category}
-                    onChange={e => setNewManualAsset({ ...newManualAsset, category: e.target.value })}
+                    value={newManualAsset.category || categories[0] || 'Producción'}
+                    onChange={e => {
+                      e.stopPropagation();
+                      setNewManualAsset(prev => ({ ...prev, category: e.target.value }));
+                    }}
                   >
                     <option value="" disabled>Seleccionar Categoría</option>
                     {categories.map(cat => (

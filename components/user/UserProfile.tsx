@@ -2,8 +2,9 @@
 import React, { useState } from 'react';
 import { UserProfile } from '../../types';
 import { SignaturePad } from '../shared/SignaturePad';
-import { User, BadgeCheck, Mail, Briefcase, Award } from 'lucide-react';
+import { User, BadgeCheck, Mail, Briefcase, Award, X, Send } from 'lucide-react';
 import { useUserStore } from '../../src/stores/useUserStore';
+import { UserSupabaseService } from '../../src/services/UserSupabaseService';
 
 interface UserProfileProps {
    user: UserProfile;
@@ -12,6 +13,9 @@ interface UserProfileProps {
 export const UserProfileView: React.FC<UserProfileProps> = ({ user }) => {
    const [signature, setSignature] = useState<string | undefined>(user.signature_url);
    const [isEditing, setIsEditing] = useState(false);
+   const [showSkillModal, setShowSkillModal] = useState(false);
+   const [requestedSkill, setRequestedSkill] = useState('');
+   const [isSubmitting, setIsSubmitting] = useState(false);
    const { roles } = useUserStore();
 
    const roleName = roles.find(r => r.id === user.role || r.name === user.role)?.name || user.role;
@@ -22,14 +26,31 @@ export const UserProfileView: React.FC<UserProfileProps> = ({ user }) => {
    const handleSaveSignature = (base64: string) => {
       // In a real app, this would be a Server Action: await uploadSignature(base64)
       setSignature(base64);
-      alert("Signature saved to profile!");
+      alert("¡Firma guardada en el perfil!");
       setIsEditing(false);
+   };
+
+   const handleSubmitSkillRequest = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!requestedSkill.trim()) return;
+
+      setIsSubmitting(true);
+      try {
+         await UserSupabaseService.createSkillRequest(user.id, requestedSkill.trim());
+         alert("✅ Solicitud enviada exitosamente a la administración.");
+         setRequestedSkill('');
+         setShowSkillModal(false);
+      } catch (error: any) {
+         alert(`❌ Error al enviar la solicitud: ${error.message}`);
+      } finally {
+         setIsSubmitting(false);
+      }
    };
 
    return (
       <div className="h-full bg-industrial-900 p-6 overflow-y-auto">
          <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-            <User className="text-industrial-accent" /> My Technician Profile
+            <User className="text-industrial-accent" /> Mi Perfil Técnico
          </h2>
 
          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-5xl">
@@ -65,7 +86,7 @@ export const UserProfileView: React.FC<UserProfileProps> = ({ user }) => {
             {/* Specialties */}
             <div className="bg-industrial-800 rounded-xl border border-industrial-700 p-6 shadow-xl">
                <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                  <Award size={18} className="text-yellow-500" /> Certifications & Specialties
+                  <Award size={18} className="text-yellow-500" /> Certificaciones y Especialidades
                </h4>
                <div className="flex flex-wrap gap-2">
                   {specialties.map((spec, idx) => (
@@ -73,8 +94,11 @@ export const UserProfileView: React.FC<UserProfileProps> = ({ user }) => {
                         <BadgeCheck size={14} className="text-industrial-accent" /> {spec}
                      </span>
                   ))}
-                  <button className="px-3 py-1.5 rounded-full border border-dashed border-industrial-500 text-industrial-500 text-sm hover:text-white hover:border-white transition-colors">
-                     + Request Skill
+                  <button
+                     onClick={() => setShowSkillModal(true)}
+                     className="px-3 py-1.5 rounded-full border border-dashed border-industrial-500 text-industrial-500 text-sm hover:text-white hover:border-white transition-colors"
+                  >
+                     + Solicitar Habilidad
                   </button>
                </div>
             </div>
@@ -83,15 +107,15 @@ export const UserProfileView: React.FC<UserProfileProps> = ({ user }) => {
             <div className="lg:col-span-2 bg-industrial-800 rounded-xl border border-industrial-700 p-6 shadow-xl">
                <div className="flex justify-between items-start mb-4">
                   <div>
-                     <h4 className="text-lg font-bold text-white flex items-center gap-2">Digital Signature</h4>
-                     <p className="text-xs text-industrial-500">Used for R-MANT-02 and R-MANT-05 validations.</p>
+                     <h4 className="text-lg font-bold text-white flex items-center gap-2">Firma Digital</h4>
+                     <p className="text-xs text-industrial-500">Usada para la validación de reportes R-MANT-02 y R-MANT-05.</p>
                   </div>
                   {!isEditing && (
                      <button
                         onClick={() => setIsEditing(true)}
                         className="text-xs bg-industrial-700 hover:bg-industrial-600 text-white px-3 py-1.5 rounded transition-colors"
                      >
-                        Update Signature
+                        Actualizar Firma
                      </button>
                   )}
                </div>
@@ -104,19 +128,80 @@ export const UserProfileView: React.FC<UserProfileProps> = ({ user }) => {
                            onSave={handleSaveSignature}
                            onClear={() => setSignature(undefined)}
                         />
-                        <button onClick={() => setIsEditing(false)} className="mt-4 text-xs text-industrial-500 underline">Cancel</button>
+                        <button onClick={() => setIsEditing(false)} className="mt-4 text-xs text-industrial-500 underline">Cancelar</button>
                      </div>
                   ) : (
                      signature ? (
                         <img src={signature} alt="Signature" className="h-24 object-contain filter invert opacity-80" />
                      ) : (
-                        <div className="text-industrial-600 text-sm italic py-8">No signature configured</div>
+                        <div className="text-industrial-600 text-sm italic py-8">Ninguna firma configurada</div>
                      )
                   )}
                </div>
             </div>
 
          </div>
+
+         {/* Modal para Solicitar Habilidad */}
+         {showSkillModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+               <div className="bg-industrial-800 border border-industrial-700 rounded-xl w-full max-w-md shadow-2xl relative">
+                  <div className="p-6 border-b border-industrial-700 flex justify-between items-center">
+                     <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                        <Award className="text-yellow-500" />
+                        Solicitar Nueva Habilidad
+                     </h3>
+                     <button
+                        onClick={() => setShowSkillModal(false)}
+                        className="text-industrial-400 hover:text-white transition-colors"
+                        disabled={isSubmitting}
+                     >
+                        <X size={20} />
+                     </button>
+                  </div>
+                  <form onSubmit={handleSubmitSkillRequest} className="p-6">
+                     <div className="mb-6">
+                        <label className="block text-sm font-medium text-industrial-300 mb-2">
+                           Nombre de la Certificación o Habilidad
+                        </label>
+                        <input
+                           type="text"
+                           required
+                           className="w-full bg-industrial-900 border border-industrial-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-industrial-500 placeholder-industrial-600"
+                           placeholder="Ej. Operador de Montacargas Nivel 2"
+                           value={requestedSkill}
+                           onChange={(e) => setRequestedSkill(e.target.value)}
+                           disabled={isSubmitting}
+                        />
+                        <p className="mt-2 text-xs text-industrial-500">
+                           Esta solicitud será enviada al Gerente de Planta o Administrador de Sistema para su revisión y aprobación.
+                        </p>
+                     </div>
+                     <div className="flex justify-end gap-3">
+                        <button
+                           type="button"
+                           onClick={() => setShowSkillModal(false)}
+                           className="px-4 py-2 rounded-lg text-sm font-medium text-industrial-300 hover:text-white transition-colors border border-industrial-700"
+                           disabled={isSubmitting}
+                        >
+                           Cancelar
+                        </button>
+                        <button
+                           type="submit"
+                           disabled={isSubmitting}
+                           className="bg-industrial-accent hover:bg-industrial-500 text-white px-6 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                           {isSubmitting ? 'Enviando...' : (
+                              <>
+                                 <Send size={16} /> Enviar Solicitud
+                              </>
+                           )}
+                        </button>
+                     </div>
+                  </form>
+               </div>
+            </div>
+         )}
       </div>
    );
 };

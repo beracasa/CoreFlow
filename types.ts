@@ -54,6 +54,7 @@ export interface UserProfile {
   email: string;
   tenant_id: string;
   role: UserRole | string; // Updated to allow custom role IDs
+  roleName?: string; // Added to hold the joined role name
   full_name: string;
   job_title: string;
   avatar_url?: string;

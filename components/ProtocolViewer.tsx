@@ -37,48 +37,29 @@ export const ProtocolViewer: React.FC<ProtocolViewerProps> = ({ tasks, readOnly 
         const isRequired = task.actionFlags[actionKey as keyof typeof task.actionFlags];
         const isChecked = task.checks?.[actionKey] || false;
 
-        if (!isRequired) return null;
-
         if (readOnly) {
             return isChecked ? (
                 <div className="w-full h-full flex items-center justify-center">
                     <span className="text-black font-bold text-xs">X</span>
                 </div>
-            ) : <div className="w-full h-full flex items-center justify-center"><div className="w-1.5 h-1.5 bg-gray-300 rounded-full"></div></div>;
+            ) : <div className="w-full h-full flex items-center justify-center"><div className="w-1.5 h-1.5 bg-gray-300 rounded-full opacity-20"></div></div>;
         }
 
         return (
-            <>
-                <button
-                    type="button"
-                    className={`w-full h-full flex items-center justify-center cursor-pointer transition-colors focus:outline-none relative z-10 ${isChecked ? 'bg-emerald-100/50 hover:bg-emerald-200/50' : 'hover:bg-gray-50'}`}
-                    onClick={(e) => {
-                        // e.stopPropagation(); // Try removing stopPropagation in case it interferes with some global handler, though unlikely.
-                        console.log('DEBUG: ProtocolViewer Button Clicked', { id: task.id, actionKey, readOnly });
-                        if (onToggle) onToggle(task.id, actionKey);
-                    }}
-                >
-                    {isChecked ? (
-                        <span className="text-emerald-700 font-bold text-lg leading-none transform scale-110 pointer-events-none">X</span>
-                    ) : (
-                        <div className="w-5 h-5 border-2 border-industrial-400 rounded-sm bg-white hover:border-emerald-500 transition-colors pointer-events-none"></div>
-                    )}
-                </button>
-                {/* Native Checkbox for Debugging */}
-                {
-                    !readOnly && (
-                        <input
-                            type="checkbox"
-                            className="absolute top-0 right-0 h-4 w-4 z-50 opacity-50 cursor-pointer"
-                            checked={isChecked}
-                            onChange={() => {
-                                console.log('DEBUG: Native Checkbox Changed');
-                                if (onToggle) onToggle(task.id, actionKey);
-                            }}
-                        />
-                    )
-                }
-            </>
+            <button
+                type="button"
+                className={`w-full h-full flex items-center justify-center cursor-pointer transition-colors focus:outline-none ${isChecked ? 'bg-emerald-100/50 hover:bg-emerald-200/50' : 'hover:bg-gray-50'}`}
+                onClick={(e) => {
+                    e.preventDefault();
+                    if (onToggle) onToggle(task.id, actionKey);
+                }}
+            >
+                {isChecked ? (
+                    <span className="text-emerald-700 font-bold text-lg leading-none transform scale-110">X</span>
+                ) : (
+                    <div className="w-5 h-5 border-2 border-industrial-400 rounded-sm bg-white hover:border-emerald-500 transition-colors"></div>
+                )}
+            </button>
         );
     };
 

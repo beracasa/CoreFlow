@@ -24,13 +24,27 @@ export const UserManagement: React.FC = () => {
 
     // --- ACTIONS ---
 
-    const handleInvite = (e: React.FormEvent) => {
+    const handleInvite = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (!newUser.role) {
+            alert('Por favor, selecciona un rol para este usuario.');
+            return;
+        }
+
         if (newUser.email && newUser.fullName) {
-            if (newUser.email && newUser.fullName) {
-                addUser(newUser.email, newUser.fullName, newUser.role, newUser.title, newUser.companyCode);
+            try {
+                // Configurar rol temporalmente en la UI como 'INVITED' o algo, o depender de la DB
+                await addUser(newUser.email, newUser.fullName, newUser.role, newUser.title, newUser.companyCode);
+
+                alert(`✅ Invitación enviada existosamente a: ${newUser.email}`);
                 setShowInviteModal(false);
                 setNewUser({ email: '', role: '', fullName: '', title: '', companyCode: '' });
+
+                // Refrescamos lista
+                await fetchUsers();
+            } catch (error: any) {
+                alert(`❌ Error al invitar usuario: ${error.message || 'Error de permisos o conexión.'}`);
             }
         }
     };

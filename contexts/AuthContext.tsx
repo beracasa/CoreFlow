@@ -26,7 +26,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       id: sbUser.id,
       email: sbUser.email || '',
       full_name: metadata.full_name || 'Usuario',
-      role: metadata.role || UserRole.ADMIN_SOLICITANTE,
+      role: metadata.role_id || metadata.role || UserRole.ADMIN_SOLICITANTE,
       tenant_id: metadata.tenant_id || 'default-tenant',
       status: 'ACTIVE',
       job_title: metadata.job_title || 'N/A',
@@ -53,7 +53,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       id: data.id,
       email: data.email,
       full_name: data.full_name,
-      role: data.role, // Source of truth
+      role: data.role_id || data.role, // Source of truth: role_id from new schema
       company_code: data.company_code,
       job_title: data.job_title,
       status: data.status,
@@ -184,9 +184,35 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const hasRole = (allowedRoles: UserRole[]) => {
     if (!user) return false;
-    // Simple logic: if user role is in allowed list. 
-    // Types might need casting if role comes as string from DB
-    return allowedRoles.includes(user.role as UserRole);
+
+    // Si el rol sigue siendo el string hardcodeado, usa la lógica vieja
+    if (allowedRoles.includes(user.role as UserRole)) return true;
+
+    // Si el rol es un UUID, buscar en los roles dinámicos
+    const roles = useUserStore.getState().roles;
+    const userRoleDef = roles.find(r => r.id === user.role);
+
+    if (userRoleDef) {
+      // Si el rol de DB dice "Admin", "Manager" o "Supervisor" o es de sistema
+      // consideramos que es un "ADMIN_SOLICITANTE" lógico para mantener compatibilidad
+      if (allowedRoles.includes(UserRole.ADMIN_SOLICITANTE)) {
+        if (userRoleDef.name.toLowerCase().includes('admin') ||
+          userRoleDef.name.toLowerCase().includes('manager') ||
+          userRoleDef.isSystem) {
+          return true;
+        }
+      }
+
+      // Si se requiere tecnico
+      if (allowedRoles.includes(UserRole.TECNICO_MANT)) {
+        if (userRoleDef.name.toLowerCase().includes('tecnico') ||
+          userRoleDef.name.toLowerCase().includes('mecanico')) {
+          return true;
+        }
+      }
+    }
+
+    return false;
   };
 
   const hasPermission = (permissionId: string) => {
@@ -196,12 +222,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (user.role === UserRole.ADMIN_SOLICITANTE) return true;
 
     // 2. Check Dynamic Roles
-    // We need access to the roles list regarding the user's role ID.
-    // Since we are inside a hook, we can use the store directly (it's external state).
     const roles = useUserStore.getState().roles;
     const userRoleDef = roles.find(r => r.id === user.role);
 
     if (!userRoleDef) return false;
+
+    // 2.5 New System Admin Bypass
+    if (userRoleDef.isSystem ||
+      userRoleDef.name.toLowerCase().includes('admin') ||
+      userRoleDef.name.toLowerCase().includes('manager')) {
+      return true;
+    }
 
     // 3. Check specific permission
     if (Array.isArray(userRoleDef.permissions)) {
