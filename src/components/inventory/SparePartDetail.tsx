@@ -15,13 +15,18 @@ export const SparePartDetail: React.FC<SparePartDetailProps> = ({ part, onClose 
     const [isEditing, setIsEditing] = useState(false);
     const [currentPart, setCurrentPart] = useState(part);
 
-    const handleEditSuccess = () => {
+    const handleEditSuccess = (updatedPart?: SparePart) => {
         setIsEditing(false);
-        // Reload part data
-        inventoryService.getAllParts().then(parts => {
-            const updated = parts.find(p => p.id === currentPart.id);
-            if (updated) setCurrentPart(updated);
-        });
+        if (updatedPart) {
+            // Use the RPC return value directly — avoids re-fetching via PostgREST
+            setCurrentPart(updatedPart);
+        } else {
+            // Fallback: reload from server
+            inventoryService.getAllParts().then(parts => {
+                const updated = parts.find(p => p.id === currentPart.id);
+                if (updated) setCurrentPart(updated);
+            });
+        }
     };
 
     if (isEditing) {

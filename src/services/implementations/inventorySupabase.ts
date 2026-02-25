@@ -1,7 +1,7 @@
 
 import { supabase } from '../supabaseClient';
 import { IInventoryService } from '../inventoryService';
-import { SparePart, PartsRequest } from '../../../types/inventory';
+import { SparePart, PartsRequest } from '../../types/inventory';
 
 export class InventorySupabaseService implements IInventoryService {
 
@@ -9,42 +9,34 @@ export class InventorySupabaseService implements IInventoryService {
     private mapDBToPart(record: any): SparePart {
         return {
             id: record.id,
+            name: record.name || '',
             partNumber: record.sku,
-            sku: record.sku,
-            name: record.name,
+            description: record.description || '',
             category: record.category,
-            currentStock: record.current_stock,
-            minStock: record.minimum_stock,
-            minimumStock: record.minimum_stock,
-            maxStock: record.maximum_stock || 0, 
-            maximumStock: record.maximum_stock || 0,
-            reorderPoint: record.reorder_point, 
-            location: record.location_code,
-            locationCode: record.location_code,
-            cost: record.unit_cost,
-            unitCost: record.unit_cost,
-            supplier: record.supplier,
-            leadTimeDays: record.lead_time_days
-            // photoUrl: record.image_url
-            // createdAt: record.created_at
+            unitOfMeasure: record.unit_of_measure || 'Unidad',
+            currentStock: Number(record.current_stock || 0),
+            minStock: Number(record.minimum_stock ?? record.min_safety_stock ?? 0),
+            maxStock: Number(record.maximum_stock || 0),
+            location: record.location_code || '',
+            cost: Number(record.unit_cost || 0),
+            photoUrl: record.image_url,
+            createdAt: record.created_at
         } as SparePart;
     }
 
     private mapPartToDB(part: Partial<SparePart>): any {
         return {
-            // id: part.id, // generated
-            sku: part.sku || part.partNumber,
+            sku: part.partNumber,
             name: part.name,
+            description: part.description,
             category: part.category,
+            unit_of_measure: part.unitOfMeasure,
             current_stock: part.currentStock,
-            minimum_stock: part.minStock || part.minimumStock,
-            maximum_stock: part.maxStock || part.maximumStock,
-            reorder_point: part.reorderPoint,
-            location_code: part.location || part.locationCode,
-            unit_cost: part.cost || part.unitCost,
-            supplier: part.supplier,
-            lead_time_days: part.leadTimeDays
-            // image_url: (part as any).photoUrl // Column doesn't exist in spare_parts table
+            minimum_stock: part.minStock,
+            maximum_stock: part.maxStock,
+            location_code: part.location,
+            unit_cost: part.cost,
+            image_url: part.photoUrl
         };
     }
 
@@ -53,7 +45,7 @@ export class InventorySupabaseService implements IInventoryService {
     async getAllParts(): Promise<SparePart[]> {
         const { data, error } = await supabase
             .from('spare_parts')
-            .select('*')
+            .select('id, sku, name, description, category, unit_of_measure, current_stock, minimum_stock, maximum_stock, location_code, unit_cost, image_url, created_at')
             .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -61,36 +53,42 @@ export class InventorySupabaseService implements IInventoryService {
     }
 
     async createPart(partData: Omit<SparePart, 'id' | 'currentStock'> & { initialStock?: number }): Promise<SparePart> {
-        const dbPayload = this.mapPartToDB({
-            ...partData,
-            currentStock: partData.initialStock || 0
-        });
-
         const id = crypto.randomUUID();
-        dbPayload.id = id;
-
-        const { data, error } = await supabase
-            .from('spare_parts')
-            .insert(dbPayload)
-            .select()
-            .single();
-
+        const { data, error } = await supabase.rpc('upsert_spare_part', {
+            p_id:               id,
+            p_sku:              partData.partNumber,
+            p_name:             partData.name,
+            p_description:      partData.description || null,
+            p_category:         partData.category,
+            p_unit_of_measure:  partData.unitOfMeasure,
+            p_current_stock:    partData.initialStock || 0,
+            p_minimum_stock:    partData.minStock || 0,
+            p_maximum_stock:    partData.maxStock || 0,
+            p_location_code:    partData.location || null,
+            p_unit_cost:        partData.cost || 0,
+            p_image_url:        partData.photoUrl || null
+        });
         if (error) throw error;
-        return this.mapDBToPart(data);
+        return this.mapDBToPart(Array.isArray(data) ? data[0] : data);
     }
 
     async updatePart(updatedPart: SparePart): Promise<SparePart> {
-        const dbPayload = this.mapPartToDB(updatedPart);
-
-        const { data, error } = await supabase
-            .from('spare_parts')
-            .update(dbPayload)
-            .eq('id', updatedPart.id)
-            .select()
-            .single();
-
+        const { data, error } = await supabase.rpc('upsert_spare_part', {
+            p_id:               updatedPart.id,
+            p_sku:              updatedPart.partNumber,
+            p_name:             updatedPart.name,
+            p_description:      updatedPart.description || null,
+            p_category:         updatedPart.category,
+            p_unit_of_measure:  updatedPart.unitOfMeasure,
+            p_current_stock:    updatedPart.currentStock || 0,
+            p_minimum_stock:    updatedPart.minStock || 0,
+            p_maximum_stock:    updatedPart.maxStock || 0,
+            p_location_code:    updatedPart.location || null,
+            p_unit_cost:        updatedPart.cost || 0,
+            p_image_url:        updatedPart.photoUrl || null
+        });
         if (error) throw error;
-        return this.mapDBToPart(data);
+        return this.mapDBToPart(Array.isArray(data) ? data[0] : data);
     }
 
     async addStock(partId: string, quantity: number, relatedDocId?: string): Promise<void> {
@@ -129,37 +127,266 @@ export class InventorySupabaseService implements IInventoryService {
 
     // --- Requests API (Stubs for now) ---
 
+    // --- Requests API ---
+
     async getAllRequests(): Promise<PartsRequest[]> {
-        console.warn('getAllRequests: Not implemented in Supabase yet');
-        return [];
+        const { data, error } = await supabase
+            .from('spare_part_requests')
+            .select(`
+                *,
+                spare_part_request_items (*),
+                purchase_requests (*)
+            `)
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Error fetching requests:', error);
+            throw error;
+        }
+
+        return data.map(record => ({
+            id: record.id,
+            requestNumber: record.request_number,
+            technicianId: record.technician_name,
+            status: record.status as any,
+            priority: record.priority as any,
+            items: (record.spare_part_request_items || []).map((item: any) => ({
+                partId: item.part_id,
+                quantityRequested: Number(item.quantity_requested),
+                quantityDelivered: Number(item.quantity_delivered),
+                usageLocation: item.usage_location
+            })),
+            createdDate: record.created_at,
+            deliveredTo: record.delivered_to,
+            purchaseHistory: (record.purchase_requests || []).map((pr: any) => ({
+                id: pr.id,
+                requestDate: pr.request_date,
+                items: pr.items,
+                requestedBy: pr.requested_by,
+                purchaseRequestNumber: pr.purchase_request_number
+            }))
+        } as PartsRequest));
     }
 
     async createRequest(requestData: any): Promise<PartsRequest> {
-        console.warn('createRequest: Not implemented in Supabase yet');
-        return {} as PartsRequest;
+        const requestId = crypto.randomUUID();
+        
+        // 1. Create the main request
+        const { data: request, error: requestError } = await supabase
+            .from('spare_part_requests')
+            .insert({
+                id: requestId,
+                technician_name: requestData.technicianId,
+                priority: requestData.priority,
+                status: 'OPEN'
+            })
+            .select()
+            .single();
+
+        if (requestError) throw requestError;
+
+        // 2. Insert items
+        const itemsPayload = requestData.items.map((item: any) => ({
+            request_id: requestId,
+            part_id: item.partId,
+            quantity_requested: item.quantity,
+            usage_location: item.usageLocation
+        }));
+
+        const { error: itemsError } = await supabase
+            .from('spare_part_request_items')
+            .insert(itemsPayload);
+
+        if (itemsError) throw itemsError;
+
+        // Fetch back full request
+        const allRequests = await this.getAllRequests();
+        return allRequests.find(r => r.id === requestId) || {} as PartsRequest;
     }
 
-    async deliverParts(requestId: string, itemsToDeliver: any[], receiverId?: string): Promise<PartsRequest> {
-        console.warn('deliverParts: Not implemented in Supabase yet');
-        return {} as PartsRequest;
+    async deliverParts(requestId: string, itemsToDeliver: { partId: string; quantity: number }[], receiverId?: string): Promise<PartsRequest> {
+        // 1. Process each item delivery
+        for (const item of itemsToDeliver) {
+            // Update quantity_delivered in request_items
+            const { data: items, error: fetchError } = await supabase
+                .from('spare_part_request_items')
+                .select('*')
+                .eq('request_id', requestId)
+                .eq('part_id', item.partId);
+
+            if (fetchError) throw fetchError;
+            if (items && items.length > 0) {
+                const requestItem = items[0];
+                const newDelivered = (Number(requestItem.quantity_delivered) || 0) + item.quantity;
+                
+                await supabase
+                    .from('spare_part_request_items')
+                    .update({ quantity_delivered: newDelivered })
+                    .eq('id', requestItem.id);
+
+                // Create inventory transaction (this trigger will update spare_parts stock)
+                await supabase
+                    .from('inventory_transactions')
+                    .insert({
+                        part_id: item.partId,
+                        transaction_type: 'OUTBOUND',
+                        quantity: item.quantity,
+                        reference_id: requestId,
+                        notes: `Entrega para solicitud ${requestId}`,
+                        delivered_to: receiverId
+                    });
+            }
+        }
+
+        // 2. Update request status if needed
+        const req = await this.getByIdInternal(requestId);
+        if (req) {
+            let allDelivered = true;
+            let anyDelivered = false;
+            
+            for (const item of (req as any).spare_part_request_items) {
+                if (Number(item.quantity_delivered) < Number(item.quantity_requested)) {
+                    allDelivered = false;
+                }
+                if (Number(item.quantity_delivered) > 0) {
+                    anyDelivered = true;
+                }
+            }
+
+            const newStatus = allDelivered ? 'CLOSED' : (anyDelivered ? 'PARTIAL' : 'OPEN');
+            
+            await supabase
+                .from('spare_part_requests')
+                .update({ 
+                    status: newStatus,
+                    delivered_to: receiverId || (req as any).delivered_to
+                })
+                .eq('id', requestId);
+        }
+
+        // Return updated request
+        const all = await this.getAllRequests();
+        return all.find(r => r.id === requestId) || {} as PartsRequest;
+    }
+
+    private async getByIdInternal(id: string) {
+        const { data } = await supabase
+            .from('spare_part_requests')
+            .select('*, spare_part_request_items(*)')
+            .eq('id', id)
+            .single();
+        return data;
     }
 
     async closeRequest(requestId: string): Promise<PartsRequest> {
-         console.warn('closeRequest: Not implemented in Supabase yet');
-         return {} as PartsRequest;
+         const { error } = await supabase
+            .from('spare_part_requests')
+            .update({ status: 'CLOSED' })
+            .eq('id', requestId);
+        
+        if (error) throw error;
+        const all = await this.getAllRequests();
+        return all.find(r => r.id === requestId) || {} as PartsRequest;
     }
 
     async deleteRequest(requestId: string): Promise<void> {
-         console.warn('deleteRequest: Not implemented in Supabase yet');
+         const { error } = await supabase
+            .from('spare_part_requests')
+            .delete()
+            .eq('id', requestId);
+        if (error) throw error;
     }
 
     async updateRequest(updatedRequest: PartsRequest): Promise<PartsRequest> {
-         console.warn('updateRequest: Not implemented in Supabase yet');
-         return updatedRequest;
+         // Update main request
+         const { error: reqError } = await supabase
+            .from('spare_part_requests')
+            .update({
+                technician_name: updatedRequest.technicianId,
+                priority: updatedRequest.priority,
+                status: updatedRequest.status,
+                delivered_to: updatedRequest.deliveredTo
+            })
+            .eq('id', updatedRequest.id);
+
+        if (reqError) throw reqError;
+
+        // Update items (this is complex, for now let's assume we replace or update by part_id)
+        // Simplification: Delete existing items and re-insert
+        await supabase.from('spare_part_request_items').delete().eq('request_id', updatedRequest.id);
+        
+        const itemsPayload = updatedRequest.items.map(item => ({
+            request_id: updatedRequest.id,
+            part_id: item.partId,
+            quantity_requested: item.quantityRequested,
+            quantity_delivered: item.quantityDelivered,
+            usage_location: item.usageLocation
+        }));
+
+        await supabase.from('spare_part_request_items').insert(itemsPayload);
+
+        const all = await this.getAllRequests();
+        return all.find(r => r.id === updatedRequest.id) || {} as PartsRequest;
     }
 
     async savePurchaseRequest(requestId: string, purchaseRequest: any): Promise<PartsRequest> {
-         console.warn('savePurchaseRequest: Not implemented in Supabase yet');
-         return {} as PartsRequest;
+         const { error } = await supabase
+            .from('purchase_requests')
+            .insert({
+                request_id: requestId,
+                purchase_request_number: purchaseRequest.purchaseRequestNumber,
+                requested_by: purchaseRequest.requestedBy,
+                items: purchaseRequest.items,
+                request_date: purchaseRequest.requestDate
+            });
+
+        if (error) throw error;
+
+        // If a purchase request is made, we could optionally update the main request status to PENDING_STOCK
+        await supabase.from('spare_part_requests').update({ status: 'PENDING_STOCK' }).eq('id', requestId);
+
+        const all = await this.getAllRequests();
+        return all.find(r => r.id === requestId) || {} as PartsRequest;
+    }
+
+    async saveReception(reception: { documentNumber?: string; items: any[]; notes?: string }): Promise<any> {
+        const { data, error } = await supabase
+            .from('stock_receptions')
+            .insert({
+                document_number: reception.documentNumber || null,
+                items: reception.items,
+                notes: reception.notes || null
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+
+        return {
+            id: data.id,
+            receptionDate: data.reception_date,
+            documentNumber: data.document_number,
+            receivedBy: data.received_by,
+            items: data.items,
+            notes: data.notes
+        };
+    }
+
+    async getReceptions(): Promise<any[]> {
+        const { data, error } = await supabase
+            .from('stock_receptions')
+            .select('*')
+            .order('reception_date', { ascending: false });
+
+        if (error) throw error;
+
+        return (data || []).map((record: any) => ({
+            id: record.id,
+            receptionDate: record.reception_date,
+            documentNumber: record.document_number,
+            receivedBy: record.received_by,
+            items: record.items || [],
+            notes: record.notes
+        }));
     }
 }

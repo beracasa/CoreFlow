@@ -9,7 +9,7 @@ import { useMasterStore } from '../../stores/useMasterStore';
 interface PartCreationFormProps {
     initialData?: SparePart;
     onCancel?: () => void;
-    onSuccess?: () => void;
+    onSuccess?: (updatedPart?: SparePart) => void;
 }
 
 export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData, onCancel, onSuccess }) => {
@@ -111,16 +111,15 @@ export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData,
         try {
             if (initialData) {
                 // Edit mode
-                await inventoryService.updatePart({
+                const updated = await inventoryService.updatePart({
                     ...initialData,
                     ...formData,
-                    currentStock: formData.initialStock // Treat 'initialStock' input as current stock update if wished, or ignore. 
-                    // Usually we don't update stock via simple edit, but let's assume valid for now or strictly keep it separately.
-                    // The prompt didn't specify locking stock. Let's assume we map 'initialStock' back to 'currentStock'.
+                    currentStock: formData.initialStock
                 });
                 setFeedback({ type: 'success', message: 'Repuesto actualizado exitosamente.' });
+                if (onSuccess) onSuccess(updated);
             } else {
-                await inventoryService.createPart(formData);
+                const created = await inventoryService.createPart(formData);
                 setFeedback({ type: 'success', message: 'Repuesto creado exitosamente.' });
                 // Reset only if create
                 setFormData({
@@ -137,8 +136,8 @@ export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData,
                     photoUrl: ''
                 });
                 setDisplayCost('');
+                if (onSuccess) onSuccess(created);
             }
-            if (onSuccess) onSuccess();
         } catch (error: any) {
             console.error(error);
             setFeedback({ type: 'error', message: error.message || 'Error al procesar la solicitud.' });

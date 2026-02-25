@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Machine, Technician, MachineStatus, MaintenanceTask, MaintenancePlan, MaintenanceInterval, ZoneStructure } from '../types';
+import { Machine, Technician, MachineStatus, MaintenanceTask, MaintenancePlan, MaintenanceInterval, ZoneStructure, UserRole } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
 import { UserManagement } from './user/UserManagement';
 import { RoleManagement } from './user/RoleManagement';
 import { ProtocolBuilder } from './ProtocolBuilder';
@@ -49,7 +50,7 @@ export const Configuration: React.FC<ConfigurationProps> = ({
     zones: storeZoneStructures, addZone: storeAddZone, updateZone: storeUpdateZone, removeZone: storeRemoveZone, reorderZones,
     plantSettings, updateSettings,
     // Protocol Actions
-    maintenancePlans, addMaintenancePlan, updateMaintenancePlan,
+    maintenancePlans, addMaintenancePlan, updateMaintenancePlan, removeMaintenancePlan,
     // Config Lists
     branches, addBranch, removeBranch, updateBranch,
     categories, addCategory, removeCategory, updateCategory,
@@ -110,7 +111,14 @@ export const Configuration: React.FC<ConfigurationProps> = ({
   const [machineToAssociate, setMachineToAssociate] = useState<string>('');
   const [machineSearchQuery, setMachineSearchQuery] = useState('');
   const [isMachineSearchOpen, setIsMachineSearchOpen] = useState(false);
+  const { hasRole } = useAuth();
   const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  // Interval Addition State
+  const [isAddingInterval, setIsAddingInterval] = useState(false);
+  const [newIntervalHours, setNewIntervalHours] = useState('');
+  const [intervalToDelete, setIntervalToDelete] = useState<string | null>(null);
+  const [machineToRemove, setMachineToRemove] = useState<string | null>(null);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -164,10 +172,8 @@ export const Configuration: React.FC<ConfigurationProps> = ({
     }
   };
 
-  const handleAddInterval = (machineId: string) => {
-    const hoursStr = prompt("Ingrese las horas del intervalo (ej. 2160):");
-    if (!hoursStr) return;
-    const hours = parseInt(hoursStr);
+  const handleConfirmAddInterval = (machineId: string) => {
+    const hours = parseInt(newIntervalHours);
     if (isNaN(hours)) return;
 
     const newInterval: MaintenanceInterval = {
@@ -188,11 +194,13 @@ export const Configuration: React.FC<ConfigurationProps> = ({
       // Should not happen if UI is correct, but safe fallback
       addMaintenancePlan({ machineId, intervals: [newInterval] });
     }
+
+    setIsAddingInterval(false);
+    setNewIntervalHours('');
   };
 
   const handleDeleteInterval = (machineId: string, intervalId: string) => {
-    if (!confirm('¿Seguro que desea eliminar este intervalo?')) return;
-
+    // Confirmation handled by inline UI
     const existingPlan = maintenancePlans.find(p => p.machineId === machineId);
     if (existingPlan) {
       const updatedPlan = {
@@ -203,6 +211,7 @@ export const Configuration: React.FC<ConfigurationProps> = ({
     }
 
     if (activeIntervalTab === intervalId) setActiveIntervalTab(null);
+    setIntervalToDelete(null); // Clear inline confirm state
   };
 
   // State for Equipment Configuration
@@ -549,30 +558,69 @@ export const Configuration: React.FC<ConfigurationProps> = ({
                       if (!m) return null; // Should not happen if data is consistent
 
                       return (
-                        <button
-                          key={m.id}
-                          onClick={() => {
-                            setSelectedProtocolMachineId(m.id);
-                            // Auto select first interval if exists
-                            const currentPlan = maintenancePlans.find(p => p.machineId === m.id);
-                            if (currentPlan && currentPlan.intervals.length > 0) {
-                              setActiveIntervalTab(currentPlan.intervals[0].id);
-                            } else {
-                              setActiveIntervalTab(null);
-                            }
-                          }}
-                          className={`w-full text-left p-3 rounded text-sm transition-colors flex flex-col gap-1 ${selectedProtocolMachineId === m.id ? 'bg-industrial-700 text-white border border-industrial-600' : 'text-industrial-400 hover:bg-industrial-700/50'}`}
-                        >
-                          <span className="font-bold text-white">{m.name}</span>
-                          <div className="flex justify-between items-center w-full mt-1">
-                            <div className="flex flex-col gap-0.5">
-                              {m.alias && <span className="text-[10px] text-industrial-300 font-mono">Alias: {m.alias}</span>}
-                              {m.plate && <span className="text-[10px] text-industrial-400 font-mono">Matrícula: {m.plate}</span>}
-                              {!m.alias && !m.plate && <span className="text-[10px] text-industrial-500 italic">Sin identificadores</span>}
+                        <div key={m.id} className="relative group w-full flex flex-col">
+                          <button
+                            onClick={() => {
+                              setSelectedProtocolMachineId(m.id);
+                              // Auto select first interval if exists
+                              const currentPlan = maintenancePlans.find(p => p.machineId === m.id);
+                              if (currentPlan && currentPlan.intervals.length > 0) {
+                                setActiveIntervalTab(currentPlan.intervals[0].id);
+                              } else {
+                                setActiveIntervalTab(null);
+                              }
+                            }}
+                            className={`w-full text-left p-3 rounded text-sm transition-colors flex flex-col gap-1 ${selectedProtocolMachineId === m.id ? 'bg-industrial-700 text-white border border-industrial-600' : 'text-industrial-400 hover:bg-industrial-700/50'}`}
+                          >
+                            <span className="font-bold text-white pr-6">{m.name}</span>
+                            <div className="flex justify-between items-center w-full mt-1">
+                              <div className="flex flex-col gap-0.5">
+                                {m.alias && <span className="text-[10px] text-industrial-300 font-mono">Alias: {m.alias}</span>}
+                                {m.plate && <span className="text-[10px] text-industrial-400 font-mono">Matrícula: {m.plate}</span>}
+                                {!m.alias && !m.plate && <span className="text-[10px] text-industrial-500 italic">Sin identificadores</span>}
+                              </div>
+                              <span className="text-[10px] text-industrial-500 bg-industrial-900/50 px-2 py-0.5 rounded">{plan.intervals.length} Intervalos</span>
                             </div>
-                            <span className="text-[10px] text-industrial-500 bg-industrial-900/50 px-2 py-0.5 rounded">{plan.intervals.length} Intervalos</span>
-                          </div>
-                        </button>
+                          </button>
+
+                          {hasRole([UserRole.ADMIN_SOLICITANTE]) && (
+                            <div className="absolute top-2 right-2">
+                              {machineToRemove === m.id ? (
+                                <div className="flex gap-1 bg-industrial-800 p-1 rounded shadow-lg border border-industrial-600">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      removeMaintenancePlan(m.id);
+                                      setMachineToRemove(null);
+                                      if (selectedProtocolMachineId === m.id) {
+                                        setSelectedProtocolMachineId(null);
+                                      }
+                                    }}
+                                    className="bg-red-500 hover:bg-red-600 text-white rounded p-0.5"
+                                    title="Confirmar"
+                                  >
+                                    <Check size={12} />
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setMachineToRemove(null); }}
+                                    className="bg-industrial-600 hover:bg-industrial-500 text-white rounded p-0.5"
+                                    title="Cancelar"
+                                  >
+                                    <X size={12} />
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setMachineToRemove(m.id); }}
+                                  className="text-red-500 opacity-0 group-hover:opacity-100 transition-opacity p-1 bg-industrial-800 rounded shadow border border-red-500"
+                                  title="Quitar Equipo"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       )
                     })}
 
@@ -590,32 +638,71 @@ export const Configuration: React.FC<ConfigurationProps> = ({
                     <>
                       {/* Interval Tabs */}
                       <div className="flex items-center gap-2 p-2 border-b border-industrial-700 bg-industrial-800/50 overflow-x-auto">
-                        {maintenancePlans.find(p => p.machineId === selectedProtocolMachineId)?.intervals.map(interval => (
-                          <div key={interval.id} className="group relative flex items-center">
-                            <button
-                              onClick={() => setActiveIntervalTab(interval.id)}
-                              className={`px-4 py-2 rounded text-xs font-bold transition-all border ${activeIntervalTab === interval.id ? 'bg-industrial-600 text-white border-industrial-500 shadow-md' : 'bg-industrial-900 text-industrial-400 border-industrial-700 hover:bg-industrial-700'}`}
-                            >
-                              {interval.label}
-                            </button>
-                            {activeIntervalTab === interval.id && (
+                        {(maintenancePlans.find(p => p.machineId === selectedProtocolMachineId)?.intervals || [])
+                          .slice()
+                          .sort((a, b) => a.hours - b.hours)
+                          .map(interval => (
+                            <div key={interval.id} className="group relative flex items-center">
                               <button
-                                onClick={(e) => { e.stopPropagation(); handleDeleteInterval(selectedProtocolMachineId, interval.id); }}
-                                className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-                                title="Eliminar Intervalo"
+                                onClick={() => setActiveIntervalTab(interval.id)}
+                                className={`px-4 py-2 rounded text-xs font-bold transition-all border ${activeIntervalTab === interval.id ? 'bg-industrial-600 text-white border-industrial-500 shadow-md' : 'bg-industrial-900 text-industrial-400 border-industrial-700 hover:bg-industrial-700'}`}
                               >
-                                <X size={10} />
+                                {interval.label}
                               </button>
-                            )}
-                          </div>
-                        ))}
+                              {intervalToDelete === interval.id ? (
+                                <div className="absolute -top-3 -right-3 flex gap-1 bg-industrial-800 p-1 rounded shadow-lg z-10 border border-industrial-600">
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleDeleteInterval(selectedProtocolMachineId, interval.id); }}
+                                    className="bg-red-500 hover:bg-red-600 text-white rounded p-0.5"
+                                    title="Confirmar"
+                                  >
+                                    <Check size={12} />
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setIntervalToDelete(null); }}
+                                    className="bg-industrial-600 hover:bg-industrial-500 text-white rounded p-0.5"
+                                    title="Cancelar"
+                                  >
+                                    <X size={12} />
+                                  </button>
+                                </div>
+                              ) : activeIntervalTab === interval.id && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); setIntervalToDelete(interval.id); }}
+                                  className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-10 border border-red-600"
+                                  title="Eliminar Intervalo"
+                                >
+                                  <X size={10} />
+                                </button>
+                              )}
+                            </div>
+                          ))}
 
-                        <button
-                          onClick={() => handleAddInterval(selectedProtocolMachineId)}
-                          className="px-3 py-2 rounded text-xs font-medium text-industrial-400 hover:text-white hover:bg-industrial-700 border border-transparent border-dashed hover:border-industrial-500 flex items-center gap-1"
-                        >
-                          <Plus size={12} /> Nvo. Intervalo
-                        </button>
+                        {isAddingInterval ? (
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              className="px-2 py-1 w-24 bg-industrial-900 border border-industrial-600 rounded text-xs text-white"
+                              placeholder="Hrs..."
+                              value={newIntervalHours}
+                              onChange={(e) => setNewIntervalHours(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleConfirmAddInterval(selectedProtocolMachineId);
+                                if (e.key === 'Escape') setIsAddingInterval(false);
+                              }}
+                              autoFocus
+                            />
+                            <button onClick={() => handleConfirmAddInterval(selectedProtocolMachineId)} className="p-1 bg-industrial-accent text-white rounded"><Plus size={14} /></button>
+                            <button onClick={() => setIsAddingInterval(false)} className="p-1 text-industrial-400 hover:text-white"><X size={14} /></button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setIsAddingInterval(true)}
+                            className="px-3 py-2 rounded text-xs font-medium text-industrial-400 hover:text-white hover:bg-industrial-700 border border-transparent border-dashed hover:border-industrial-500 flex items-center gap-1"
+                          >
+                            <Plus size={12} /> Nvo. Intervalo
+                          </button>
+                        )}
                       </div>
 
                       {/* Content */}

@@ -13,7 +13,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- TABLA: SUPPLIERS (Proveedores)
 -- =============================================================================
 CREATE TABLE IF NOT EXISTS suppliers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL, -- Aislamiento de datos por inquilino
     name TEXT NOT NULL,
     tax_id TEXT, -- RFC o Identificador Fiscal
@@ -41,7 +41,7 @@ CREATE POLICY "Tenant Isolation Policy for Suppliers" ON suppliers
 -- TABLA: SPARE_PARTS (Maestro de Repuestos)
 -- =============================================================================
 CREATE TABLE IF NOT EXISTS spare_parts (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL,
     supplier_id UUID REFERENCES suppliers(id),
     sku TEXT NOT NULL, -- Código único de repuesto (Stock Keeping Unit)
@@ -77,7 +77,7 @@ CREATE POLICY "Tenant Isolation Policy for Spare Parts" ON spare_parts
 -- TABLA: INVENTORY_TRANSACTIONS (Libro Mayor de Movimientos)
 -- =============================================================================
 CREATE TABLE IF NOT EXISTS inventory_transactions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL,
     part_id UUID NOT NULL REFERENCES spare_parts(id) ON DELETE RESTRICT,
     transaction_type TEXT CHECK (transaction_type IN ('INBOUND', 'OUTBOUND', 'ADJUSTMENT_ADD', 'ADJUSTMENT_SUB')),
@@ -104,7 +104,7 @@ CREATE POLICY "Tenant Isolation Policy for Transactions" ON inventory_transactio
 -- TABLA: ASSET_SPARE_PARTS (Relación Activo-Repuesto)
 -- =============================================================================
 CREATE TABLE IF NOT EXISTS asset_spare_parts (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     tenant_id UUID NOT NULL,
     asset_id UUID NOT NULL, -- Referencia al ID de la máquina (Tabla Assets externa)
     part_id UUID NOT NULL REFERENCES spare_parts(id) ON DELETE CASCADE,

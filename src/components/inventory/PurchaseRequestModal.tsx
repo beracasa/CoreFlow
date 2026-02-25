@@ -15,7 +15,8 @@ interface PurchaseRequestModalProps {
 }
 
 export const PurchaseRequestModal: React.FC<PurchaseRequestModalProps> = ({ request, parts, onClose, onSuccess }) => {
-    const { plantSettings, currentUser } = useMasterStore();
+    const { plantSettings } = useMasterStore();
+    const currentUser = (useMasterStore.getState() as any).currentUser;
     const [selectedItems, setSelectedItems] = useState<Record<string, number>>({});
     // Track items that were explicitly removed by the user to prevent re-adding them automatically
     const [removedItems, setRemovedItems] = useState<Set<string>>(new Set());
@@ -124,7 +125,7 @@ export const PurchaseRequestModal: React.FC<PurchaseRequestModalProps> = ({ requ
 
     const handleGenerateRequest = async () => {
         const itemsList = Object.entries(selectedItems)
-            .filter(([_, qty]) => qty > 0)
+            .filter(([_, qty]) => Number(qty) > 0)
             .map(([partId, qty]) => {
                 const part = parts.find(p => p.id === partId);
                 const reqItem = request.items.find(i => i.partId === partId);
@@ -133,7 +134,7 @@ export const PurchaseRequestModal: React.FC<PurchaseRequestModalProps> = ({ requ
                     code: part?.partNumber || '-',
                     name: part?.name || partId,
                     currentStock: part?.currentStock || 0,
-                    qtyRequested: qty,
+                    qtyRequested: Number(qty),
                     pendingForRequest: reqItem ? Math.max(0, reqItem.quantityRequested - reqItem.quantityDelivered) : 0
                 };
             });
@@ -312,8 +313,12 @@ export const PurchaseRequestModal: React.FC<PurchaseRequestModalProps> = ({ requ
                                                                 type="number"
                                                                 min="1"
                                                                 className="w-full bg-industrial-900 border border-industrial-600 rounded px-2 py-1 text-white text-center font-mono focus:ring-1 focus:ring-orange-500 outline-none"
-                                                                value={selectedItems[partId] || 0}
-                                                                onChange={(e) => handleQuantityChange(partId, parseInt(e.target.value) || 0)}
+                                                                value={selectedItems[partId] || ''}
+                                                                onFocus={e => e.target.select()}
+                                                                onChange={(e) => {
+                                                                    const val = e.target.value === '' ? 0 : parseInt(e.target.value);
+                                                                    handleQuantityChange(partId, isNaN(val) ? 0 : val);
+                                                                }}
                                                             />
                                                         </td>
                                                         <td className="px-4 py-3 text-center">
@@ -349,8 +354,8 @@ export const PurchaseRequestModal: React.FC<PurchaseRequestModalProps> = ({ requ
                             onClick={handleGenerateRequest}
                             disabled={activeItems.length === 0}
                             className={`flex items-center px-4 py-2 rounded-lg font-bold text-sm transition-colors shadow-lg ${activeItems.length === 0
-                                    ? 'bg-industrial-700 text-industrial-500 cursor-not-allowed'
-                                    : 'bg-orange-600 hover:bg-orange-700 text-white'
+                                ? 'bg-industrial-700 text-industrial-500 cursor-not-allowed'
+                                : 'bg-orange-600 hover:bg-orange-700 text-white'
                                 }`}
                         >
                             <Download className="w-4 h-4 mr-2" />

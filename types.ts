@@ -103,6 +103,7 @@ export interface Machine {
   power?: number;         // P (KVA)
   imageUrl?: string;      // Imagen del Equipo
   documents?: MachineDocument[] | string[];   // Documentos adjuntos (soporta ambos formatos)
+  maintenancePlans?: MaintenancePlan[]; // R-MANT-02 Protocols inside JSONB
 }
 
 /**
@@ -202,6 +203,7 @@ export interface MaintenanceTask {
 
 export interface WorkOrder {
   id: string;
+  displayId?: string;
   title: string;
   machineId: string;
   status: WorkOrderStatus;

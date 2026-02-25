@@ -104,8 +104,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
       })();
 
-      // Force timeout after 5 seconds to clear loading state
-      const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 5000));
+      // Force timeout after 1.5 seconds to clear loading state
+      const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 1500));
 
       await Promise.race([sessionPromise, timeoutPromise]);
 
@@ -140,7 +140,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             }
           })();
 
-          const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 5000));
+          const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 1500));
 
           await Promise.race([fetchPromise, timeoutPromise]);
 

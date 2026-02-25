@@ -3,7 +3,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useWorkOrderStore } from '../src/stores/useWorkOrderStore';
 import { useMasterStore } from '../src/stores/useMasterStore';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Plus, Calendar, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { FileText, Plus, Calendar, AlertCircle, CheckCircle, Clock, Download } from 'lucide-react';
 
 interface MaintenanceListProps {
   type: 'R-MANT-02' | 'R-MANT-05';
@@ -70,8 +70,25 @@ export const MaintenanceList: React.FC<MaintenanceListProps> = ({ type }) => {
         <table className="w-full text-left text-sm text-industrial-400">
           <thead className="bg-industrial-900 text-xs uppercase font-bold text-industrial-500">
             <tr>
-              <th className="px-6 py-4">Orden</th>
-              <th className="px-6 py-4">Mantenimiento</th>
+              <th className="px-6 py-4">Nº Orden</th>
+              {type === 'R-MANT-02' ? (
+                <>
+                  <th className="px-6 py-4">Equipo</th>
+                  <th className="px-6 py-4">Zona / Línea</th>
+                  <th className="px-6 py-4">Alias</th>
+                  <th className="px-6 py-4">Tipo Mantenimiento</th>
+                  <th className="px-6 py-4">Intervalo</th>
+                </>
+              ) : (
+                <th className="px-6 py-4">Máquina / Accesorio</th>
+              )}
+              {type === 'R-MANT-05' && (
+                <>
+                  <th className="px-6 py-4">Tipo Mantenimiento</th>
+                  <th className="px-6 py-4">Departamento</th>
+                  <th className="px-6 py-4">Tipo de Avería</th>
+                </>
+              )}
               <th className="px-6 py-4">Fecha</th>
               <th className="px-6 py-4">Estado</th>
             </tr>
@@ -79,42 +96,107 @@ export const MaintenanceList: React.FC<MaintenanceListProps> = ({ type }) => {
           <tbody className="divide-y divide-industrial-700">
             {filteredOrders.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-6 py-12 text-center text-industrial-600 italic">
+                <td colSpan={type === 'R-MANT-02' ? 8 : 7} className="px-6 py-12 text-center text-industrial-600 italic">
                   No records found for {type}
                 </td>
               </tr>
             ) : (
-              filteredOrders.map((order) => (
-                <tr
-                  key={order.id}
-                  onClick={() => navigate(`/orders/${order.id}`)}
-                  className="hover:bg-industrial-700/50 transition-colors cursor-pointer group"
-                >
-                  {/* Orden */}
-                  <td className="px-6 py-4 font-mono text-industrial-300 font-medium group-hover:text-white transition-colors">
-                    {order.id}
-                  </td>
+              filteredOrders.map((order) => {
+                const machine = machines.find(m => m.id === order.machineId);
 
-                  {/* Mantenimiento */}
-                  <td className="px-6 py-4">
-                    <div className="text-white font-medium mb-0.5">{getMaintenanceName(order)}</div>
-                    {/* Optional: Show plate underneath if needed, or keeping it clean */}
-                  </td>
+                const maintTypeMap: Record<string, string> = {
+                  'Preventive': 'Preventivo',
+                  'Programmed': 'Programado',
+                  'Other': 'Otro'
+                };
+                const translatedType = order.maintenanceType ? (maintTypeMap[order.maintenanceType] || order.maintenanceType) : '-';
 
-                  {/* Fecha */}
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2 text-xs">
-                      <Calendar className="w-3 h-3 text-industrial-500" />
-                      {new Date(order.createdDate).toLocaleDateString()}
-                    </div>
-                  </td>
+                return (
+                  <tr
+                    key={order.id}
+                    onClick={() => navigate(`/orders/${order.id}`, { state: { type } })}
+                    className="hover:bg-industrial-700/50 transition-colors cursor-pointer group"
+                  >
+                    {/* Nº Orden */}
+                    <td className="px-6 py-4">
+                      <div className="text-white font-mono font-bold whitespace-nowrap">{order.displayId || '(Nuevo)'}</div>
+                    </td>
+                    {type === 'R-MANT-02' ? (
+                      <>
+                        {/* Equipo */}
+                        <td className="px-6 py-4 text-white font-medium">
+                          {machine?.name || '-'}
+                        </td>
+                        {/* Zona / Línea */}
+                        <td className="px-6 py-4 text-white font-medium">
+                          {machine?.zone || '-'}
+                        </td>
+                        {/* Alias */}
+                        <td className="px-6 py-4 text-white font-medium">
+                          {machine?.alias || '-'}
+                        </td>
+                        {/* Tipo Mantenimiento */}
+                        <td className="px-6 py-4 text-white font-medium">
+                          {translatedType}
+                        </td>
+                        {/* Intervalo */}
+                        <td className="px-6 py-4 text-white font-medium">
+                          {order.interval || '-'}
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        {/* Máquina / Accesorio */}
+                        <td className="px-6 py-4 text-white font-medium">
+                          {machine?.name || '-'} {machine?.alias ? `(${machine.alias})` : ''}
+                        </td>
+                        {/* Tipo Mantenimiento */}
+                        <td className="px-6 py-4 text-white font-medium">
+                          {order.maintenanceType || '-'}
+                        </td>
+                        {/* Departamento */}
+                        <td className="px-6 py-4 text-white font-medium">
+                          {order.department || '-'}
+                        </td>
+                        {/* Tipo de Avería */}
+                        <td className="px-6 py-4 text-white font-medium">
+                          {order.failureType || '-'}
+                        </td>
+                      </>
+                    )}
 
-                  {/* Estado */}
-                  <td className="px-6 py-4 text-xs font-medium">
-                    {getStatusBadge(order.currentStage)}
-                  </td>
-                </tr>
-              ))
+                    {/* Fecha */}
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2 text-sm text-white font-medium">
+                        <Calendar className="w-4 h-4 text-industrial-500" />
+                        {new Date(order.createdDate).toLocaleDateString()}
+                      </div>
+                    </td>
+
+                    {/* Estado y Acciones */}
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        {getStatusBadge(order.currentStage)}
+
+                        {type === 'R-MANT-02' && order.currentStage === WorkOrderStage.CLOSED && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation(); // Prevenir navegación
+                              import('../src/utils/pdf/pdfGenerator').then(module => {
+                                module.generateRMant02PDF(order, machine);
+                              });
+                            }}
+                            className="p-1.5 bg-industrial-800 hover:bg-industrial-700 text-industrial-300 rounded border border-industrial-600 transition-colors"
+                            title="Descargar PDF"
+                          >
+                            <Download className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>

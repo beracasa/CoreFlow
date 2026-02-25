@@ -1,4 +1,4 @@
-import { SparePart, PartsRequest, InventoryTransaction, PurchaseRequest } from '../types/inventory';
+import { SparePart, PartsRequest, InventoryTransaction, PurchaseRequest, StockReception, StockReceptionItem } from '../types/inventory';
 
 export interface IInventoryService {
     getAllParts(): Promise<SparePart[]>;
@@ -17,4 +17,8 @@ export interface IInventoryService {
 
     // Purchase Request
     savePurchaseRequest(requestId: string, purchaseRequest: any): Promise<PartsRequest>;
+
+    // Reception History
+    saveReception(reception: Omit<StockReception, 'id' | 'receptionDate'>): Promise<StockReception>;
+    getReceptions(): Promise<StockReception[]>;
 }

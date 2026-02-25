@@ -5,11 +5,9 @@ import { ReceptionForm } from '../src/components/inventory/ReceptionForm';
 import { PartCreationForm } from '../src/components/inventory/PartCreationForm';
 import { RequestList } from '../src/components/inventory/RequestList';
 import { RequestDetail } from '../src/components/inventory/RequestDetail';
-import { InventoryMockService } from '../src/services/implementations/inventoryMock';
+import { inventoryService } from '../src/services';
 import { PartsRequest, SparePart } from '../src/types/inventory';
 import { Layers, FileText, ArrowDownCircle, PlusCircle, List } from 'lucide-react';
-
-const service = new InventoryMockService();
 
 export const Inventory: React.FC<any> = () => {
   const [activeTab, setActiveTab] = useState<'list' | 'request' | 'requests_list' | 'receive' | 'create'>('list');
@@ -19,7 +17,7 @@ export const Inventory: React.FC<any> = () => {
   // Fetch parts when showing details, as we need them for names
   useEffect(() => {
     if (activeTab === 'requests_list' && selectedRequest) {
-      service.getAllParts().then(setParts);
+      inventoryService.getAllParts().then(setParts);
     }
   }, [activeTab, selectedRequest]);
 

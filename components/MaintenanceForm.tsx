@@ -4,9 +4,10 @@ import { z } from 'zod';
 import { WorkOrder, Machine, Technician, Priority, WorkOrderStatus, SparePart, WorkOrderStage, MaintenanceTask, UserRole } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
-import { Save, X, CheckSquare, Plus, Trash2, Lock, PlayCircle, CheckCircle, ArrowRight, Settings, User, Clock, AlertCircle, UploadCloud, Image, FileText, Download, Paperclip } from 'lucide-react';
+import { X, Calendar, User, FileText, CheckCircle, Clock, AlertCircle, Wrench, Package, ShieldCheck, FileKey, Info, ChevronRight, Lock, Save, PenTool, CheckSquare, Plus, Trash2, Camera, Upload, ImageIcon, Trash, FileIcon, UserCircle, Download, ArrowRight, PlayCircle, Settings, UploadCloud, Image, Paperclip } from 'lucide-react';
 import { ProtocolViewer } from './ProtocolViewer';
 import { useMasterStore } from '../src/stores/useMasterStore';
+import { useUserStore } from '../src/stores/useUserStore';
 
 // --- 1. CONFIGURATION & MASTER DATA ENGINE ---
 
@@ -77,13 +78,7 @@ const MAINTENANCE_PROTOCOLS: Record<string, Record<string, MaintenanceTask[]>> =
    }
 };
 
-// Mock Spare Parts for Selection
-const MOCK_SPARE_PARTS: SparePart[] = [
-   { id: 'sp1', sku: '589635', name: 'Tornillo M8x20', currentStock: 100, minimumStock: 10, unitCost: 1.5, supplier: 'Wurth', leadTimeDays: 1 },
-   { id: 'sp2', sku: '602111', name: 'Rodamiento 6205', currentStock: 10, minimumStock: 2, unitCost: 12.50, supplier: 'SKF', leadTimeDays: 3 },
-   { id: 'sp3', sku: '998822', name: 'Aceite Hidráulico', currentStock: 50, minimumStock: 10, unitCost: 5.00, supplier: 'Shell', leadTimeDays: 2 },
-   { id: 'sp4', sku: '100200', name: 'Sello Viton', currentStock: 20, minimumStock: 5, unitCost: 8.20, supplier: 'Generic', leadTimeDays: 5 },
-];
+// Mock Spare Parts for Selection removed in favor of real `useMasterStore().spareParts`
 
 // --- 2. ZOD VALIDATION SCHEMAS (State Guards) ---
 
@@ -191,7 +186,13 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
       }
       if (initialData) {
          setFormData(prev => {
-            const nextData = { ...prev, ...initialData, formType: type };
+            const nextData = {
+               ...prev,
+               ...initialData,
+               formType: type,
+               // Initialize assignedTo for new records if not present
+               assignedTo: initialData.assignedTo || prev.assignedTo || user?.id
+            };
             // Deep check to prevent infinite React render loops if initialData reference keeps changing from parent
             if (JSON.stringify(prev) === JSON.stringify(nextData)) {
                return prev;
@@ -223,79 +224,97 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
    }, [initialMachineId, initialData]);
 
    // Access store
-   // Access store
-   const { maintenancePlans, categories } = useMasterStore();
+   const { maintenancePlans, categories, parts: spareParts } = useMasterStore();
+   const { users, fetchUsers } = useUserStore();
+
+   useEffect(() => {
+      // Ensure users are loaded
+      if (users.length === 0) fetchUsers();
+   }, []);
 
    // -- LOGIC ENGINE: Cumulative Tasks --
    const generateCumulativeTasks = (machineId: string, machineType: string, selectedInterval: string): MaintenanceTask[] => {
-      // 1. Try to find a specific plan for this machine
-      const specificPlan = maintenancePlans.find(p => p.machineId === machineId);
+      // 1. Try to find a specific plan for this machine directly from the machine object first, then the specific array.
+      const targetMachine = machines.find(m => m.id === machineId);
+      const specificPlan = targetMachine?.maintenancePlans?.[0] || maintenancePlans.find(p => p.machineId === machineId);
 
-      if (specificPlan) {
+      if (specificPlan && specificPlan.intervals && specificPlan.intervals.length > 0) {
          // Dynamic Logic based on Maintenance Module
-         // Find the target interval object to get its hours
-         const targetInterval = specificPlan.intervals.find(i => i.label === selectedInterval);
-         if (!targetInterval) return [];
+         let targetHours = 0;
+         const cleanSelected = selectedInterval.toLowerCase().trim();
 
-         const targetHours = targetInterval.hours;
+         const targetInterval = specificPlan.intervals.find(i =>
+            i.label.toLowerCase().trim() === cleanSelected ||
+            parseInt(i.label) === parseInt(selectedInterval)
+         );
+
+         if (targetInterval) {
+            targetHours = targetInterval.hours;
+         } else {
+            // Fallback: extract numbers directly from selectedInterval string if label mismatch
+            const match = selectedInterval.match(/(\d+)/);
+            if (match) {
+               targetHours = parseInt(match[1]);
+            } else {
+               targetHours = -1;
+            }
+         }
 
          // Filter intervals <= targetHours and Sort by hours ASC
          const relevantIntervals = specificPlan.intervals
             .filter(i => i.hours <= targetHours)
             .sort((a, b) => a.hours - b.hours);
 
-         // Flatten tasks
-         // Note: references, estimatedTime etc are already in tasks.
-         // We add a unique ID to avoid collisions if we were to have same task in multiple (unlikely but possible logic)
-         // But mainly we tag them with intervalOrigin
-         let cumulativeTasks: MaintenanceTask[] = [];
+         if (relevantIntervals.length > 0) {
+            // Flatten tasks
+            let cumulativeTasks: MaintenanceTask[] = [];
 
-         relevantIntervals.forEach(interval => {
-            const labeledTasks = interval.tasks.map(t => ({
-               ...t,
-               id: `t-${interval.id}-${t.id}-${Math.random().toString(36).substr(2, 5)}`, // Ensure unique ID for this instance
-               intervalOrigin: interval.label,
-               completed: false
-            }));
-            cumulativeTasks = [...cumulativeTasks, ...labeledTasks];
-         });
+            relevantIntervals.forEach(interval => {
+               const labeledTasks = interval.tasks.map(t => ({
+                  ...t,
+                  id: `t-${interval.id}-${t.id}-${Math.random().toString(36).substr(2, 5)}`, // Ensure unique ID
+                  intervalOrigin: interval.label,
+                  completed: false
+               }));
+               cumulativeTasks = [...cumulativeTasks, ...labeledTasks];
+            });
 
-         return cumulativeTasks;
-      } else {
-         // Fallback to legacy hardcoded logic if no plan exists
-         const selectedIndex = INTERVAL_HIERARCHY.indexOf(selectedInterval);
-         if (selectedIndex === -1) return [];
-
-         let tasks: MaintenanceTask[] = [];
-
-         for (let i = 0; i <= selectedIndex; i++) {
-            const intervalLabel = INTERVAL_HIERARCHY[i];
-
-            // Resolve category name safely (handles both string[] and object[] in store)
-            const categoryMatch = categories.find(c => typeof c === 'string' ? c === machineType : c.id === machineType);
-            const actualMachineType = categoryMatch
-               ? (typeof categoryMatch === 'string' ? categoryMatch : categoryMatch.name)
-               : machineType;
-
-            // Find protocol set flexibly
-            const mtUpper = (actualMachineType || '').toUpperCase();
-            // Default to SACMI to show a rich example table instead of the single-row GENERIC
-            const matchingKey = Object.keys(MAINTENANCE_PROTOCOLS).find(k => mtUpper.includes(k) && k !== 'GENERIC') || 'SACMI';
-
-            const protocolSet = MAINTENANCE_PROTOCOLS[matchingKey];
-            const sourceTasks = protocolSet[intervalLabel] || [];
-
-            const newTasks = sourceTasks.map(t => ({
-               ...t,
-               id: `t-${intervalLabel.replace(/\s/g, '')}-${t.id}-${Math.random().toString(36).substr(2, 5)}`,
-               intervalOrigin: intervalLabel,
-               completed: false
-            }));
-
-            tasks = [...tasks, ...newTasks];
+            return cumulativeTasks;
          }
-         return tasks;
       }
+      // Fallback to legacy hardcoded logic if no plan exists
+      const selectedIndex = INTERVAL_HIERARCHY.indexOf(selectedInterval);
+      if (selectedIndex === -1) return [];
+
+      let tasks: MaintenanceTask[] = [];
+
+      for (let i = 0; i <= selectedIndex; i++) {
+         const intervalLabel = INTERVAL_HIERARCHY[i];
+
+         // Resolve category name safely (handles both string[] and object[] in store)
+         const categoryMatch = categories.find(c => typeof c === 'string' ? c === machineType : c.id === machineType);
+         const actualMachineType = categoryMatch
+            ? (typeof categoryMatch === 'string' ? categoryMatch : categoryMatch.name)
+            : machineType;
+
+         // Find protocol set flexibly
+         const mtUpper = (actualMachineType || '').toUpperCase();
+         // Default to SACMI to show a rich example table instead of the single-row GENERIC
+         const matchingKey = Object.keys(MAINTENANCE_PROTOCOLS).find(k => mtUpper.includes(k) && k !== 'GENERIC') || 'SACMI';
+
+         const protocolSet = MAINTENANCE_PROTOCOLS[matchingKey];
+         const sourceTasks = protocolSet[intervalLabel] || [];
+
+         const newTasks = sourceTasks.map(t => ({
+            ...t,
+            id: `t-${intervalLabel.replace(/\s/g, '')}-${t.id}-${Math.random().toString(36).substr(2, 5)}`,
+            intervalOrigin: intervalLabel,
+            completed: false
+         }));
+
+         tasks = [...tasks, ...newTasks];
+      }
+      return tasks;
    };
 
    const handleTaskToggle = (taskId: string, action: string) => {
@@ -374,7 +393,11 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
    };
 
    const handleInternalSave = (order: WorkOrder, stay: boolean = false) => {
-      const orderToSave = { ...order, type: order.type || type };
+      const orderToSave = {
+         ...order,
+         formType: type,
+         type: order.type || (type === 'R-MANT-02' ? 'PREVENTIVE' : 'CORRECTIVE')
+      };
       if (!orderToSave.title || orderToSave.title.trim() === '') {
          const machine = machines.find(m => m.id === orderToSave.machineId);
          const machineName = machine ? (machine.alias || machine.name) : 'Unknown Machine';
@@ -417,6 +440,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
       const result = Schema.safeParse(formData);
 
       if (!result.success) {
+         console.warn("DEBUG ZOD VALIDATION FAILED on Section 1:", result.error.issues);
          setValidationError("Por favor complete todos los campos obligatorios de la Sección 1.");
 
          const fieldErrors = new Set<string>();
@@ -512,7 +536,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                   {type === 'R-MANT-02'
                      ? t('mant02.formTitle')
                      : 'SOLICITUD, ANÁLISIS Y EJECUCIÓN DE AVERÍAS DE MAQUINARIAS / EQUIPOS AUXILIARES E INFRAESTRUCTURA'}
-                  <span className="text-sm font-mono text-industrial-500 ml-2">{formData.id ? `ID: ${formData.id}` : '(New)'}</span>
+                  <span className="text-sm font-mono text-industrial-500 ml-2">{formData.displayId ? `ID: ${formData.displayId}` : '(New)'}</span>
                </h2>
                {/* Status Pills */}
                <div className="flex gap-2 text-xs mt-1 items-center">
@@ -533,7 +557,22 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                   </div>
                </div>
             </div>
-            <button onClick={onCancel} className="text-industrial-400 hover:text-white"><X className="w-6 h-6" /></button>
+            <div className="flex items-center gap-4">
+               {type === 'R-MANT-02' && formData.currentStage === WorkOrderStage.CLOSED && (
+                  <button
+                     onClick={() => {
+                        import('../src/utils/pdf/pdfGenerator').then(module => {
+                           module.generateRMant02PDF(formData, selectedMachine || undefined);
+                        });
+                     }}
+                     className="bg-industrial-800 hover:bg-industrial-700 text-industrial-300 px-4 py-2 rounded flex items-center gap-2 border border-industrial-600 transition-colors text-sm font-bold"
+                  >
+                     <Download className="w-4 h-4" />
+                     Descargar PDF
+                  </button>
+               )}
+               <button onClick={onCancel} className="text-industrial-400 hover:text-white"><X className="w-6 h-6" /></button>
+            </div>
          </div>
 
          {/* Global Validation Error Banner */}
@@ -578,7 +617,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                            <div className="space-y-1">
                               <label className="text-xs text-industrial-400 font-bold">Número de Orden</label>
                               <input type="text" readOnly disabled className="w-full bg-industrial-900/50 border border-industrial-700 rounded p-2 text-industrial-300 text-sm font-mono"
-                                 value={formData.id || 'RM05-XXXXX'} />
+                                 value={formData.displayId || 'RM05-XXXXX'} />
                            </div>
 
                            {/* 2. Requester (Current User or Selection if Admin) */}
@@ -586,11 +625,12 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                               <label className="text-xs text-industrial-400 font-bold">Nombre del Solicitante</label>
                               <select disabled={!isSection1Editable}
                                  className={`w-full bg-industrial-900 border rounded p-2 text-white text-sm focus:border-emerald-500 outline-none ${invalidFields.has('assignedTo') ? 'border-red-500 bg-red-900/10' : 'border-industrial-600'}`}
-                                 value={formData.assignedTo || user?.id || ''}
+                                 value={formData.assignedTo || ''}
                                  onChange={e => setFormData({ ...formData, assignedTo: e.target.value })}>
-                                 {/* Only show users with appropriate role */}
-                                 {technicians.filter(t => t.role === UserRole.ADMIN_SOLICITANTE || t.role === UserRole.TECNICO_MANT).map(t => (
-                                    <option key={t.id} value={t.id}>{t.name}</option>
+                                 <option value="">- Seleccionar -</option>
+                                 {/* Only show users with appropriate role (or all, depending on need, showing ADMIN_SOLICITANTE, OPERADOR, GERENCIA, etc. Usually anyone can request) */}
+                                 {users.map(u => (
+                                    <option key={u.id} value={u.id}>{u.full_name}</option>
                                  ))}
                               </select>
                            </div>
@@ -620,8 +660,9 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                               <label className="text-xs text-industrial-400 font-bold">Ubicación / Área</label>
                               <select disabled={!isSection1Editable}
                                  className={`w-full bg-industrial-900 border rounded p-2 text-white text-sm focus:border-emerald-500 outline-none ${invalidFields.has('branch') ? 'border-red-500 bg-red-900/10' : 'border-industrial-600'}`}
-                                 value={formData.branch || 'Ravi Caribe'}
+                                 value={formData.branch || ''}
                                  onChange={e => setFormData({ ...formData, branch: e.target.value })}>
+                                 <option value="">- Seleccionar -</option>
                                  <option value="Ravi Caribe">Ravi Caribe</option>
                                  <option value="Labels Caribe">Labels Caribe</option>
                               </select>
@@ -651,6 +692,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                  className={`w-full bg-industrial-900 border rounded p-2 text-white text-sm focus:border-emerald-500 outline-none ${invalidFields.has('equipmentType') ? 'border-red-500 bg-red-900/10' : 'border-industrial-600'}`}
                                  value={formData.equipmentType || ''}
                                  onChange={e => setFormData({ ...formData, equipmentType: e.target.value as any })}>
+                                 <option value="">- Seleccionar -</option>
                                  <option value="Mantenimiento Maquinaria">Mantenimiento Maquinaria</option>
                                  <option value="Mantenimiento Elemento Auxiliar">Mantenimiento Elemento Auxiliar</option>
                               </select>
@@ -692,8 +734,9 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                               <label className="text-xs text-industrial-400 font-bold">Tipo de Mantenimiento</label>
                               <select disabled={!isSection1Editable}
                                  className={`w-full bg-industrial-900 border rounded p-2 text-white text-sm focus:border-emerald-500 outline-none ${invalidFields.has('maintenanceType') ? 'border-red-500 bg-red-900/10' : 'border-industrial-600'}`}
-                                 value={formData.maintenanceType || 'Correctivo'}
+                                 value={formData.maintenanceType || ''}
                                  onChange={e => setFormData({ ...formData, maintenanceType: e.target.value as any })}>
+                                 <option value="">- Seleccionar -</option>
                                  <option value="Correctivo">Correctivo</option>
                                  <option value="Preventivo">Preventivo</option>
                                  <option value="Cambio de Formato">Cambio de Formato</option>
@@ -708,6 +751,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                  className={`w-full bg-industrial-900 border rounded p-2 text-white text-sm focus:border-emerald-500 outline-none ${invalidFields.has('condition') ? 'border-red-500 bg-red-900/10' : 'border-industrial-600'}`}
                                  value={formData.condition || ''}
                                  onChange={e => setFormData({ ...formData, condition: e.target.value as any })}>
+                                 <option value="">- Seleccionar -</option>
                                  <option value="Normal">Normal</option>
                                  <option value="Media">Media</option>
                                  <option value="Crítica">Crítica</option>
@@ -721,6 +765,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                  className={`w-full bg-industrial-900 border rounded p-2 text-white text-sm focus:border-emerald-500 outline-none ${invalidFields.has('failureType') ? 'border-red-500 bg-red-900/10' : 'border-industrial-600'}`}
                                  value={formData.failureType || ''}
                                  onChange={e => setFormData({ ...formData, failureType: e.target.value as any })}>
+                                 <option value="">- Seleccionar -</option>
                                  <option value="Mecánica">Mecánica</option>
                                  <option value="Eléctrica">Eléctrica</option>
                                  <option value="Electrónica">Electrónica</option>
@@ -756,6 +801,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                     className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm focus:border-emerald-500 outline-none"
                                     value={formData.frequency || ''}
                                     onChange={e => setFormData({ ...formData, frequency: e.target.value as any })}>
+                                    <option value="">- Seleccionar -</option>
                                     <option value="Primera vez">Primera vez</option>
                                     <option value="Ocasional">Ocasional</option>
                                     <option value="Frecuente">Frecuente</option>
@@ -798,7 +844,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                         <div className="space-y-1">
                            <label className="text-xs text-industrial-400 font-bold">Número de Orden</label>
                            <input type="text" readOnly disabled className="w-full bg-industrial-900/50 border border-industrial-700 rounded p-2 text-industrial-300 text-sm font-mono"
-                              value={formData.id || 'ORD-XXX'} />
+                              value={formData.displayId || 'RM02-XXXXX'} />
                         </div>
 
                         {/* 2. Maintenance Type */}
@@ -862,7 +908,6 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                            />
                         </div>
 
-                        {/* 6. Interval Selection */}
                         <div className="space-y-1">
                            <label className="text-xs text-industrial-400 font-bold">{t('mant02.interval')}</label>
                            <select disabled={!isSection1Editable || !selectedMachine}
@@ -870,9 +915,10 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                               value={formData.interval || ''} onChange={handleIntervalChange}>
                               <option value="">- Seleccionar Programa -</option>
                               {(() => {
-                                 const plan = maintenancePlans.find(p => p.machineId === selectedMachine?.id);
-                                 const intervals = plan?.intervals.map(i => i.label)
-                                    || (selectedMachine?.intervals && selectedMachine.intervals.length > 0 ? selectedMachine.intervals : INTERVAL_HIERARCHY);
+                                 const plan = selectedMachine?.maintenancePlans?.[0] || maintenancePlans.find(p => p.machineId === selectedMachine?.id);
+                                 const intervals = (plan?.intervals && plan.intervals.length > 0)
+                                    ? plan.intervals.slice().sort((a, b) => a.hours - b.hours).map(i => i.label)
+                                    : (selectedMachine?.intervals && selectedMachine.intervals.length > 0 ? selectedMachine.intervals : INTERVAL_HIERARCHY);
 
                                  return intervals.map(int => <option key={int} value={int}>{int}</option>);
                               })()}
@@ -1129,7 +1175,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                            {/* 3. Spare Parts (Dynamic Table) */}
                            <div className="border-t border-industrial-700 pt-6">
                               <h4 className="text-sm font-bold text-white mb-4">Repuestos Utilizados</h4>
-                              <div className="bg-industrial-900 rounded border border-industrial-700 overflow-hidden mb-2">
+                              <div className="bg-industrial-900 rounded border border-industrial-700 mb-2">
                                  <table className="w-full text-sm text-left text-industrial-300">
                                     <thead className="bg-industrial-800 text-industrial-400 font-bold">
                                        <tr>
@@ -1160,45 +1206,53 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                                          setFormData({ ...formData, consumedParts: updated });
                                                       }}
                                                    />
-                                                   {/* Custom Dropdown Results */}
+                                                   {/* Custom Dropdown Results - connected to inventory */}
                                                    {!part.partId && part.partName && (
-                                                      <div className="absolute left-0 top-full mt-1 w-[300px] z-50 bg-industrial-800 border border-industrial-600 rounded-md shadow-xl max-h-60 overflow-y-auto">
-                                                         {MOCK_SPARE_PARTS.filter(p =>
+                                                      <div className="absolute left-0 top-full mt-1 w-[360px] z-50 bg-industrial-800 border border-industrial-600 rounded-md shadow-xl max-h-60 overflow-y-auto">
+                                                         {(spareParts || []).filter(p =>
                                                             p.name.toLowerCase().includes(part.partName.toLowerCase()) ||
-                                                            p.sku.includes(part.partName)
+                                                            p.partNumber.toLowerCase().includes(part.partName.toLowerCase())
                                                          ).length > 0 ? (
-                                                            MOCK_SPARE_PARTS.filter(p =>
+                                                            (spareParts || []).filter(p =>
                                                                p.name.toLowerCase().includes(part.partName.toLowerCase()) ||
-                                                               p.sku.includes(part.partName)
+                                                               p.partNumber.toLowerCase().includes(part.partName.toLowerCase())
                                                             ).map(sp => (
                                                                <div
                                                                   key={sp.id}
-                                                                  className="p-2 hover:bg-industrial-700 cursor-pointer border-b border-industrial-700/50 last:border-0 flex justify-between items-center group/item"
+                                                                  className="p-2.5 hover:bg-industrial-700 cursor-pointer border-b border-industrial-700/50 last:border-0 flex justify-between items-center gap-3"
                                                                   onClick={() => {
                                                                      const updated = [...(formData.consumedParts || [])];
                                                                      updated[idx] = {
                                                                         ...updated[idx],
                                                                         partId: sp.id,
-                                                                        partName: `${sp.sku} - ${sp.name}`,
-                                                                        sku: sp.sku,
-                                                                        unitCost: sp.unitCost,
-                                                                        totalCost: sp.unitCost * updated[idx].quantity,
-                                                                        unit: 'Unidad'
+                                                                        partName: `${sp.partNumber} - ${sp.name}`,
+                                                                        sku: sp.partNumber,
+                                                                        unitCost: sp.cost,
+                                                                        totalCost: sp.cost * updated[idx].quantity,
+                                                                        unit: sp.unitOfMeasure || 'Unidad'
                                                                      };
                                                                      setFormData({ ...formData, consumedParts: updated });
                                                                   }}
                                                                >
-                                                                  <div className="flex flex-col">
-                                                                     <span className="text-white text-xs font-bold">{sp.sku} - {sp.name}</span>
-                                                                     <span className="text-industrial-400 text-[10px]">RD${sp.unitCost.toFixed(2)}</span>
+                                                                  <div className="flex flex-col flex-1 min-w-0">
+                                                                     <span className="text-white text-xs font-bold truncate">
+                                                                        <span className="text-pink-400 mr-1">{sp.partNumber}</span>
+                                                                        {sp.name}
+                                                                     </span>
+                                                                     <span className="text-industrial-400 text-[10px]">
+                                                                        {sp.unitOfMeasure || 'Unidad'} &bull; RD${(sp.cost || 0).toFixed(2)}
+                                                                     </span>
                                                                   </div>
-                                                                  <div className={`text-[10px] px-2 py-0.5 rounded font-bold ${sp.currentStock < sp.minimumStock ? 'bg-red-900/50 text-red-400 border border-red-500/30' : 'bg-emerald-900/50 text-emerald-400 border border-emerald-500/30'}`}>
+                                                                  <div className={`flex-shrink-0 text-[10px] px-2 py-0.5 rounded font-bold ${sp.currentStock <= sp.minStock
+                                                                     ? 'bg-red-900/50 text-red-400 border border-red-500/30'
+                                                                     : 'bg-emerald-900/50 text-emerald-400 border border-emerald-500/30'
+                                                                     }`}>
                                                                      Stock: {sp.currentStock}
                                                                   </div>
                                                                </div>
                                                             ))
                                                          ) : (
-                                                            <div className="p-2 text-industrial-500 text-xs italic text-center">No results found</div>
+                                                            <div className="p-3 text-industrial-500 text-xs italic text-center">No se encontraron repuestos</div>
                                                          )}
                                                       </div>
                                                    )}
@@ -1300,20 +1354,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                     <div className="text-center p-4 text-industrial-500 italic">No tasks generated.</div>
                                  )}
 
-                                 {/* Temporary explicit completion override for demo since Viewer is read-only for now */}
-                                 {isSection2Editable && formData.tasks && formData.tasks.length > 0 && (
-                                    <div className="p-2 bg-industrial-800 border-t border-industrial-700 flex justify-end">
-                                       <button
-                                          onClick={() => {
-                                             const updated = formData.tasks?.map(t => ({ ...t, completed: true }));
-                                             setFormData({ ...formData, tasks: updated });
-                                          }}
-                                          className="text-xs text-emerald-400 hover:text-emerald-300 underline"
-                                       >
-                                          Mark All Tasks Completed (Demo Shortcut)
-                                       </button>
-                                    </div>
-                                 )}
+
                               </div>
                            </div>
 
@@ -1434,14 +1475,14 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                         {/* Image Upload */}
                         <div className="space-y-2">
                            <label className="text-xs text-industrial-400 font-bold flex items-center gap-2"><Image size={14} /> Evidencia Fotográfica (Imagen)</label>
-                           <div className={`border-2 border-dashed rounded-lg p-4 flex flex-col items-center justify-center gap-2 ${isSection3Editable ? 'border-industrial-600 hover:border-emerald-500 cursor-pointer bg-industrial-900' : 'border-industrial-700 bg-industrial-900/50'}`}>
+                           <div className={`relative overflow-hidden border-2 border-dashed rounded-lg p-4 flex flex-col items-center justify-center gap-2 ${isSection3Editable ? 'border-industrial-600 hover:border-emerald-500 cursor-pointer bg-industrial-900' : 'border-industrial-700 bg-industrial-900/50'}`}>
                               {formData.closingImage ? (
                                  <div className="relative w-full h-32 bg-black rounded overflow-hidden flex items-center justify-center group">
                                     <img src={formData.closingImage} alt="Evidence" className="h-full object-contain" />
                                     {isSection3Editable && (
                                        <button
                                           onClick={() => setFormData({ ...formData, closingImage: undefined })}
-                                          className="absolute top-1 right-1 bg-red-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                                          className="absolute top-1 right-1 bg-red-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
                                        >
                                           <X size={12} />
                                        </button>
@@ -1457,7 +1498,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                        <input
                                           type="file"
                                           accept="image/*"
-                                          className="hidden"
+                                          className="absolute inset-0 opacity-0 cursor-pointer"
                                           onChange={(e) => {
                                              // Mock upload - in real app, upload to storage and get URL
                                              if (e.target.files?.[0]) {
@@ -1475,9 +1516,9 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                         {/* File Upload */}
                         <div className="space-y-2">
                            <label className="text-xs text-industrial-400 font-bold flex items-center gap-2"><FileText size={14} /> Archivo Adjunto (PDF/Doc)</label>
-                           <div className={`border-2 border-dashed rounded-lg p-4 flex flex-col items-center justify-center gap-2 ${isSection3Editable ? 'border-industrial-600 hover:border-emerald-500 cursor-pointer bg-industrial-900' : 'border-industrial-700 bg-industrial-900/50'}`}>
+                           <div className={`relative overflow-hidden border-2 border-dashed rounded-lg p-4 flex flex-col items-center justify-center gap-2 ${isSection3Editable ? 'border-industrial-600 hover:border-emerald-500 cursor-pointer bg-industrial-900' : 'border-industrial-700 bg-industrial-900/50'}`}>
                               {formData.closingFile ? (
-                                 <div className="w-full flex items-center justify-between bg-industrial-800 p-2 rounded border border-industrial-700">
+                                 <div className="relative w-full flex items-center justify-between bg-industrial-800 p-2 rounded border border-industrial-700 z-10">
                                     <div className="flex items-center gap-2 overflow-hidden">
                                        <FileText size={16} className="text-blue-400 flex-shrink-0" />
                                        <span className="text-xs text-industrial-300 truncate">Attached File</span>
@@ -1553,7 +1594,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                     type="time"
                                     disabled
                                     readOnly
-                                    className="w-24 bg-industrial-900/50 border border-industrial-700 rounded p-2 text-industrial-400 text-sm text-center"
+                                    className="w-32 bg-industrial-900/50 border border-industrial-700 rounded p-2 text-industrial-400 text-sm text-center"
                                     value={formData.closingDate ? new Date(formData.closingDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : '--:--'}
                                  />
                                  {isSection3Editable && (
@@ -1622,20 +1663,22 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                      </div>
                   </div>
 
-                  {isSection3Editable && (
-                     <div className="p-4 border-t border-emerald-500/30 flex justify-end gap-4">
-                        <button onClick={() => setFormData(p => ({ ...p, currentStage: WorkOrderStage.EXECUTION, status: WorkOrderStatus.IN_PROGRESS }))} className="text-industrial-400 hover:text-white text-sm underline">
-                           Rechazar (Volver a Ejecución)
-                        </button>
-                        <button onClick={closeWorkOrder} className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2 rounded font-bold shadow-lg transition-colors flex items-center gap-2">
-                           Cerrar Mantenimiento <Save size={16} />
-                        </button>
-                     </div>
-                  )}
-               </section>
+                  {
+                     isSection3Editable && (
+                        <div className="p-4 border-t border-emerald-500/30 flex justify-end gap-4">
+                           <button onClick={() => setFormData(p => ({ ...p, currentStage: WorkOrderStage.EXECUTION, status: WorkOrderStatus.IN_PROGRESS }))} className="text-industrial-400 hover:text-white text-sm underline">
+                              Rechazar (Volver a Ejecución)
+                           </button>
+                           <button onClick={closeWorkOrder} className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2 rounded font-bold shadow-lg transition-colors flex items-center gap-2">
+                              Cerrar Mantenimiento <Save size={16} />
+                           </button>
+                        </div>
+                     )
+                  }
+               </section >
 
-            </div>
-         </div>
-      </div>
+            </div >
+         </div >
+      </div >
    );
 };

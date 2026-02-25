@@ -48,7 +48,7 @@ export const ProtocolViewer: React.FC<ProtocolViewerProps> = ({ tasks, readOnly 
         return (
             <button
                 type="button"
-                className={`w-full h-full flex items-center justify-center cursor-pointer transition-colors focus:outline-none ${isChecked ? 'bg-emerald-100/50 hover:bg-emerald-200/50' : 'hover:bg-gray-50'}`}
+                className={`w-full h-full flex items-center justify-center cursor-pointer transition-colors focus:outline-none ${isChecked ? 'bg-emerald-100/50 hover:bg-emerald-200/50' : 'bg-transparent hover:bg-emerald-50'}`}
                 onClick={(e) => {
                     e.preventDefault();
                     if (onToggle) onToggle(task.id, actionKey);
@@ -57,7 +57,7 @@ export const ProtocolViewer: React.FC<ProtocolViewerProps> = ({ tasks, readOnly 
                 {isChecked ? (
                     <span className="text-emerald-700 font-bold text-lg leading-none transform scale-110">X</span>
                 ) : (
-                    <div className="w-5 h-5 border-2 border-industrial-400 rounded-sm bg-white hover:border-emerald-500 transition-colors"></div>
+                    <div className={`w-4 h-4 border-2 rounded transition-colors shadow-sm ${isRequired ? 'border-industrial-500 bg-white hover:border-emerald-500' : 'border-gray-300 bg-gray-50/50 hover:border-emerald-400'}`}></div>
                 )}
             </button>
         );

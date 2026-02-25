@@ -8,6 +8,7 @@ export class WorkOrderSupabaseService implements IWorkOrderService {
     private mapDBToApp(record: any): WorkOrder {
         return {
             id: record.id,
+            displayId: record.display_id,
             title: record.title,
             machineId: record.machine_id,
             status: record.status,
@@ -38,6 +39,7 @@ export class WorkOrderSupabaseService implements IWorkOrderService {
             checklist: record.checklist || {},
             consumedParts: record.consumed_parts || [],
             executors: record.executors || [],
+            tasks: record.tasks || [],
 
             // Additional
             observations: record.observations,
@@ -45,11 +47,23 @@ export class WorkOrderSupabaseService implements IWorkOrderService {
             receivedBy: record.received_by,
 
             // R-MANT-05
+            // R-MANT-05
             department: record.department,
+            branch: record.branch,
+            equipmentType: record.equipment_type,
+            condition: record.condition,
             failureType: record.failure_type,
             frequency: record.frequency,
             consequence: record.consequence,
             actionTaken: record.action_taken,
+            requestDescription: record.request_description,
+            requestReceivedBy: record.request_received_by,
+            requestReceivedDate: record.request_received_date,
+            failuresAndActivities: record.failures_and_activities,
+            closingImage: record.closing_image,
+            closingFile: record.closing_file,
+            supervisorId: record.supervisor_id,
+            closingDate: record.closing_date,
 
             // Signatures
             signatureExecutor: record.signature_executor,
@@ -63,6 +77,7 @@ export class WorkOrderSupabaseService implements IWorkOrderService {
     private mapAppToDB(order: Partial<WorkOrder>): any {
         const dbRecord: any = {
             // id: order.id, // ID usually generated or passed explicitly
+            display_id: order.displayId,
             title: order.title,
             machine_id: order.machineId,
             status: order.status,
@@ -93,6 +108,7 @@ export class WorkOrderSupabaseService implements IWorkOrderService {
             checklist: order.checklist,
             consumed_parts: order.consumedParts,
             executors: order.executors,
+            tasks: order.tasks,
 
             // Additional
             observations: order.observations,
@@ -100,11 +116,23 @@ export class WorkOrderSupabaseService implements IWorkOrderService {
             received_by: order.receivedBy,
 
             // R-MANT-05
+            // R-MANT-05
             department: order.department,
+            branch: order.branch,
+            equipment_type: order.equipmentType,
+            condition: order.condition,
             failure_type: order.failureType,
             frequency: order.frequency,
             consequence: order.consequence,
             action_taken: order.actionTaken,
+            request_description: order.requestDescription,
+            request_received_by: order.requestReceivedBy,
+            request_received_date: order.requestReceivedDate,
+            failures_and_activities: order.failuresAndActivities,
+            closing_image: order.closingImage,
+            closing_file: order.closingFile,
+            supervisor_id: order.supervisorId,
+            closing_date: order.closingDate,
 
             // Signatures
             signature_executor: order.signatureExecutor,

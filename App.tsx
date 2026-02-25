@@ -166,7 +166,7 @@ const MaintenanceFormPage = () => {
 
   return (
     <MaintenanceForm
-      type={(state?.type as any) || 'R-MANT-02'}
+      type={existingOrder?.formType || (state?.type as any) || 'R-MANT-02'}
       machines={machines}
       technicians={technicians}
       onSave={(order) => handleSave(order)}

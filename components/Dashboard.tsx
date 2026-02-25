@@ -17,7 +17,7 @@ export const Dashboard: React.FC = () => {
 
   const handleMoveMachine = (id: string, x: number, y: number) => {
     // RBAC: Only Admins can change Layout
-    if (!hasRole([UserRole.ADMIN_SOLICITANTE])) {
+    if (!hasRole([UserRole.ADMIN_SOLICITANTE, UserRole.ADMIN])) {
       alert("Access Denied: Only Admins can modify plant layout.");
       return;
     }
@@ -25,6 +25,14 @@ export const Dashboard: React.FC = () => {
     if (machine) {
       updateMachine({ ...machine, location: { x, y } });
     }
+  };
+
+  const handleUpdateZone = (updatedZone: any) => {
+    if (!hasRole([UserRole.ADMIN_SOLICITANTE, UserRole.ADMIN])) {
+      alert("Access Denied: Only Admins can modify plant layout.");
+      return;
+    }
+    updateZone(updatedZone);
   };
 
   const handleCreateWorkOrder = (machineId: string) => {
@@ -82,7 +90,7 @@ export const Dashboard: React.FC = () => {
         zones={zones}
         onCreateWorkOrder={handleCreateWorkOrder}
         onMoveMachine={handleMoveMachine}
-        onUpdateZone={updateZone}
+        onUpdateZone={handleUpdateZone}
         onAddMachine={handleOpenAddMachineInfo}
         onAddZone={addZone}
         onRemoveZone={removeZone}

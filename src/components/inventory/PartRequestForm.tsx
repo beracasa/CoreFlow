@@ -292,8 +292,12 @@ export const PartRequestForm: React.FC<PartRequestFormProps> = ({ initialData, o
                                 type="number"
                                 min="1"
                                 className="w-full bg-industrial-900 border border-industrial-600 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-industrial-accent transition-colors font-mono"
-                                value={quantity}
-                                onChange={e => setQuantity(parseInt(e.target.value) || 0)}
+                                value={quantity || ''}
+                                onFocus={e => e.target.select()}
+                                onChange={e => {
+                                    const val = e.target.value === '' ? 0 : parseInt(e.target.value);
+                                    setQuantity(isNaN(val) ? 0 : val);
+                                }}
                             />
                         </div>
 

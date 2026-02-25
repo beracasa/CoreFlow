@@ -46,8 +46,8 @@ DROP POLICY IF EXISTS "Admins view tenant profiles" ON public.profiles;
 DROP POLICY IF EXISTS "Admins can update any profile" ON public.profiles;
 DROP POLICY IF EXISTS "Admins can delete any profile" ON public.profiles;
 DROP POLICY IF EXISTS "Admins can insert any profile" ON public.profiles;
-DROP POLICY IF EXISTS "Enable read access for users in their own tenant" ON public.profiles;
-DROP POLICY IF EXISTS "Users can read all profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Users view tenant profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Users can see themselves" ON public.profiles;
 
 -- 4. Re-create Clean Policies (No subqueries directly inside USING)
 

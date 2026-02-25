@@ -49,7 +49,8 @@ export const MachineSupabaseService = {
         intervals: [],
         history: [],
         telemetry: { timestamp: new Date().toISOString(), temperature: 0, vibration: 0, pressure: 0, powerConsumption: 0 },
-        documents: record.documents || [] // ✅ FIX: Map documents field
+        documents: record.documents || [], // ✅ FIX: Map documents field
+        maintenancePlans: record.maintenance_plans || [] // ✅ FIX: Map maintenance plans
       };
     }) as Machine[];
   },
@@ -91,7 +92,8 @@ export const MachineSupabaseService = {
         running_hours: machine.runningHours || 0,
         last_maintenance: machine.lastMaintenance || null,
         next_maintenance: machine.nextMaintenance || null,
-        documents: machine.documents || [] // ✅ FIX: Persist documents field
+        documents: machine.documents || [], // ✅ FIX: Persist documents field
+        maintenance_plans: machine.maintenancePlans || [] // ✅ FIX: Persist maintenance plans
       })
       .select()
       .single();
@@ -143,11 +145,15 @@ export const MachineSupabaseService = {
         last_maintenance: machine.lastMaintenance || null,
         next_maintenance: machine.nextMaintenance || null,
         updated_at: new Date().toISOString(),
-        documents: machine.documents || [] // ✅ FIX: Persist documents field
+        documents: machine.documents || [], // ✅ FIX: Persist documents field
+        maintenance_plans: machine.maintenancePlans || [] // ✅ FIX: Persist maintenance plans
       })
       .eq('id', machine.id);
 
-    if (error) throw error;
+    if (error) {
+      console.error("==> updateMachine Supabase Error:", JSON.stringify(error, null, 2));
+      throw error;
+    }
   },
 
   async getRecentMachineHourLogs(limit: number = 50): Promise<any[]> {

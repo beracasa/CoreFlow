@@ -34,6 +34,13 @@ export const PlantMapContainer: React.FC<PlantMapContainerProps> = ({ machines, 
   const [resizingZoneId, setResizingZoneId] = useState<string | null>(null);
   const [resizeHandle, setResizeHandle] = useState<string | null>(null); // 'nw', 'ne', 'sw', 'se'
 
+  // Track cursor offset to prevent jumping when dragging starts
+  const [dragOffset, setDragOffset] = useState<{ x: number, y: number }>({ x: 0, y: 0 });
+
+  // Draft state for fast dragging without hammering the backend
+  const [draftMachinePos, setDraftMachinePos] = useState<{ id: string, x: number, y: number } | null>(null);
+  const [draftZonePos, setDraftZonePos] = useState<{ id: string, x: number, y: number, w?: number, h?: number } | null>(null);
+
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Analysis State
@@ -57,6 +64,10 @@ export const PlantMapContainer: React.FC<PlantMapContainerProps> = ({ machines, 
 
   const placedMachines = machines.filter(m => (m.location?.x !== undefined && m.location?.y !== undefined && (m.location.x > 0 || m.location.y > 0)));
   const unplacedMachines = machines.filter(m => !m.location || (m.location.x === 0 && m.location.y === 0));
+
+  // Determine actual display data (merging draft states with store states)
+  const displayMachines = placedMachines.map(m => draftMachinePos?.id === m.id ? { ...m, location: { x: draftMachinePos.x, y: draftMachinePos.y } } : m);
+  const displayZones = placedZones.map(z => draftZonePos?.id === z.id ? { ...z, x: draftZonePos.x, y: draftZonePos.y, width: draftZonePos.w ?? z.width, height: draftZonePos.h ?? z.height } : z);
 
   const handleOpenAssetModal = (type: 'MACHINE' | 'ZONE', zoneInfo?: { id: string, line: string }) => {
     setAssetModalType(type);
@@ -105,16 +116,38 @@ export const PlantMapContainer: React.FC<PlantMapContainerProps> = ({ machines, 
 
   // --- DRAG AND DROP LOGIC (MACHINES) ---
   const handleDragStart = (e: React.MouseEvent, machine: Machine) => {
-    if (!isEditMode) return;
+    if (!isEditMode || !containerRef.current) return;
     e.stopPropagation();
+
+    const rect = containerRef.current.getBoundingClientRect();
+    const xPct = ((e.clientX - rect.left) / rect.width) * 100;
+    const yPct = ((e.clientY - rect.top) / rect.height) * 100;
+
+    setDragOffset({
+      x: xPct - (machine.location?.x || 0),
+      y: yPct - (machine.location?.y || 0)
+    });
+
     setDraggingId(machine.id);
+    setDraftMachinePos({ id: machine.id, x: machine.location.x, y: machine.location.y });
   };
 
   // --- ZONE EDITING LOGIC ---
   const handleZoneMouseDown = (e: React.MouseEvent, zone: ZoneStructure) => {
-    if (!isEditMode) return;
+    if (!isEditMode || !containerRef.current) return;
     e.stopPropagation();
+
+    const rect = containerRef.current.getBoundingClientRect();
+    const xPct = ((e.clientX - rect.left) / rect.width) * 100;
+    const yPct = ((e.clientY - rect.top) / rect.height) * 100;
+
+    setDragOffset({
+      x: xPct - (zone.x || 0),
+      y: yPct - (zone.y || 0)
+    });
+
     setDraggingZoneId(zone.id);
+    setDraftZonePos({ id: zone.id, x: zone.x || 0, y: zone.y || 0, w: zone.width, h: zone.height });
   };
 
   const handleResizeMouseDown = (e: React.MouseEvent, zone: ZoneStructure, handle: string) => {
@@ -122,6 +155,7 @@ export const PlantMapContainer: React.FC<PlantMapContainerProps> = ({ machines, 
     e.stopPropagation();
     setResizingZoneId(zone.id);
     setResizeHandle(handle);
+    setDraftZonePos({ id: zone.id, x: zone.x || 0, y: zone.y || 0, w: zone.width, h: zone.height });
   };
 
   const handleAddEquipmentToLine = (e: React.MouseEvent, zoneId: string, lineName: string) => {
@@ -144,9 +178,16 @@ export const PlantMapContainer: React.FC<PlantMapContainerProps> = ({ machines, 
 
     // 1. Moving Machine
     if (draggingId && onMoveMachine) {
-      const clampedX = Math.max(0, Math.min(100, xPct));
-      const clampedY = Math.max(0, Math.min(100, yPct));
-      onMoveMachine(draggingId, clampedX, clampedY);
+      // Apply offset to cursor
+      const targetX = xPct - dragOffset.x;
+      const targetY = yPct - dragOffset.y;
+
+      // Snap logic (optional, but keep it roughly grid-aligned if preferred)
+      // For machines, we might just want free movement
+      const clampedX = Math.max(0, Math.min(100, targetX));
+      const clampedY = Math.max(0, Math.min(100, targetY));
+
+      setDraftMachinePos({ id: draggingId, x: clampedX, y: clampedY });
       return;
     }
 
@@ -154,20 +195,15 @@ export const PlantMapContainer: React.FC<PlantMapContainerProps> = ({ machines, 
     if (draggingZoneId && onUpdateZone) {
       const zone = zones.find(z => z.id === draggingZoneId);
       if (zone) {
-        // Mouse position is the new Top-Left (simplified)
-        let newX = xPct;
-        let newY = yPct;
+        // Apply offset to keep cursor relative to the zone
+        let newX = xPct - dragOffset.x;
+        let newY = yPct - dragOffset.y;
 
-        // Grid Snapping (2.5% matches the 40px grid roughly on standard screens)
-        const snap = 2.5;
-        newX = Math.round(newX / snap) * snap;
-        newY = Math.round(newY / snap) * snap;
-
-        // Bounds
+        // Bounds (ensure the zone doesn't bleed off the map 100x100 grid)
         newX = Math.max(0, Math.min(100 - (zone.width || 20), newX));
         newY = Math.max(0, Math.min(100 - (zone.height || 20), newY));
 
-        onUpdateZone({ ...zone, x: newX, y: newY });
+        setDraftZonePos({ id: zone.id, x: newX, y: newY, w: zone.width, h: zone.height });
       }
       return;
     }
@@ -176,7 +212,6 @@ export const PlantMapContainer: React.FC<PlantMapContainerProps> = ({ machines, 
     if (resizingZoneId && resizeHandle && onUpdateZone) {
       const zone = zones.find(z => z.id === resizingZoneId);
       if (zone) {
-        const snap = 2.5;
         let newWidth = zone.width || 20;
         let newHeight = zone.height || 20;
         const currentX = zone.x || 0;
@@ -184,28 +219,50 @@ export const PlantMapContainer: React.FC<PlantMapContainerProps> = ({ machines, 
 
         // Calculate new dimensions based on handle (Supporting SE only for now)
         if (resizeHandle.includes('e')) {
-          const rawWidth = xPct - currentX;
-          newWidth = Math.round(rawWidth / snap) * snap;
+          newWidth = xPct - currentX;
         }
         if (resizeHandle.includes('s')) {
-          const rawHeight = yPct - currentY;
-          newHeight = Math.round(rawHeight / snap) * snap;
+          newHeight = yPct - currentY;
         }
 
         // Constrain min size
-        newWidth = Math.max(snap * 2, newWidth);
-        newHeight = Math.max(snap * 2, newHeight);
+        newWidth = Math.max(2, newWidth);
+        newHeight = Math.max(2, newHeight);
 
-        onUpdateZone({ ...zone, width: newWidth, height: newHeight });
+        setDraftZonePos({ id: zone.id, x: currentX, y: currentY, w: newWidth, h: newHeight });
       }
     }
   };
 
   const handleMouseUp = () => {
+    // Grid snapping on drop (optional, comment out if you want completely free placement)
+    const snap = 1; // Snapping to 1% instead of 2.5% for finer control, or remove completely
+
+    // Commit machine draft position
+    if (draggingId && draftMachinePos && onMoveMachine) {
+      const finalX = Math.round(draftMachinePos.x / snap) * snap;
+      const finalY = Math.round(draftMachinePos.y / snap) * snap;
+      onMoveMachine(draftMachinePos.id, finalX, finalY);
+    }
+
+    // Commit zone draft position/size
+    if ((draggingZoneId || resizingZoneId) && draftZonePos && onUpdateZone) {
+      const zone = zones.find(z => z.id === draftZonePos.id);
+      if (zone) {
+        const finalX = Math.round(draftZonePos.x / snap) * snap;
+        const finalY = Math.round(draftZonePos.y / snap) * snap;
+        const finalW = draftZonePos.w ? Math.round(draftZonePos.w / snap) * snap : zone.width;
+        const finalH = draftZonePos.h ? Math.round(draftZonePos.h / snap) * snap : zone.height;
+        onUpdateZone({ ...zone, x: finalX, y: finalY, width: finalW, height: finalH });
+      }
+    }
+
     setDraggingId(null);
     setDraggingZoneId(null);
     setResizingZoneId(null);
     setResizeHandle(null);
+    setDraftMachinePos(null);
+    setDraftZonePos(null);
   };
 
   // Helper to render layer buttons with tooltips
@@ -323,7 +380,7 @@ export const PlantMapContainer: React.FC<PlantMapContainerProps> = ({ machines, 
           style={{ transform: `scale(${zoomLevel})` }}
         >
           {/* --- DYNAMIC ZONES --- */}
-          {placedZones.map(zone => (
+          {displayZones.map(zone => (
             <div
               key={zone.id}
               className={`absolute transition-all duration-75 group ${isEditMode ? 'cursor-move' : 'pointer-events-none'}`}
@@ -408,7 +465,7 @@ export const PlantMapContainer: React.FC<PlantMapContainerProps> = ({ machines, 
           ))}
 
           {/* --- MACHINES --- */}
-          {placedMachines.map((machine) => (
+          {displayMachines.map((machine) => (
             <AssetNode
               key={machine.id}
               machine={machine}

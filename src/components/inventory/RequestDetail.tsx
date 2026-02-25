@@ -1,12 +1,12 @@
 import React from 'react';
 import { inventoryService } from '../../services';
 import { PartsRequest, SparePart } from '../../types/inventory';
-import { Package, Calendar, User, Clock, ArrowLeft, CheckCircle, Truck, XCircle, Save, Edit, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { Package, Calendar, User, Clock, ArrowLeft, CheckCircle, Truck, XCircle, Save, Edit, Trash2, Search } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { PartRequestForm } from './PartRequestForm';
 import { PurchaseRequestModal } from './PurchaseRequestModal';
-
-// Service initialized in index.ts
+import { UserSupabaseService } from '../../services/UserSupabaseService';
+import { UserProfile } from '../../types';
 
 interface RequestDetailProps {
     request: PartsRequest;
@@ -23,12 +23,24 @@ import { useMasterStore } from '../../stores/useMasterStore';
 export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, onBack }) => {
     const { technicians, plantSettings } = useMasterStore();
     const [isProcessing, setIsProcessing] = useState(false);
+    const currentUser = (useMasterStore.getState() as any).currentUser;
+    const [selectedItems, setSelectedItems] = useState<Record<string, number>>({});
     const [isEditing, setIsEditing] = useState(false);
     const [deliveryQuantities, setDeliveryQuantities] = useState<Record<string, number>>({});
     const [localRequest, setLocalRequest] = useState(request);
     const [selectedReceiver, setSelectedReceiver] = useState('');
     const [showReceiverError, setShowReceiverError] = useState(false);
     const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
+    const [systemUsers, setSystemUsers] = useState<UserProfile[]>([]);
+    const [receiverSearch, setReceiverSearch] = useState('');
+    const [isReceiverDropdownOpen, setIsReceiverDropdownOpen] = useState(false);
+
+    // Load system users on mount so we can resolve names in the "Entregado a" field
+    useEffect(() => {
+        UserSupabaseService.getUsers()
+            .then(users => setSystemUsers(users))
+            .catch(err => console.error('Error loading users:', err));
+    }, []);
 
     const handleStartProcessing = () => {
         const initialQuantities: Record<string, number> = {};
@@ -39,6 +51,14 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
         setDeliveryQuantities(initialQuantities);
         setIsProcessing(true);
     };
+
+    const filteredUsers = systemUsers.filter(u =>
+        !receiverSearch ||
+        (u.full_name || '').toLowerCase().includes(receiverSearch.toLowerCase()) ||
+        (u.email || '').toLowerCase().includes(receiverSearch.toLowerCase())
+    );
+
+    const selectedReceiverUser = systemUsers.find(u => u.id === selectedReceiver);
 
     const handleQuantityChange = (partId: string, value: number) => {
         setDeliveryQuantities(prev => ({
@@ -55,12 +75,14 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
         }
 
         try {
-            const itemsToDeliver = Object.entries(deliveryQuantities).map(([partId, quantity]) => ({
-                partId,
-                quantity
-            }));
+            const itemsList = Object.entries(deliveryQuantities)
+                .filter(([_, qty]) => Number(qty) > 0)
+                .map(([partId, qty]) => ({
+                    partId,
+                    quantity: Number(qty)
+                }));
 
-            const updatedRequest = await inventoryService.deliverParts(localRequest.id, itemsToDeliver, selectedReceiver);
+            const updatedRequest = await inventoryService.deliverParts(localRequest.id, itemsList, selectedReceiver);
             setLocalRequest(updatedRequest);
             setIsProcessing(false);
             setSelectedReceiver(''); // Reset
@@ -130,7 +152,9 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
         doc.text(`Prioridad: ${priorityText}`, 14, 63);
 
         const deliveredToName = localRequest.deliveredTo
-            ? (technicians.find(t => t.id === localRequest.deliveredTo)?.name || localRequest.deliveredTo)
+            ? (systemUsers.find(u => u.id === localRequest.deliveredTo)?.full_name
+                || technicians.find(t => t.id === localRequest.deliveredTo)?.name
+                || localRequest.deliveredTo)
             : '-';
         doc.text(`Entregado a: ${deliveredToName}`, 14, 69);
 
@@ -351,7 +375,9 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
                                     <p className="text-xs text-industrial-500">Entregado a</p>
                                     <p className="font-medium text-white truncate">
                                         {localRequest.deliveredTo
-                                            ? (technicians.find(t => t.id === localRequest.deliveredTo)?.name || localRequest.deliveredTo)
+                                            ? (systemUsers.find(u => u.id === localRequest.deliveredTo)?.full_name
+                                                || technicians.find(t => t.id === localRequest.deliveredTo)?.name
+                                                || localRequest.deliveredTo)
                                             : '-'}
                                     </p>
                                 </div>
@@ -441,19 +467,71 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
                     {isProcessing && (
                         <div className="mt-4 bg-industrial-900/50 rounded-lg p-4 border border-industrial-700">
                             <label className="block text-xs font-bold text-industrial-500 uppercase tracking-wider mb-2">Entregado a: <span className="text-red-400">*</span></label>
-                            <select
-                                className={`w-full md:w-1/2 bg-industrial-800 border rounded-lg px-4 py-2 text-white outline-none focus:ring-2 transition-colors ${showReceiverError ? 'border-red-500 ring-2 ring-red-500/20' : 'border-industrial-600 focus:ring-blue-500'}`}
-                                value={selectedReceiver}
-                                onChange={(e) => {
-                                    setSelectedReceiver(e.target.value);
-                                    if (e.target.value) setShowReceiverError(false);
-                                }}
-                            >
-                                <option value="">Seleccionar Persona...</option>
-                                {technicians.filter(t => t.status === 'ACTIVE').map(tech => (
-                                    <option key={tech.id} value={tech.id}>{tech.name} ({tech.role})</option>
-                                ))}
-                            </select>
+                            <div className={`relative w-full md:w-1/2`}>
+                                {/* Search Input */}
+                                <div className={`flex items-center bg-industrial-800 border rounded-lg px-3 py-2 transition-colors ${showReceiverError ? 'border-red-500 ring-2 ring-red-500/20' : 'border-industrial-600 focus-within:ring-2 focus-within:ring-blue-500'}`}>
+                                    <Search className="w-4 h-4 text-industrial-500 mr-2 flex-shrink-0" />
+                                    <input
+                                        type="text"
+                                        className="bg-transparent flex-1 text-white outline-none placeholder-industrial-500 text-sm"
+                                        placeholder={selectedReceiverUser ? selectedReceiverUser.full_name : 'Buscar usuario...'}
+                                        value={receiverSearch}
+                                        onFocus={() => setIsReceiverDropdownOpen(true)}
+                                        onBlur={() => setTimeout(() => setIsReceiverDropdownOpen(false), 200)}
+                                        onChange={e => {
+                                            setReceiverSearch(e.target.value);
+                                            setIsReceiverDropdownOpen(true);
+                                            if (selectedReceiver) {
+                                                setSelectedReceiver('');
+                                                setShowReceiverError(false);
+                                            }
+                                        }}
+                                    />
+                                    {selectedReceiverUser && (
+                                        <span className="text-xs bg-blue-900/40 text-blue-300 border border-blue-700 px-2 py-0.5 rounded-full ml-1 flex-shrink-0">
+                                            {selectedReceiverUser.full_name}
+                                        </span>
+                                    )}
+                                </div>
+
+                                {/* Dropdown */}
+                                {isReceiverDropdownOpen && (
+                                    <div className="absolute z-50 w-full mt-1 bg-industrial-800 border border-industrial-600 rounded-lg shadow-2xl max-h-56 overflow-y-auto">
+                                        {filteredUsers.length > 0 ? (
+                                            <ul className="py-1">
+                                                {filteredUsers.map(user => (
+                                                    <li
+                                                        key={user.id}
+                                                        className={`px-4 py-2.5 cursor-pointer flex items-center gap-3 hover:bg-industrial-700 border-b border-industrial-700/50 last:border-0 ${selectedReceiver === user.id ? 'bg-blue-900/30' : ''}`}
+                                                        onMouseDown={e => {
+                                                            e.preventDefault();
+                                                            setSelectedReceiver(user.id);
+                                                            setReceiverSearch('');
+                                                            setIsReceiverDropdownOpen(false);
+                                                            setShowReceiverError(false);
+                                                        }}
+                                                    >
+                                                        <div className="w-7 h-7 rounded-full bg-industrial-700 border border-industrial-600 flex items-center justify-center flex-shrink-0">
+                                                            <User className="w-3 h-3 text-industrial-400" />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-white text-sm font-medium truncate">{user.full_name || 'Sin nombre'}</p>
+                                                            <p className="text-industrial-500 text-xs truncate">{user.email}</p>
+                                                        </div>
+                                                        {selectedReceiver === user.id && (
+                                                            <CheckCircle className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                                                        )}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        ) : (
+                                            <div className="px-4 py-3 text-industrial-500 text-sm italic">
+                                                {systemUsers.length === 0 ? 'Cargando usuarios...' : 'No se encontraron usuarios.'}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                             {showReceiverError && (
                                 <p className="text-xs text-red-400 mt-1 font-medium">Debe seleccionar quién recibe el repuesto.</p>
                             )}

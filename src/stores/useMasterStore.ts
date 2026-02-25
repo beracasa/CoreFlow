@@ -97,24 +97,37 @@ export const useMasterStore = create<MasterState>((set, get) => ({
         currency: 'DOP'
     },
     currentPlan: PlanTier.BUSINESS,
-    maintenancePlans: typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('coreflow_maintenance_plans') || '[]') : [],
+    // Maintained for backwards compatibility, but now derived from `machines` on fetch
+    maintenancePlans: [],
 
-    // Maintenance Plans actions with localStorage persistence
-    addMaintenancePlan: (plan) => set((state) => {
-        const newPlans = [...state.maintenancePlans, plan];
-        if (typeof window !== 'undefined') localStorage.setItem('coreflow_maintenance_plans', JSON.stringify(newPlans));
-        return { maintenancePlans: newPlans };
-    }),
-    updateMaintenancePlan: (plan) => set((state) => {
-        const newPlans = state.maintenancePlans.map(p => p.machineId === plan.machineId ? plan : p);
-        if (typeof window !== 'undefined') localStorage.setItem('coreflow_maintenance_plans', JSON.stringify(newPlans));
-        return { maintenancePlans: newPlans };
-    }),
-    removeMaintenancePlan: (machineId) => set((state) => {
-        const newPlans = state.maintenancePlans.filter(p => p.machineId !== machineId);
-        if (typeof window !== 'undefined') localStorage.setItem('coreflow_maintenance_plans', JSON.stringify(newPlans));
-        return { maintenancePlans: newPlans };
-    }),
+    // Maintenance Plans actions with Supabase persistence
+    addMaintenancePlan: async (plan) => {
+        const state = get();
+        const machine = state.machines.find(m => m.id === plan.machineId);
+        if (machine) {
+            const updatedMachine = { ...machine, maintenancePlans: [plan] };
+            await get().updateMachine(updatedMachine);
+            set({ maintenancePlans: [...state.maintenancePlans, plan] });
+        }
+    },
+    updateMaintenancePlan: async (plan) => {
+        const state = get();
+        const machine = state.machines.find(m => m.id === plan.machineId);
+        if (machine) {
+            const updatedMachine = { ...machine, maintenancePlans: [plan] };
+            await get().updateMachine(updatedMachine);
+            set({ maintenancePlans: state.maintenancePlans.map(p => p.machineId === plan.machineId ? plan : p) });
+        }
+    },
+    removeMaintenancePlan: async (machineId) => {
+        const state = get();
+        const machine = state.machines.find(m => m.id === machineId);
+        if (machine) {
+            const updatedMachine = { ...machine, maintenancePlans: [] };
+            await get().updateMachine(updatedMachine);
+            set({ maintenancePlans: state.maintenancePlans.filter(p => p.machineId !== machineId) });
+        }
+    },
 
     isLoading: false,
     isInitialized: false,
@@ -181,6 +194,11 @@ export const useMasterStore = create<MasterState>((set, get) => ({
 
             const currentState = get();
 
+            // Extract maintenance plans from machines for backward compatibility with the UI
+            const extractedMaintenancePlans = machines
+                .filter(m => m.maintenancePlans && m.maintenancePlans.length > 0)
+                .flatMap(m => m.maintenancePlans || []);
+
             set({
                 machines,
                 technicians,
@@ -193,6 +211,7 @@ export const useMasterStore = create<MasterState>((set, get) => ({
                 partLocations: partLocations.length > 0 ? partLocations : currentState.partLocations,
                 partUnits: partUnits.length > 0 ? partUnits : currentState.partUnits,
                 plantSettings: plantSettings,
+                maintenancePlans: extractedMaintenancePlans,
                 isLoading: false,
                 isInitialized: true // Mark as initialized
             });
@@ -203,13 +222,17 @@ export const useMasterStore = create<MasterState>((set, get) => ({
     },
 
     updateMachine: async (updatedMachine) => {
+        // Optimistic UI Update
+        const previousMachines = get().machines;
+        set((state) => ({
+            machines: state.machines.map(m => m.id === updatedMachine.id ? updatedMachine : m)
+        }));
+
         try {
             await MasterDataService.updateMachine(updatedMachine);
-            set((state) => ({
-                machines: state.machines.map(m => m.id === updatedMachine.id ? updatedMachine : m)
-            }));
         } catch (error: any) {
-            set({ error: error.message });
+            // Revert on failure
+            set({ machines: previousMachines, error: error.message });
             throw error; // Re-throw so component can handle it
         }
     },
@@ -284,14 +307,18 @@ export const useMasterStore = create<MasterState>((set, get) => ({
     },
 
     updateZone: async (updatedZone) => {
+        // Optimistic UI Update
+        const previousZones = get().zones;
+        set((state) => ({
+            zones: state.zones.map(z => z.id === updatedZone.id ? updatedZone : z)
+                .sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0))
+        }));
+
         try {
             await MasterDataService.updateZone(updatedZone);
-            set((state) => ({
-                zones: state.zones.map(z => z.id === updatedZone.id ? updatedZone : z)
-                    .sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0))
-            }));
         } catch (error: any) {
-            set({ error: error.message });
+             // Revert on failure
+            set({ zones: previousZones, error: error.message });
         }
     },
 

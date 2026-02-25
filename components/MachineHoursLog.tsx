@@ -82,7 +82,6 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
             setCurrentReading(0);
             setDisplayReading('');
 
-            alert("Hours logged successfully. Maintenance schedule updated.");
         } catch (error) {
             console.error(error);
             alert("Error logging hours.");

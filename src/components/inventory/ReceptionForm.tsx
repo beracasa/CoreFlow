@@ -1,40 +1,54 @@
 import React, { useState, useEffect } from 'react';
 import { inventoryService } from '../../services';
-import { SparePart } from '../../types/inventory';
-import { ArrowDownCircle } from 'lucide-react';
-
-// Service initialized in index.ts
+import { SparePart, StockReception } from '../../types/inventory';
+import { ArrowDownCircle, Clock, FileText, Package, ChevronDown, ChevronRight } from 'lucide-react';
 
 export const ReceptionForm: React.FC = () => {
+    const [activeTab, setActiveTab] = useState<'new' | 'history'>('new');
+
+    // --- Nueva Recepción State ---
     const [parts, setParts] = useState<SparePart[]>([]);
     const [selectedPartId, setSelectedPartId] = useState('');
     const [quantity, setQuantity] = useState(0);
     const [relatedDocId, setRelatedDocId] = useState('');
-    const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
-
-    // Searchable Dropdown State
+    const [notes, setNotes] = useState('');
+    const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
     const [showDropdown, setShowDropdown] = useState(false);
-
-    // Multi-item State
     const [itemsToReceive, setItemsToReceive] = useState<{ partId: string; partName: string; partNumber: string; quantity: number }[]>([]);
+
+    // --- History State ---
+    const [receptions, setReceptions] = useState<StockReception[]>([]);
+    const [loadingHistory, setLoadingHistory] = useState(false);
+    const [expandedId, setExpandedId] = useState<string | null>(null);
 
     useEffect(() => {
         inventoryService.getAllParts().then(setParts);
     }, []);
 
+    const loadHistory = () => {
+        setLoadingHistory(true);
+        inventoryService.getReceptions()
+            .then(data => setReceptions(data))
+            .catch(err => console.error('Error loading reception history:', err))
+            .finally(() => setLoadingHistory(false));
+    };
+
+    // Load history whenever switching to that tab
+    useEffect(() => {
+        if (activeTab === 'history') {
+            loadHistory();
+        }
+    }, [activeTab]);
+
     const handleAddItem = () => {
         if (!selectedPartId || quantity <= 0) return;
-
         const part = parts.find(p => p.id === selectedPartId);
         if (!part) return;
-
         setItemsToReceive(prev => [
             ...prev,
             { partId: part.id, partName: part.name, partNumber: part.partNumber, quantity }
         ]);
-
-        // Reset inputs but keep filtered doc id
         setSelectedPartId('');
         setSearchTerm('');
         setQuantity(0);
@@ -52,18 +66,25 @@ export const ReceptionForm: React.FC = () => {
         }
 
         try {
-            // Process all items sequentially
+            // 1. Update stock for each item
             for (const item of itemsToReceive) {
                 await inventoryService.addStock(item.partId, item.quantity, relatedDocId);
             }
 
-            setMessage({ type: 'success', text: 'Todos los ítems han sido recibidos correctamente.' });
+            // 2. Save the consolidated reception record
+            await inventoryService.saveReception({
+                documentNumber: relatedDocId || undefined,
+                notes: notes || undefined,
+                items: itemsToReceive
+            });
+
+            setMessage({ type: 'success', text: 'Recepción registrada correctamente.' });
             setItemsToReceive([]);
             setRelatedDocId('');
+            setNotes('');
             setQuantity(0);
             setSearchTerm('');
             setSelectedPartId('');
-
             inventoryService.getAllParts().then(setParts);
         } catch (err) {
             console.error(err);
@@ -71,153 +92,261 @@ export const ReceptionForm: React.FC = () => {
         }
     };
 
+    const filteredParts = parts.filter(p =>
+        p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.partNumber.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
     return (
-        <div className="bg-industrial-800 rounded-lg shadow-xl border border-industrial-700 p-6">
-            <div className="flex items-center mb-6 text-white pb-6 border-b border-industrial-700">
+        <div className="bg-industrial-800 rounded-lg shadow-xl border border-industrial-700 overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center px-6 pt-6 pb-0 text-white border-b border-industrial-700">
                 <span className="p-1.5 bg-emerald-900/30 rounded border border-emerald-800 mr-3">
                     <ArrowDownCircle className="w-6 h-6 text-emerald-500" />
                 </span>
-                <h2 className="text-xl font-bold">Recepción de Mercadería</h2>
+                <h2 className="text-xl font-bold mr-8">Recepción de Mercadería</h2>
+
+                {/* Tabs */}
+                <div className="flex border-b border-transparent gap-1">
+                    <button
+                        onClick={() => setActiveTab('new')}
+                        className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'new'
+                            ? 'border-emerald-500 text-emerald-400'
+                            : 'border-transparent text-industrial-400 hover:text-white'}`}
+                    >
+                        <span className="flex items-center gap-2"><Package className="w-4 h-4" />Nueva Recepción</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('history')}
+                        className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'history'
+                            ? 'border-emerald-500 text-emerald-400'
+                            : 'border-transparent text-industrial-400 hover:text-white'}`}
+                    >
+                        <span className="flex items-center gap-2"><Clock className="w-4 h-4" />Historial</span>
+                    </button>
+                </div>
             </div>
 
-            {message && (
-                <div className={`mb-6 p-4 rounded-lg flex items-center border ${message.type === 'success' ? 'bg-emerald-900/30 text-emerald-400 border-emerald-800' : 'bg-red-900/30 text-red-400 border-red-800'}`}>
-                    <span className="font-medium text-sm">{message.text}</span>
-                </div>
-            )}
+            {/* ── TAB: Nueva Recepción ── */}
+            {activeTab === 'new' && (
+                <div className="p-6 space-y-6">
+                    {message && (
+                        <div className={`p-4 rounded-lg flex items-center border ${message.type === 'success'
+                            ? 'bg-emerald-900/30 text-emerald-400 border-emerald-800'
+                            : 'bg-red-900/30 text-red-400 border-red-800'}`}>
+                            <span className="font-medium text-sm">{message.text}</span>
+                        </div>
+                    )}
 
-            <div className="space-y-6">
-                {/* Document Header - Applies safely to all items */}
-                <div>
-                    <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">N° Orden Compra / Guía (Global)</label>
-                    <input
-                        type="text"
-                        className="w-full bg-industrial-900 border border-industrial-600 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-emerald-500 transition-colors"
-                        value={relatedDocId}
-                        onChange={e => setRelatedDocId(e.target.value)}
-                        placeholder="Ej: OC-2024-001"
-                    />
-                </div>
-
-                <div className="p-4 bg-industrial-900/50 border border-industrial-700 rounded-lg space-y-4">
-                    <h3 className="text-white font-bold text-sm">Agregar Ítem</h3>
-
+                    {/* Document Number */}
                     <div>
-                        <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">Repuesto</label>
+                        <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">N° Orden Compra / Guía (Global)</label>
+                        <input
+                            type="text"
+                            className="w-full bg-industrial-900 border border-industrial-600 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-emerald-500 transition-colors"
+                            value={relatedDocId}
+                            onChange={e => setRelatedDocId(e.target.value)}
+                            placeholder="Ej: OC-2024-001"
+                        />
+                    </div>
+
+                    {/* Add Item */}
+                    <div className="p-4 bg-industrial-900/50 border border-industrial-700 rounded-lg space-y-4">
+                        <h3 className="text-white font-bold text-sm">Agregar Ítem</h3>
+
                         <div className="relative">
+                            <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">Repuesto</label>
                             <input
                                 type="text"
                                 placeholder="Buscar repuesto por código o nombre..."
                                 className="w-full bg-industrial-900 border border-industrial-600 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-emerald-500 transition-colors"
                                 value={searchTerm}
-                                onChange={e => {
-                                    setSearchTerm(e.target.value);
-                                    setSelectedPartId('');
-                                    setShowDropdown(true);
-                                }}
+                                onChange={e => { setSearchTerm(e.target.value); setSelectedPartId(''); setShowDropdown(true); }}
                                 onFocus={() => setShowDropdown(true)}
                                 onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
                             />
                             {showDropdown && (
                                 <div className="absolute z-10 w-full mt-1 bg-industrial-800 border border-industrial-600 rounded-lg shadow-xl max-h-60 overflow-y-auto">
-                                    {parts.filter(p =>
-                                        p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                        p.partNumber.toLowerCase().includes(searchTerm.toLowerCase())
-                                    ).length > 0 ? (
-                                        parts.filter(p =>
-                                            p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                            p.partNumber.toLowerCase().includes(searchTerm.toLowerCase())
-                                        ).map(p => (
-                                            <div
-                                                key={p.id}
-                                                className="px-4 py-2 hover:bg-industrial-700 cursor-pointer text-white text-sm border-b border-industrial-700/50 last:border-0"
-                                                onClick={() => {
-                                                    setSelectedPartId(p.id);
-                                                    setSearchTerm(`${p.partNumber} - ${p.name}`);
-                                                    setShowDropdown(false);
-                                                }}
-                                            >
-                                                <span className="font-bold text-emerald-400">{p.partNumber}</span> - {p.name}
-                                            </div>
-                                        ))
-                                    ) : (
+                                    {filteredParts.length > 0 ? filteredParts.map(p => (
+                                        <div
+                                            key={p.id}
+                                            className="px-4 py-2 hover:bg-industrial-700 cursor-pointer text-white text-sm border-b border-industrial-700/50 last:border-0"
+                                            onClick={() => { setSelectedPartId(p.id); setSearchTerm(`${p.partNumber} - ${p.name}`); setShowDropdown(false); }}
+                                        >
+                                            <span className="font-bold text-emerald-400">{p.partNumber}</span> - {p.name}
+                                        </div>
+                                    )) : (
                                         <div className="px-4 py-2 text-industrial-400 text-sm">No se encontraron resultados</div>
                                     )}
                                 </div>
                             )}
                         </div>
-                    </div>
 
-                    <div className="grid grid-cols-2 gap-4 items-end">
-                        <div className="col-span-1">
-                            <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">Cantidad</label>
-                            <input
-                                type="number"
-                                min="1"
-                                className="w-full bg-industrial-900 border border-industrial-600 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-emerald-500 transition-colors font-mono"
-                                value={quantity === 0 ? '' : quantity}
-                                onChange={e => {
-                                    const val = e.target.value;
-                                    setQuantity(val === '' ? 0 : parseInt(val));
-                                }}
-                            />
-                        </div>
-                        <div className="col-span-1">
+                        <div className="grid grid-cols-2 gap-4 items-end">
+                            <div>
+                                <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">Cantidad</label>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    className="w-full bg-industrial-900 border border-industrial-600 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-emerald-500 transition-colors font-mono"
+                                    value={quantity === 0 ? '' : quantity}
+                                    onFocus={e => e.target.select()}
+                                    onChange={e => { const val = e.target.value; setQuantity(val === '' ? 0 : parseInt(val)); }}
+                                />
+                            </div>
                             <button
                                 type="button"
                                 onClick={handleAddItem}
                                 disabled={!selectedPartId || quantity <= 0}
-                                className="w-full px-4 py-2.5 border border-transparent rounded-lg text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-blue-900/20"
+                                className="w-full px-4 py-2.5 border border-transparent rounded-lg text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg"
                             >
                                 + Agregar a Lista
                             </button>
                         </div>
                     </div>
-                </div>
 
-                {/* List of Items to Receive */}
-                {itemsToReceive.length > 0 && (
-                    <div className="border border-industrial-700 rounded-lg overflow-hidden">
-                        <table className="w-full text-sm text-left text-gray-400">
-                            <thead className="text-xs uppercase bg-industrial-900 text-industrial-400">
-                                <tr>
-                                    <th className="px-4 py-3">Código</th>
-                                    <th className="px-4 py-3">Repuesto</th>
-                                    <th className="px-4 py-3 text-right">Cant.</th>
-                                    <th className="px-4 py-3 text-center"></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {itemsToReceive.map((item, index) => (
-                                    <tr key={index} className="bg-industrial-800 border-t border-industrial-700 hover:bg-industrial-700/50">
-                                        <td className="px-4 py-3 font-mono text-emerald-400">{item.partNumber}</td>
-                                        <td className="px-4 py-3 text-white">{item.partName}</td>
-                                        <td className="px-4 py-3 text-right font-bold text-white">{item.quantity}</td>
-                                        <td className="px-4 py-3 text-center">
-                                            <button
-                                                onClick={() => handleRemoveItem(index)}
-                                                className="text-red-400 hover:text-red-300 font-bold px-2"
-                                            >
-                                                ✕
-                                            </button>
-                                        </td>
+                    {/* Items Table */}
+                    {itemsToReceive.length > 0 && (
+                        <div className="border border-industrial-700 rounded-lg overflow-hidden">
+                            <table className="w-full text-sm text-left text-gray-400">
+                                <thead className="text-xs uppercase bg-industrial-900 text-industrial-400">
+                                    <tr>
+                                        <th className="px-4 py-3">Código</th>
+                                        <th className="px-4 py-3">Repuesto</th>
+                                        <th className="px-4 py-3 text-right">Cant.</th>
+                                        <th className="px-4 py-3 text-center"></th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
+                                </thead>
+                                <tbody>
+                                    {itemsToReceive.map((item, index) => (
+                                        <tr key={index} className="bg-industrial-800 border-t border-industrial-700 hover:bg-industrial-700/50">
+                                            <td className="px-4 py-3 font-mono text-emerald-400">{item.partNumber}</td>
+                                            <td className="px-4 py-3 text-white">{item.partName}</td>
+                                            <td className="px-4 py-3 text-right font-bold text-white">{item.quantity}</td>
+                                            <td className="px-4 py-3 text-center">
+                                                <button onClick={() => handleRemoveItem(index)} className="text-red-400 hover:text-red-300 font-bold px-2">✕</button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
 
-                <div className="pt-4 border-t border-industrial-700">
-                    <button
-                        onClick={handleReceive}
-                        disabled={itemsToReceive.length === 0}
-                        className="w-full px-4 py-3 border border-transparent rounded-lg shadow-lg shadow-emerald-900/20 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none transition-all disabled:opacity-50 disabled:grayscale"
-                    >
-                        Registrar Ingreso ({itemsToReceive.length} ítems)
-                    </button>
+                    {/* Notes */}
+                    <div>
+                        <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">Notas (Opcional)</label>
+                        <textarea
+                            rows={2}
+                            className="w-full bg-industrial-900 border border-industrial-600 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-emerald-500 transition-colors resize-none text-sm"
+                            value={notes}
+                            onChange={e => setNotes(e.target.value)}
+                            placeholder="Observaciones sobre la recepción..."
+                        />
+                    </div>
+
+                    <div className="pt-4 border-t border-industrial-700">
+                        <button
+                            onClick={handleReceive}
+                            disabled={itemsToReceive.length === 0}
+                            className="w-full px-4 py-3 border border-transparent rounded-lg shadow-lg shadow-emerald-900/20 text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 focus:outline-none transition-all disabled:opacity-50 disabled:grayscale"
+                        >
+                            Registrar Ingreso ({itemsToReceive.length} ítems)
+                        </button>
+                    </div>
                 </div>
-            </div>
+            )}
+
+            {/* ── TAB: Historial ── */}
+            {activeTab === 'history' && (
+                <div className="p-6">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-white font-bold text-sm">Historial de Recepciones</h3>
+                        <button
+                            onClick={loadHistory}
+                            className="text-xs text-industrial-400 hover:text-white transition-colors flex items-center gap-1"
+                        >
+                            <Clock className="w-3 h-3" /> Actualizar
+                        </button>
+                    </div>
+
+                    {loadingHistory ? (
+                        <div className="text-center py-12 text-industrial-400 text-sm">Cargando historial...</div>
+                    ) : receptions.length === 0 ? (
+                        <div className="text-center py-12 text-industrial-500 text-sm">
+                            <ArrowDownCircle className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                            No hay recepciones registradas todavía.
+                        </div>
+                    ) : (
+                        <div className="space-y-2">
+                            {receptions.map(rec => (
+                                <div key={rec.id} className="border border-industrial-700 rounded-lg overflow-hidden">
+                                    {/* Row header */}
+                                    <button
+                                        className="w-full flex items-center justify-between px-4 py-3 bg-industrial-900/50 hover:bg-industrial-700/40 transition-colors text-left"
+                                        onClick={() => setExpandedId(expandedId === rec.id ? null : rec.id)}
+                                    >
+                                        <div className="flex items-center gap-4">
+                                            <span className="p-1 bg-emerald-900/30 rounded border border-emerald-800">
+                                                <ArrowDownCircle className="w-4 h-4 text-emerald-400" />
+                                            </span>
+                                            <div>
+                                                <p className="text-white text-sm font-semibold">
+                                                    {rec.documentNumber
+                                                        ? <><span className="font-mono text-emerald-400">{rec.documentNumber}</span></>
+                                                        : <span className="text-industrial-400 italic">Sin documento</span>}
+                                                </p>
+                                                <p className="text-industrial-500 text-xs">
+                                                    {new Date(rec.receptionDate).toLocaleString('es', {
+                                                        day: '2-digit', month: 'short', year: 'numeric',
+                                                        hour: '2-digit', minute: '2-digit'
+                                                    })}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-4">
+                                            <span className="inline-flex items-center gap-1 text-xs font-medium text-industrial-400 bg-industrial-800 border border-industrial-700 px-2 py-0.5 rounded-full">
+                                                <Package className="w-3 h-3" /> {rec.items.length} ítems
+                                            </span>
+                                            {expandedId === rec.id ? <ChevronDown className="w-4 h-4 text-industrial-400" /> : <ChevronRight className="w-4 h-4 text-industrial-400" />}
+                                        </div>
+                                    </button>
+
+                                    {/* Expandable items */}
+                                    {expandedId === rec.id && (
+                                        <div className="border-t border-industrial-700">
+                                            <table className="w-full text-sm text-left">
+                                                <thead className="bg-industrial-900 text-industrial-500 text-xs uppercase">
+                                                    <tr>
+                                                        <th className="px-4 py-2">Código</th>
+                                                        <th className="px-4 py-2">Repuesto</th>
+                                                        <th className="px-4 py-2 text-right">Cantidad</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-industrial-700/50">
+                                                    {rec.items.map((item, i) => (
+                                                        <tr key={i} className="hover:bg-industrial-700/30">
+                                                            <td className="px-4 py-2 font-mono text-emerald-400 text-xs">{item.partNumber}</td>
+                                                            <td className="px-4 py-2 text-white text-sm">{item.partName}</td>
+                                                            <td className="px-4 py-2 text-right font-bold text-white">{item.quantity}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                            {rec.notes && (
+                                                <div className="px-4 py-2 border-t border-industrial-700/50 flex items-center gap-2">
+                                                    <FileText className="w-3.5 h-3.5 text-industrial-500 flex-shrink-0" />
+                                                    <p className="text-industrial-400 text-xs italic">{rec.notes}</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 };

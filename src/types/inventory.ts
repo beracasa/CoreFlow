@@ -56,3 +56,19 @@ export interface PurchaseRequest {
     requestedBy: string; // User ID
     purchaseRequestNumber: string; // e.g. "SC-001"
 }
+
+export interface StockReceptionItem {
+    partId: string;
+    partName: string;
+    partNumber: string;
+    quantity: number;
+}
+
+export interface StockReception {
+    id: string;
+    receptionDate: string;
+    documentNumber?: string;
+    receivedBy?: string;
+    items: StockReceptionItem[];
+    notes?: string;
+}

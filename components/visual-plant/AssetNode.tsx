@@ -105,7 +105,7 @@ export const AssetNode: React.FC<AssetNodeProps> = ({ machine, layer, onClick, i
       {/* Delete Button (Edit Mode) */}
       {isEditMode && onDelete && (
         <button
-          onClick={(e) => {
+          onMouseDown={(e) => {
             e.stopPropagation();
             onDelete();
           }}
