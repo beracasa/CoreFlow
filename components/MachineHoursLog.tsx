@@ -17,6 +17,7 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
     const [selectedMachineId, setSelectedMachineId] = useState<string>('');
     const [currentReading, setCurrentReading] = useState<number>(0);
     const [displayReading, setDisplayReading] = useState<string>('');
+    const [selectedUnit, setSelectedUnit] = useState<'h' | 'km'>('h');
     const [isLoading, setIsLoading] = useState(false);
 
     // Filters
@@ -63,6 +64,7 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
             const newLog = await MachineSupabaseService.logMachineHours({
                 machineId: selectedMachine.id,
                 hoursLogged: currentReading,
+                unit: selectedUnit,
                 operator: user?.full_name || 'Unknown Operator'
             });
 
@@ -139,7 +141,7 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
             startY: 40,
         });
 
-        doc.save(`reporte_horas_${new Date().toISOString().split('T')[0]}.pdf`);
+        doc.save(`reporte_uso_${new Date().toISOString().split('T')[0]}.pdf`);
     };
 
     return (
@@ -225,20 +227,33 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
                         {selectedMachine && (
                             <div className="bg-industrial-900/50 p-3 rounded border border-industrial-600 mb-4">
                                 <span className="text-xs text-industrial-500 block">{t('hours.last')}</span>
-                                <span className="text-xl font-mono text-white">{new Intl.NumberFormat('en-US').format(selectedMachine.runningHours)} h</span>
+                                <span className="text-xl font-mono text-white">{new Intl.NumberFormat('en-US').format(selectedMachine.runningHours)} {selectedUnit}</span>
                             </div>
                         )}
 
-                        <div className="space-y-1">
-                            <label className="text-xs text-industrial-400 font-bold uppercase">{t('hours.current')}</label>
-                            <input
-                                type="text"
-                                required
-                                className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white font-mono"
-                                placeholder="e.g. 12,500"
-                                value={displayReading}
-                                onChange={handleReadingChange}
-                            />
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <label className="text-xs text-industrial-400 font-bold uppercase">{t('hours.current')}</label>
+                                <input
+                                    type="text"
+                                    required
+                                    className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white font-mono"
+                                    placeholder="e.g. 12,500"
+                                    value={displayReading}
+                                    onChange={handleReadingChange}
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-xs text-industrial-400 font-bold uppercase">Unidad</label>
+                                <select
+                                    className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white outline-none focus:border-emerald-500 transition-colors"
+                                    value={selectedUnit}
+                                    onChange={(e) => setSelectedUnit(e.target.value as 'h' | 'km')}
+                                >
+                                    <option value="h">Horas (h)</option>
+                                    <option value="km">Kilómetros (km)</option>
+                                </select>
+                            </div>
                         </div>
 
                         <button
@@ -314,23 +329,30 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
                                     <tr>
                                         <th className="px-6 py-3">{t('form.date')}</th>
                                         <th className="px-6 py-3">{t('form.machine')}</th>
-                                        <th className="px-6 py-3">Reading</th>
-                                        <th className="px-6 py-3">Operator</th>
+                                        <th className="px-6 py-3">Alias / Matrícula</th>
+                                        <th className="px-6 py-3">Lectura</th>
+                                        <th className="px-6 py-3">Operador</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-industrial-700">
-                                    {history.map(log => (
-                                        <tr key={log.id} className="hover:bg-industrial-700/30">
-                                            <td className="px-6 py-3">{log.date}</td>
-                                            <td className="px-6 py-3 text-white">
-                                                {machines.find(m => m.id === log.machineId)?.name || 'Unknown Log'}
-                                            </td>
-                                            <td className="px-6 py-3 font-mono text-industrial-accent">
-                                                {new Intl.NumberFormat('en-US').format(log.hoursLogged)} h
-                                            </td>
-                                            <td className="px-6 py-3">{log.operator}</td>
-                                        </tr>
-                                    ))}
+                                    {history.map(log => {
+                                        const machine = machines.find(m => m.id === log.machineId);
+                                        return (
+                                            <tr key={log.id} className="hover:bg-industrial-700/30">
+                                                <td className="px-6 py-3">{log.date}</td>
+                                                <td className="px-6 py-3 text-white">
+                                                    {machine?.name || 'Unknown Log'}
+                                                </td>
+                                                <td className="px-6 py-3 text-industrial-400 italic">
+                                                    {machine?.alias && machine?.plate ? `${machine.alias} (${machine.plate})` : (machine?.alias || machine?.plate || '-')}
+                                                </td>
+                                                <td className="px-6 py-3 font-mono text-industrial-accent">
+                                                    {new Intl.NumberFormat('en-US').format(log.hoursLogged)} {log.unit}
+                                                </td>
+                                                <td className="px-6 py-3">{log.operator}</td>
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         )}

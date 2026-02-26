@@ -66,7 +66,8 @@ export class InventorySupabaseService implements IInventoryService {
             p_maximum_stock:    partData.maxStock || 0,
             p_location_code:    partData.location || null,
             p_unit_cost:        partData.cost || 0,
-            p_image_url:        partData.photoUrl || null
+            p_image_url:        partData.photoUrl || null,
+            p_created_at:       partData.createdAt || null
         });
         if (error) throw error;
         return this.mapDBToPart(Array.isArray(data) ? data[0] : data);
@@ -85,7 +86,8 @@ export class InventorySupabaseService implements IInventoryService {
             p_maximum_stock:    updatedPart.maxStock || 0,
             p_location_code:    updatedPart.location || null,
             p_unit_cost:        updatedPart.cost || 0,
-            p_image_url:        updatedPart.photoUrl || null
+            p_image_url:        updatedPart.photoUrl || null,
+            p_created_at:       updatedPart.createdAt || null
         });
         if (error) throw error;
         return this.mapDBToPart(Array.isArray(data) ? data[0] : data);

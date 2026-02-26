@@ -173,6 +173,7 @@ export const MachineSupabaseService = {
       machineId: log.machine_id,
       date: log.date,
       hoursLogged: log.hours_logged,
+      unit: log.unit || 'h',
       operator: log.operator || 'Unknown',
       comments: log.comments
     }));
@@ -199,6 +200,7 @@ export const MachineSupabaseService = {
       machineId: log.machine_id,
       date: log.date,
       hoursLogged: log.hours_logged,
+      unit: log.unit || 'h',
       operator: log.operator || 'Unknown',
       comments: log.comments
     }));
@@ -237,19 +239,21 @@ export const MachineSupabaseService = {
       machineId: log.machine_id,
       date: log.date,
       hoursLogged: log.hours_logged,
+      unit: log.unit || 'h',
       operator: log.operator || 'Unknown',
       comments: log.comments
     }));
   },
 
-  async logMachineHours(log: { machineId: string, hoursLogged: number, operator: string, comments?: string }): Promise<any> {
-    // 1. Log the hours
+  async logMachineHours(log: { machineId: string, hoursLogged: number, unit: 'h' | 'km', operator: string, comments?: string }): Promise<any> {
+    // 1. Log the usage
     const { data, error } = await supabase
       .from('machine_hour_logs')
       .insert({
         machine_id: log.machineId,
         date: new Date().toISOString().split('T')[0], // Current date YYYY-MM-DD
         hours_logged: log.hoursLogged,
+        unit: log.unit,
         operator: log.operator,
         comments: log.comments
       })
@@ -283,6 +287,7 @@ export const MachineSupabaseService = {
       machineId: data.machine_id,
       date: data.date,
       hoursLogged: data.hours_logged,
+      unit: data.unit,
       operator: data.operator,
       comments: data.comments
     };

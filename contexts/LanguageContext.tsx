@@ -16,7 +16,7 @@ const translations: Translations = {
     'sidebar.maintenanceCanvas': 'Kanban Board',
     'sidebar.rmant02': 'Preventive (R-MANT-02)',
     'sidebar.rmant05': 'Corrective (R-MANT-05)',
-    'sidebar.hours': 'Machine Hours Log',
+    'sidebar.hours': 'Machine Usage Log',
     'sidebar.biAnalytics': 'BI & Analytics',
     'sidebar.kardex': 'Kardex 4.0',
     'sidebar.masterData': 'Master Data Core',
@@ -87,10 +87,10 @@ const translations: Translations = {
     'mant05.check3': 'Tools Removed',
     'mant05.sign': 'Digital Signature',
 
-    // Hours Log
-    'hours.title': 'Machine Hours Registry',
+    // Usage Log
+    'hours.title': 'Machine Usage Registry',
     'hours.subtitle': 'Track usage to predict maintenance',
-    'hours.log': 'Log Hours',
+    'hours.log': 'Log Usage',
     'hours.current': 'Current Reading',
     'hours.last': 'Last Logged',
 
@@ -230,7 +230,7 @@ const translations: Translations = {
     'sidebar.maintenanceCanvas': 'Tablero Kanban',
     'sidebar.rmant02': 'Preventivo (R-MANT-02)',
     'sidebar.rmant05': 'Correctivo (R-MANT-05)',
-    'sidebar.hours': 'Registro de Horas',
+    'sidebar.hours': 'Registro de Uso',
     'sidebar.biAnalytics': 'BI y Analítica',
     'sidebar.kardex': 'Kardex 4.0',
     'sidebar.masterData': 'Configuración',
@@ -301,10 +301,10 @@ const translations: Translations = {
     'mant05.check3': 'Herramientas Retiradas',
     'mant05.sign': 'Firma Digital',
 
-    // Hours Log
-    'hours.title': 'Registro de Horas de Equipo',
+    // Usage Log
+    'hours.title': 'Registro de Uso del Equipo',
     'hours.subtitle': 'Control de uso para cálculo de mantenimiento',
-    'hours.log': 'Registrar Horas',
+    'hours.log': 'Registrar Uso',
     'hours.current': 'Lectura Actual',
     'hours.last': 'Último Registro',
 

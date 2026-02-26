@@ -44,6 +44,7 @@ interface MasterState {
     addMachine: (machine: Omit<Machine, 'id'>) => Promise<void>;
     addTechnician: (tech: Technician) => Promise<void>;
     addPart: (part: Omit<SparePart, 'id'>) => Promise<void>;
+    updatePart: (updatedPart: SparePart) => Promise<void>;
 
     addZone: (zone: ZoneStructure) => Promise<void>;
     updateZone: (zone: ZoneStructure) => Promise<void>;
@@ -280,10 +281,23 @@ export const useMasterStore = create<MasterState>((set, get) => ({
         try {
             const newPart = await inventoryService.createPart(part);
             set((state) => ({
-                parts: [...state.parts, newPart]
+                parts: [newPart, ...state.parts]
             }));
         } catch (error: any) {
             set({ error: error.message });
+            throw error;
+        }
+    },
+
+    updatePart: async (updatedPart) => {
+        try {
+            const updated = await inventoryService.updatePart(updatedPart);
+            set((state) => ({
+                parts: state.parts.map(p => p.id === updated.id ? updated : p)
+            }));
+        } catch (error: any) {
+            set({ error: error.message });
+            throw error;
         }
     },
 
@@ -466,7 +480,18 @@ export const useMasterStore = create<MasterState>((set, get) => ({
             throw error;
         }
     },
-    updatePartCategory: (oldVal, newVal) => set((state) => ({ partCategories: state.partCategories.map(c => c === oldVal ? newVal : c) })),
+    updatePartCategory: async (oldVal, newVal) => {
+        try {
+            await MasterDataService.updatePartCategory(oldVal, newVal);
+            set((state) => ({ 
+                partCategories: state.partCategories.map(c => c === oldVal ? newVal : c),
+                parts: state.parts.map(p => p.category === oldVal ? { ...p, category: newVal } : p)
+            }));
+        } catch (error: any) {
+            set({ error: error.message });
+            throw error;
+        }
+    },
 
     addPartLocation: async (location) => {
         try {
@@ -486,7 +511,18 @@ export const useMasterStore = create<MasterState>((set, get) => ({
             throw error;
         }
     },
-    updatePartLocation: (oldVal, newVal) => set((state) => ({ partLocations: state.partLocations.map(l => l === oldVal ? newVal : l) })),
+    updatePartLocation: async (oldVal, newVal) => {
+        try {
+            await MasterDataService.updatePartLocation(oldVal, newVal);
+            set((state) => ({ 
+                partLocations: state.partLocations.map(l => l === oldVal ? newVal : l),
+                parts: state.parts.map(p => p.location === oldVal ? { ...p, location: newVal } : p)
+            }));
+        } catch (error: any) {
+            set({ error: error.message });
+            throw error;
+        }
+    },
 
     addPartUnit: async (unit) => {
         try {
@@ -506,5 +542,16 @@ export const useMasterStore = create<MasterState>((set, get) => ({
             throw error;
         }
     },
-    updatePartUnit: (oldVal, newVal) => set((state) => ({ partUnits: state.partUnits.map(u => u === oldVal ? newVal : u) })),
+    updatePartUnit: async (oldVal, newVal) => {
+        try {
+            await MasterDataService.updatePartUnit(oldVal, newVal);
+            set((state) => ({ 
+                partUnits: state.partUnits.map(u => u === oldVal ? newVal : u),
+                parts: state.parts.map(p => p.unitOfMeasure === oldVal ? { ...p, unitOfMeasure: newVal } : p)
+            }));
+        } catch (error: any) {
+            set({ error: error.message });
+            throw error;
+        }
+    },
 }));

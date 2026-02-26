@@ -13,7 +13,7 @@ interface PartCreationFormProps {
 }
 
 export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData, onCancel, onSuccess }) => {
-    const { partCategories, partLocations, partUnits, addPartCategory, addPartLocation, addPartUnit } = useMasterStore();
+    const { partCategories, partLocations, partUnits, addPart, updatePart } = useMasterStore();
     const [formData, setFormData] = useState({
         name: '',
         partNumber: '',
@@ -25,7 +25,8 @@ export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData,
         initialStock: 0,
         maxStock: 0,
         cost: 0,
-        photoUrl: ''
+        photoUrl: '',
+        createdAt: new Date().toISOString().split('T')[0]
     });
 
     // Formatting state for display
@@ -44,7 +45,8 @@ export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData,
                 initialStock: initialData.currentStock, // Editing typically shows current as initial or just stock
                 maxStock: initialData.maxStock || 0,
                 cost: initialData.cost,
-                photoUrl: initialData.photoUrl || ''
+                photoUrl: initialData.photoUrl || '',
+                createdAt: initialData.createdAt ? initialData.createdAt.split('T')[0] : new Date().toISOString().split('T')[0]
             });
             setDisplayCost(formatCurrency(initialData.cost).replace(/,/g, ',')); // Simplified format for display
         }
@@ -109,17 +111,27 @@ export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData,
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
+            // Uniqueness check for partNumber (SKU)
+            if (!initialData) {
+                const { parts } = useMasterStore.getState();
+                const isDuplicate = parts.some(p => p.partNumber.toLowerCase() === formData.partNumber.toLowerCase());
+                if (isDuplicate) {
+                    setFeedback({ type: 'error', message: 'El código del repuesto ya existe.' });
+                    return;
+                }
+            }
+
             if (initialData) {
                 // Edit mode
-                const updated = await inventoryService.updatePart({
+                const updated = await updatePart({
                     ...initialData,
                     ...formData,
                     currentStock: formData.initialStock
                 });
                 setFeedback({ type: 'success', message: 'Repuesto actualizado exitosamente.' });
-                if (onSuccess) onSuccess(updated);
+                if (onSuccess) onSuccess(updated as any); // Cast as updated might be void in store but it actually returns if we change it or we can just rely on the fact that it's updated in store
             } else {
-                const created = await inventoryService.createPart(formData);
+                const created = await addPart(formData);
                 setFeedback({ type: 'success', message: 'Repuesto creado exitosamente.' });
                 // Reset only if create
                 setFormData({
@@ -133,10 +145,11 @@ export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData,
                     initialStock: 0,
                     maxStock: 0,
                     cost: 0,
-                    photoUrl: ''
+                    photoUrl: '',
+                    createdAt: new Date().toISOString().split('T')[0]
                 });
                 setDisplayCost('');
-                if (onSuccess) onSuccess(created);
+                if (onSuccess) onSuccess(created as any);
             }
         } catch (error: any) {
             console.error(error);
@@ -217,7 +230,7 @@ export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData,
 
                     {/* Location */}
                     <div>
-                        <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">Ubicación</label>
+                        <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">Tramo</label>
                         <select
                             name="location"
                             className="w-full bg-industrial-900 border border-industrial-600 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-blue-500 transition-colors appearance-none cursor-pointer"
@@ -297,6 +310,19 @@ export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData,
                             value={displayCost}
                             onChange={handleCostChange}
                             placeholder="0.00"
+                        />
+                    </div>
+
+                    {/* Created At */}
+                    <div>
+                        <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">Fecha de Creación</label>
+                        <input
+                            type="date"
+                            name="createdAt"
+                            required
+                            className="w-full bg-industrial-900 border border-industrial-600 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-blue-500 transition-colors font-mono [color-scheme:dark]"
+                            value={formData.createdAt}
+                            onChange={handleChange}
                         />
                     </div>
 

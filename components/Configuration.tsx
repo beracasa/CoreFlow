@@ -782,7 +782,23 @@ export const Configuration: React.FC<ConfigurationProps> = ({
                   <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
                     {partCategories.map((item, idx) => (
                       <div key={idx} className="flex justify-between items-center bg-industrial-900/50 p-3 rounded border border-industrial-700/50 group">
-                        <span className="text-industrial-300 text-sm">{item}</span>
+                        <input
+                          type="text"
+                          defaultValue={item}
+                          className="bg-transparent text-industrial-300 border-none focus:ring-0 p-0 w-full mr-2"
+                          onBlur={(e) => {
+                            if (e.target.value !== item && e.target.value.trim() !== '') {
+                              updatePartCategory(item, e.target.value.trim());
+                            } else {
+                              e.target.value = item;
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.currentTarget.blur();
+                            }
+                          }}
+                        />
                         <button
                           onClick={() => handleRemoveFromList(removePartCategory, item)}
                           className="text-industrial-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -799,14 +815,14 @@ export const Configuration: React.FC<ConfigurationProps> = ({
               <div className="bg-industrial-800 rounded-lg border border-industrial-700 p-6">
                 <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
                   <MapPin size={20} className="text-blue-500" />
-                  Ubicaciones
+                  Tramos
                 </h4>
                 <div className="space-y-4">
                   <div className="flex gap-2">
                     <input
                       type="text"
                       className="flex-1 bg-industrial-900 border border-industrial-600 rounded px-3 py-2 text-white text-sm outline-none focus:border-emerald-500"
-                      placeholder="Nueva Ubicación"
+                      placeholder="Nuevo Tramo"
                       value={newPartLocation}
                       onChange={e => setNewPartLocation(e.target.value)}
                       onKeyDown={(e) => {
@@ -825,7 +841,23 @@ export const Configuration: React.FC<ConfigurationProps> = ({
                   <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
                     {partLocations.map((item, idx) => (
                       <div key={idx} className="flex justify-between items-center bg-industrial-900/50 p-3 rounded border border-industrial-700/50 group">
-                        <span className="text-industrial-300 text-sm">{item}</span>
+                        <input
+                          type="text"
+                          defaultValue={item}
+                          className="bg-transparent text-industrial-300 border-none focus:ring-0 p-0 w-full mr-2"
+                          onBlur={(e) => {
+                            if (e.target.value !== item && e.target.value.trim() !== '') {
+                              updatePartLocation(item, e.target.value.trim());
+                            } else {
+                              e.target.value = item;
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.currentTarget.blur();
+                            }
+                          }}
+                        />
                         <button
                           onClick={() => handleRemoveFromList(removePartLocation, item)}
                           className="text-industrial-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -868,7 +900,23 @@ export const Configuration: React.FC<ConfigurationProps> = ({
                   <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
                     {partUnits.map((item, idx) => (
                       <div key={idx} className="flex justify-between items-center bg-industrial-900/50 p-3 rounded border border-industrial-700/50 group">
-                        <span className="text-industrial-300 text-sm">{item}</span>
+                        <input
+                          type="text"
+                          defaultValue={item}
+                          className="bg-transparent text-industrial-300 border-none focus:ring-0 p-0 w-full mr-2"
+                          onBlur={(e) => {
+                            if (e.target.value !== item && e.target.value.trim() !== '') {
+                              updatePartUnit(item, e.target.value.trim());
+                            } else {
+                              e.target.value = item;
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.currentTarget.blur();
+                            }
+                          }}
+                        />
                         <button
                           onClick={() => handleRemoveFromList(removePartUnit, item)}
                           className="text-industrial-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -1379,10 +1427,10 @@ export const Configuration: React.FC<ConfigurationProps> = ({
               <div className="bg-industrial-800/50 rounded-lg border border-industrial-700/50 p-6 col-span-1 md:col-span-3 opacity-70">
                 <h4 className="text-sm font-bold text-industrial-400 mb-2 flex items-center gap-2">
                   <Layout size={16} />
-                  Ubicaciones (Solo Lectura)
+                  Tramos (Solo Lectura)
                 </h4>
                 <p className="text-xs text-industrial-500 mb-3">
-                  Las ubicaciones se gestionan en la pestaña "Zonas - Líneas". Aquí se muestran las disponibles para referencia.
+                  Los tramos se gestionan en la pestaña "Zonas - Líneas". Aquí se muestran los disponibles para referencia.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {zones.map((item, idx) => (

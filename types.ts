@@ -288,6 +288,7 @@ export interface MachineHourLog {
   machineId: string;
   date: string;
   hoursLogged: number;
+  unit: 'h' | 'km';
   operator: string;
   comments?: string;
 }

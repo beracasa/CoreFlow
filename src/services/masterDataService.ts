@@ -224,5 +224,36 @@ export const MasterDataService = {
   async removePartUnit(name: string): Promise<void> {
     const { error } = await supabase.from('spare_part_units').delete().eq('name', name);
     if (error) throw error;
+  },
+
+  // Update with Cascade
+  async updatePartCategory(oldName: string, newName: string): Promise<void> {
+    // 1. Update config table
+    const { error: configError } = await supabase.from('spare_part_categories').update({ name: newName }).eq('name', oldName);
+    if (configError) throw configError;
+
+    // 2. Cascade to spare_parts
+    const { error: cascadeError } = await supabase.from('spare_parts').update({ category: newName }).eq('category', oldName);
+    if (cascadeError) throw cascadeError;
+  },
+
+  async updatePartLocation(oldName: string, newName: string): Promise<void> {
+    // 1. Update config table
+    const { error: configError } = await supabase.from('spare_part_locations').update({ name: newName }).eq('name', oldName);
+    if (configError) throw configError;
+
+    // 2. Cascade to spare_parts
+    const { error: cascadeError } = await supabase.from('spare_parts').update({ location_code: newName }).eq('location_code', oldName);
+    if (cascadeError) throw cascadeError;
+  },
+
+  async updatePartUnit(oldName: string, newName: string): Promise<void> {
+    // 1. Update config table
+    const { error: configError } = await supabase.from('spare_part_units').update({ name: newName }).eq('name', oldName);
+    if (configError) throw configError;
+
+    // 2. Cascade to spare_parts
+    const { error: cascadeError } = await supabase.from('spare_parts').update({ unit_of_measure: newName }).eq('unit_of_measure', oldName);
+    if (cascadeError) throw cascadeError;
   }
 };

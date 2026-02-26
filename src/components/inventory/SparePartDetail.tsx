@@ -32,7 +32,7 @@ export const SparePartDetail: React.FC<SparePartDetailProps> = ({ part, onClose 
     if (isEditing) {
         return (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-                <div className="bg-industrial-800 rounded-xl shadow-2xl border border-industrial-600 w-full max-w-4xl overflow-hidden animate-slide-up">
+                <div className="bg-industrial-800 rounded-xl shadow-2xl border border-industrial-600 w-full max-w-4xl overflow-y-auto max-h-[95vh] animate-slide-up">
                     <PartCreationForm
                         initialData={currentPart}
                         onCancel={() => setIsEditing(false)}
@@ -45,7 +45,7 @@ export const SparePartDetail: React.FC<SparePartDetailProps> = ({ part, onClose 
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-            <div className="bg-industrial-800 rounded-xl shadow-2xl border border-industrial-600 w-full max-w-5xl overflow-hidden animate-slide-up">
+            <div className="bg-industrial-800 rounded-xl shadow-2xl border border-industrial-600 w-full max-w-5xl overflow-y-auto max-h-[95vh] animate-slide-up">
 
                 {/* Header */}
                 <div className="bg-industrial-900 px-6 py-4 border-b border-industrial-700 flex justify-between items-start">
@@ -95,7 +95,7 @@ export const SparePartDetail: React.FC<SparePartDetailProps> = ({ part, onClose 
                         </div>
 
                         <div className="bg-industrial-900/50 p-3 rounded-lg border border-industrial-700">
-                            <p className="text-[10px] text-industrial-500 uppercase font-bold mb-1 tracking-wider">Ubicación</p>
+                            <p className="text-[10px] text-industrial-500 uppercase font-bold mb-1 tracking-wider">Tramo</p>
                             <div className="flex items-center gap-1.5 text-white text-xl font-bold">
                                 <MapPin className="w-4 h-4 text-industrial-500" />
                                 {currentPart.location}
@@ -106,6 +106,15 @@ export const SparePartDetail: React.FC<SparePartDetailProps> = ({ part, onClose 
                             <p className="text-[10px] text-industrial-500 uppercase font-bold mb-1 tracking-wider">Categoría</p>
                             <p className="text-white text-xl font-bold truncate">
                                 {currentPart.category}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        <div className="bg-industrial-900/50 p-3 rounded-lg border border-industrial-700">
+                            <p className="text-[10px] text-industrial-500 uppercase font-bold mb-1 tracking-wider">Fecha de Creación</p>
+                            <p className="text-white text-lg font-bold">
+                                {currentPart.createdAt ? new Date(currentPart.createdAt).toLocaleDateString() : '-'}
                             </p>
                         </div>
                     </div>

@@ -4,13 +4,13 @@ import { ImportSpareParts } from './ImportSpareParts';
 import { SparePart } from '../../types/inventory';
 import { Search, AlertCircle } from 'lucide-react';
 import { SparePartDetail } from './SparePartDetail';
+import { useMasterStore } from '../../stores/useMasterStore';
 
 // Service initialized in index.ts
 
 export const InventoryList: React.FC = () => {
-    const [parts, setParts] = useState<SparePart[]>([]);
+    const { parts, isLoading: loading, fetchMasterData } = useMasterStore();
     const [searchTerm, setSearchTerm] = useState('');
-    const [loading, setLoading] = useState(true);
     const [selectedPart, setSelectedPart] = useState<SparePart | null>(null);
     const [showImportModal, setShowImportModal] = useState(false);
 
@@ -28,15 +28,8 @@ export const InventoryList: React.FC = () => {
     const categories = Array.from(new Set(parts.map(p => p.category).filter(Boolean))).sort();
     const locations = Array.from(new Set(parts.map(p => p.location).filter(Boolean))).sort();
 
-    const fetchParts = async () => {
-        setLoading(true);
-        const data = await inventoryService.getAllParts();
-        setParts(data);
-        setLoading(false);
-    };
-
     useEffect(() => {
-        fetchParts();
+        fetchMasterData();
     }, []);
 
     const filteredParts = parts.filter(part => {
@@ -100,7 +93,7 @@ export const InventoryList: React.FC = () => {
                 </div>
 
                 <div>
-                    <label className="block text-xs font-bold text-industrial-500 uppercase tracking-wider mb-2">Ubicación</label>
+                    <label className="block text-xs font-bold text-industrial-500 uppercase tracking-wider mb-2">Tramo</label>
                     <select
                         className="w-full px-4 py-2 bg-industrial-900 border border-industrial-600 rounded-lg focus:ring-2 focus:ring-industrial-accent focus:border-transparent outline-none text-white appearance-none cursor-pointer"
                         value={locationFilter}
@@ -138,7 +131,7 @@ export const InventoryList: React.FC = () => {
                                     <th className="px-6 py-3 text-left text-xs font-bold text-industrial-500 uppercase tracking-wider">Código</th>
                                     <th className="px-6 py-3 text-left text-xs font-bold text-industrial-500 uppercase tracking-wider">Nombre</th>
                                     <th className="px-6 py-3 text-left text-xs font-bold text-industrial-500 uppercase tracking-wider">Categoría</th>
-                                    <th className="px-6 py-3 text-left text-xs font-bold text-industrial-500 uppercase tracking-wider">Ubicación</th>
+                                    <th className="px-6 py-3 text-left text-xs font-bold text-industrial-500 uppercase tracking-wider">Tramo</th>
                                     <th className="px-6 py-3 text-right text-xs font-bold text-industrial-500 uppercase tracking-wider">Stock</th>
                                     <th className="px-6 py-3 text-right text-xs font-bold text-industrial-500 uppercase tracking-wider">Mínimo</th>
                                     <th className="px-6 py-3 text-center text-xs font-bold text-industrial-500 uppercase tracking-wider">Estado</th>
@@ -194,7 +187,7 @@ export const InventoryList: React.FC = () => {
                 <ImportSpareParts
                     onClose={() => setShowImportModal(false)}
                     onSuccess={() => {
-                        fetchParts();
+                        fetchMasterData();
                     }}
                 />
             )}
