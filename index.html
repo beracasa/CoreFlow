@@ -1,66 +1,86 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CoreFlow Maintenance Cloud</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            fontFamily: {
-              sans: ['Inter', 'sans-serif'],
-              mono: ['JetBrains Mono', 'monospace'],
-            },
-            colors: {
-              industrial: {
-                900: '#0f172a', // Slate 900
-                800: '#1e293b', // Slate 800
-                700: '#334155', // Slate 700
-                600: '#475569', // Slate 600
-                500: '#64748b', // Slate 500
-                accent: '#3b82f6', // Blue 500
-                success: '#10b981', // Emerald 500
-                warning: '#f59e0b', // Amber 500
-                danger: '#ef4444', // Red 500
-              }
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CoreFlow Maintenance Cloud</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap"
+    rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            industrial: {
+              900: '#0f172a', // Slate 900
+              800: '#1e293b', // Slate 800
+              700: '#334155', // Slate 700
+              600: '#475569', // Slate 600
+              500: '#64748b', // Slate 500
+              accent: '#3b82f6', // Blue 500
+              success: '#10b981', // Emerald 500
+              warning: '#f59e0b', // Amber 500
+              danger: '#ef4444', // Red 500
             }
           }
         }
       }
-    </script>
-    <style>
-      body {
-        background-color: #0f172a;
-        color: #f8fafc;
-      }
-      /* Custom Scrollbar for Industrial feel */
-      ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-      }
-      ::-webkit-scrollbar-track {
-        background: #1e293b; 
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #475569; 
-        border-radius: 4px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #64748b; 
-      }
-      /* White Calendar Icons for Dark Theme */
-      input[type="date"]::-webkit-calendar-picker-indicator {
-        filter: invert(1);
-        cursor: pointer;
-      }
-    </style>
+    }
+  </script>
+  <style>
+    body {
+      background-color: #0f172a;
+      color: #f8fafc;
+    }
+
+    /* Custom Scrollbar for Industrial feel */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #1e293b;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #475569;
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #64748b;
+    }
+
+    /* Hide native calendar icon and use Lucide for better contrast */
+    input[type="date"]::-webkit-calendar-picker-indicator {
+      opacity: 0 !important;
+      cursor: pointer;
+    }
+
+    input[type="date"]::-webkit-inner-spin-button,
+    input[type="date"]::-webkit-clear-button {
+      filter: invert(1) brightness(100%) !important;
+    }
+
+    /* Force dark color scheme for native widgets */
+    input[type="date"] {
+      color-scheme: dark;
+    }
+  </style>
 
 </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
-  </body>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+
 </html>

@@ -454,6 +454,10 @@ const LanguageContext = createContext<LanguageContextType | undefined>(undefined
 export const LanguageProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [language, setLanguage] = useState<Language>('es');
 
+  React.useEffect(() => {
+    document.documentElement.lang = language;
+  }, [language]);
+
   const t = (key: string) => {
     return translations[language][key] || key;
   };

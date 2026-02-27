@@ -349,3 +349,88 @@ export const generateRMant02PDF = (order: WorkOrder, machine?: Machine) => {
   // --- SAVE ---
   doc.save(`R-MANT-02-${order.displayId || order.id}.pdf`);
 };
+
+export const generateMaintenanceListPDF = (orders: WorkOrder[], title: string, machines: Machine[]) => {
+  const doc = new jsPDF({
+    orientation: 'landscape',
+    unit: 'mm',
+    format: 'a4',
+  });
+
+  const pageWidth = doc.internal.pageSize.width;
+  const margin = 10;
+
+  // --- HEADER SECTION ---
+  doc.rect(margin, margin, pageWidth - 2 * margin, 20);
+  
+  // Logo / Company Name
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(0, 150, 0);
+  if (COMPANY_LOGO_BASE64) {
+    doc.addImage(COMPANY_LOGO_BASE64, 'PNG', margin + 2, margin + 2, 35, 12);
+  } else {
+    doc.setFontSize(14);
+    doc.text("COREFLOW INC.", margin + 5, margin + 10);
+    doc.setFontSize(7);
+    doc.setTextColor(150, 150, 150);
+    doc.text("SOLUCIONES INDUSTRIALES", margin + 5, margin + 14);
+  }
+
+  // Report Title
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(16);
+  doc.text(title, pageWidth / 2, margin + 12, { align: 'center' });
+
+  // Date and Metadata
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Fecha de Reporte: ${new Date().toLocaleDateString()}`, pageWidth - margin - 5, margin + 8, { align: 'right' });
+  doc.text(`Registros Encontrados: ${orders.length}`, pageWidth - margin - 5, margin + 14, { align: 'right' });
+
+  // --- TABLE SECTION ---
+  const isRMant02 = title.includes('PREVENTIVO');
+
+  const head = isRMant02 
+    ? [['Nº Orden', 'Equipo', 'Zona / Línea', 'Alias', 'Tipo', 'Intervalo', 'Fecha', 'Estado']]
+    : [['Nº Orden', 'Equipo', 'Tipo', 'Departamento', 'Tipo de Avería', 'Fecha', 'Estado']];
+
+  const body = orders.map(o => {
+    const machine = machines.find(m => m.id === o.machineId);
+    const date = new Date(o.createdDate).toLocaleDateString();
+    
+    if (isRMant02) {
+      return [
+        o.displayId || '(Nuevo)',
+        machine?.name || '-',
+        machine?.zone || '-',
+        machine?.alias || '-',
+        o.maintenanceType || '-',
+        o.interval || '-',
+        date,
+        o.currentStage
+      ];
+    } else {
+      return [
+        o.displayId || '(Nuevo)',
+        `${machine?.name || '-'} ${machine?.alias ? `(${machine.alias})` : ''}`,
+        o.maintenanceType || '-',
+        o.department || '-',
+        o.failureType || '-',
+        date,
+        o.currentStage
+      ];
+    }
+  });
+
+  autoTable(doc, {
+    startY: 35,
+    head: head,
+    body: body,
+    theme: 'grid',
+    styles: { fontSize: 8, cellPadding: 2 },
+    headStyles: { fillColor: [0, 100, 0], textColor: [255, 255, 255] },
+    alternateRowStyles: { fillColor: [245, 255, 245] }
+  });
+
+  doc.save(`${title.replace(/\s/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
+};

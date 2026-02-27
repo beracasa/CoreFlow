@@ -11,7 +11,7 @@ interface MaintenanceListProps {
 }
 
 export const MaintenanceList: React.FC<MaintenanceListProps> = ({ type }) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { workOrders } = useWorkOrderStore();
   const { machines } = useMasterStore();
   const navigate = useNavigate();
@@ -19,11 +19,19 @@ export const MaintenanceList: React.FC<MaintenanceListProps> = ({ type }) => {
   const [searchQuery, setSearchQuery] = React.useState('');
   const [selectedZone, setSelectedZone] = React.useState('');
   const [selectedInterval, setSelectedInterval] = React.useState('');
+  const [selectedFailureType, setSelectedFailureType] = React.useState('');
   const [selectedStatus, setSelectedStatus] = React.useState('');
+  const [startDateFilter, setStartDateFilter] = React.useState('');
+  const [endDateFilter, setEndDateFilter] = React.useState('');
+
+  // Refs for date inputs
+  const startDateRef = React.useRef<HTMLInputElement>(null);
+  const endDateRef = React.useRef<HTMLInputElement>(null);
 
   // Get unique values for filters
   const uniqueZones = Array.from(new Set(machines.map(m => m.zone).filter(Boolean)));
   const uniqueIntervals = Array.from(new Set(workOrders.filter(o => o.formType === 'R-MANT-02').map(o => o.interval).filter(Boolean)));
+  const uniqueFailureTypes = Array.from(new Set(workOrders.filter(o => o.formType === 'R-MANT-05').map(o => o.failureType).filter(Boolean)));
   const statusOptions = [
     { label: 'SOLICITADO', value: WorkOrderStage.REQUESTED },
     { label: 'EJECUCIÓN', value: WorkOrderStage.EXECUTION },
@@ -50,11 +58,27 @@ export const MaintenanceList: React.FC<MaintenanceListProps> = ({ type }) => {
     // 3. Zone filter
     if (selectedZone && machine?.zone !== selectedZone) return false;
 
-    // 4. Interval filter
-    if (selectedInterval && o.interval !== selectedInterval) return false;
+    // 4. Interval filter (R-MANT-02 only)
+    if (type === 'R-MANT-02' && selectedInterval && o.interval !== selectedInterval) return false;
+
+    // 4b. Failure Type filter (R-MANT-05 only)
+    if (type === 'R-MANT-05' && selectedFailureType && o.failureType !== selectedFailureType) return false;
 
     // 5. Status filter
     if (selectedStatus && o.currentStage !== selectedStatus) return false;
+
+    // 6. Date Range filter
+    if (startDateFilter) {
+      const orderDate = new Date(o.createdDate);
+      const start = new Date(startDateFilter);
+      if (orderDate < start) return false;
+    }
+    if (endDateFilter) {
+      const orderDate = new Date(o.createdDate);
+      const end = new Date(endDateFilter);
+      end.setHours(23, 59, 59, 999); // Inclusion of the whole end day
+      if (orderDate > end) return false;
+    }
 
     return true;
   });
@@ -98,13 +122,27 @@ export const MaintenanceList: React.FC<MaintenanceListProps> = ({ type }) => {
             {type === 'R-MANT-02' ? 'Programación y seguimiento de mantenimientos preventivos' : 'Reporte y gestión de fallas correctivas'}
           </p>
         </div>
-        <button
-          onClick={() => navigate('/orders/new', { state: { type } })}
-          className="bg-industrial-accent hover:bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium transition-colors shadow-lg shadow-blue-900/20 flex items-center gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          {t('mant.new')}
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              import('../src/utils/pdf/pdfGenerator').then(module => {
+                const title = type === 'R-MANT-02' ? 'REPORTE MANTENIMIENTO PREVENTIVO' : 'REPORTE MANTENIMIENTO CORRECTIVO';
+                module.generateMaintenanceListPDF(filteredOrders, title, machines);
+              });
+            }}
+            className="bg-industrial-800 hover:bg-industrial-700 text-industrial-300 px-4 py-2 rounded text-sm font-medium border border-industrial-600 transition-colors flex items-center gap-2"
+          >
+            <Download className="w-4 h-4" />
+            Generar Reporte
+          </button>
+          <button
+            onClick={() => navigate('/orders/new', { state: { type } })}
+            className="bg-industrial-accent hover:bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium transition-colors shadow-lg shadow-blue-900/20 flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            {t('mant.new')}
+          </button>
+        </div>
       </div>
 
       {/* Filters Section */}
@@ -135,17 +173,30 @@ export const MaintenanceList: React.FC<MaintenanceListProps> = ({ type }) => {
           ))}
         </select>
 
-        {/* Interval Filter */}
-        <select
-          value={selectedInterval}
-          onChange={(e) => setSelectedInterval(e.target.value)}
-          className="px-4 py-2 bg-industrial-900 border border-industrial-700 rounded-lg text-sm text-white focus:outline-none focus:border-industrial-accent transition-colors"
-        >
-          <option value="">Todos los Intervalos</option>
-          {uniqueIntervals.map(interval => (
-            <option key={interval} value={interval}>{interval}</option>
-          ))}
-        </select>
+        {/* Dynamic Filter (Interval or Failure Type) */}
+        {type === 'R-MANT-02' ? (
+          <select
+            value={selectedInterval}
+            onChange={(e) => setSelectedInterval(e.target.value)}
+            className="px-4 py-2 bg-industrial-900 border border-industrial-700 rounded-lg text-sm text-white focus:outline-none focus:border-industrial-accent transition-colors"
+          >
+            <option value="">Todos los Intervalos</option>
+            {uniqueIntervals.map(interval => (
+              <option key={interval} value={interval}>{interval}</option>
+            ))}
+          </select>
+        ) : (
+          <select
+            value={selectedFailureType}
+            onChange={(e) => setSelectedFailureType(e.target.value)}
+            className="px-4 py-2 bg-industrial-900 border border-industrial-700 rounded-lg text-sm text-white focus:outline-none focus:border-industrial-accent transition-colors"
+          >
+            <option value="">Todas las Averías</option>
+            {uniqueFailureTypes.map(ft => (
+              <option key={ft} value={ft}>{ft}</option>
+            ))}
+          </select>
+        )}
 
         {/* Status Filter */}
         <select
@@ -158,6 +209,69 @@ export const MaintenanceList: React.FC<MaintenanceListProps> = ({ type }) => {
             <option key={opt.value} value={opt.value}>{opt.label}</option>
           ))}
         </select>
+      </div>
+
+      {/* Date Range Filters Row */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 bg-industrial-800/30 p-4 rounded-xl border border-industrial-700/30 border-t-0 -mt-6">
+        <div className="md:col-span-2 flex items-center gap-4">
+          <span className="text-xs font-bold text-white uppercase tracking-wider whitespace-nowrap flex items-center gap-2">
+            <Calendar className="w-4 h-4" style={{ color: '#FFFFFF' }} fill="none" />
+            Filtrar por Rango de Fechas:
+          </span>
+          <div className="flex gap-2 flex-1">
+            <div className="relative flex-1 group">
+              <input
+                ref={startDateRef}
+                type="date"
+                lang="es"
+                value={startDateFilter}
+                onChange={(e) => setStartDateFilter(e.target.value)}
+                className="w-full px-3 py-1.5 bg-industrial-900 border border-industrial-700 rounded text-xs text-white [color-scheme:dark] accent-industrial-accent pr-8 focus:border-industrial-accent outline-none"
+                style={{ colorScheme: 'dark' }}
+              />
+              <button
+                type="button"
+                onClick={() => startDateRef.current?.showPicker()}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-white hover:text-industrial-accent transition-colors"
+                title="Seleccionar fecha inicial"
+              >
+                <Calendar className="w-3.5 h-3.5" strokeWidth={2.5} />
+              </button>
+            </div>
+
+            <span className="text-industrial-600 flex items-center">al</span>
+
+            <div className="relative flex-1 group">
+              <input
+                ref={endDateRef}
+                type="date"
+                lang="es"
+                value={endDateFilter}
+                onChange={(e) => setEndDateFilter(e.target.value)}
+                className="w-full px-3 py-1.5 bg-industrial-900 border border-industrial-700 rounded text-xs text-white [color-scheme:dark] accent-industrial-accent pr-8 focus:border-industrial-accent outline-none"
+                style={{ colorScheme: 'dark' }}
+              />
+              <button
+                type="button"
+                onClick={() => endDateRef.current?.showPicker()}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-white hover:text-industrial-accent transition-colors"
+                title="Seleccionar fecha final"
+              >
+                <Calendar className="w-3.5 h-3.5" strokeWidth={2.5} />
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className="md:col-span-2 flex justify-end">
+          {(startDateFilter || endDateFilter) && (
+            <button
+              onClick={() => { setStartDateFilter(''); setEndDateFilter(''); }}
+              className="text-xs text-industrial-500 hover:text-industrial-300 transition-colors"
+            >
+              Limpiar Fechas
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="bg-industrial-800 rounded-lg border border-industrial-700 overflow-hidden shadow-xl flex-1 flex flex-col">
@@ -263,8 +377,8 @@ export const MaintenanceList: React.FC<MaintenanceListProps> = ({ type }) => {
                       {/* Fecha */}
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2 text-sm text-white font-medium">
-                          <Calendar className="w-4 h-4 text-industrial-500" />
-                          {new Date(order.createdDate).toLocaleDateString()}
+                          <Calendar className="w-4 h-4" style={{ color: '#FFFFFF', strokeWidth: 3 }} />
+                          {new Date(order.createdDate).toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US')}
                         </div>
                       </td>
 
