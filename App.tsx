@@ -214,11 +214,11 @@ const AppLayout = () => {
                 {plantSettings.logoUrl ? <img src={plantSettings.logoUrl} alt="Logo" className="w-full h-full object-contain p-0.5" /> : <Hexagon size={24} className="text-white" strokeWidth={2.5} />}
               </div>
               <div>
-                <h1 className="text-xl font-bold text-white tracking-tight leading-none">CoreFlow</h1>
+                <h1 className="text-xl font-bold text-white tracking-tight leading-none">CoreFlow 4.0</h1>
                 <p className="text-[10px] text-blue-400 font-medium tracking-wider uppercase">Maintenance Cloud</p>
               </div>
             </div>
-            <p className="text-xs text-industrial-500 mt-1">Secured Instance</p>
+            <p className="text-xs text-industrial-500 mt-1">Secure Industrial Gateway</p>
           </div>
 
           <nav className="flex-1 space-y-1 mt-4">

@@ -9,6 +9,7 @@ export interface SparePart {
     minStock: number;
     maxStock: number;
     location: string;
+    subLocation: string;
     cost: number;
     photoUrl?: string;
     createdAt?: string;

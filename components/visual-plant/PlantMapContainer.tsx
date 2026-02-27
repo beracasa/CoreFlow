@@ -303,7 +303,6 @@ export const PlantMapContainer: React.FC<PlantMapContainerProps> = ({ machines, 
           <div className="flex gap-4 items-center">
             <div className="bg-industrial-800/90 backdrop-blur px-4 py-2 rounded-xl border border-industrial-600 shadow-xl">
               <h2 className="text-lg font-bold text-white font-mono tracking-tight leading-none">{t('map.title')}</h2>
-              <p className="text-[10px] text-industrial-400">{zones.length} {t('map.zone')}</p>
             </div>
 
             {/* Edit Layout Button - Protected by Permission */}

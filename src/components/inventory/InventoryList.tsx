@@ -9,7 +9,7 @@ import { useMasterStore } from '../../stores/useMasterStore';
 // Service initialized in index.ts
 
 export const InventoryList: React.FC = () => {
-    const { parts, isLoading: loading, fetchMasterData } = useMasterStore();
+    const { parts, isLoading: loading, fetchMasterData, partCategories: categories, partLocations: locations } = useMasterStore();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedPart, setSelectedPart] = useState<SparePart | null>(null);
     const [showImportModal, setShowImportModal] = useState(false);
@@ -24,9 +24,6 @@ export const InventoryList: React.FC = () => {
         part.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         part.partNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
         part.description.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const categories = Array.from(new Set(parts.map(p => p.category).filter(Boolean))).sort();
-    const locations = Array.from(new Set(parts.map(p => p.location).filter(Boolean))).sort();
 
     useEffect(() => {
         fetchMasterData();

@@ -18,6 +18,7 @@ export class InventorySupabaseService implements IInventoryService {
             minStock: Number(record.minimum_stock ?? record.min_safety_stock ?? 0),
             maxStock: Number(record.maximum_stock || 0),
             location: record.location_code || '',
+            subLocation: record.sub_location || '',
             cost: Number(record.unit_cost || 0),
             photoUrl: record.image_url,
             createdAt: record.created_at
@@ -35,6 +36,7 @@ export class InventorySupabaseService implements IInventoryService {
             minimum_stock: part.minStock,
             maximum_stock: part.maxStock,
             location_code: part.location,
+            sub_location: part.subLocation,
             unit_cost: part.cost,
             image_url: part.photoUrl
         };
@@ -65,6 +67,7 @@ export class InventorySupabaseService implements IInventoryService {
             p_minimum_stock:    partData.minStock || 0,
             p_maximum_stock:    partData.maxStock || 0,
             p_location_code:    partData.location || null,
+            p_sub_location:     partData.subLocation || null,
             p_unit_cost:        partData.cost || 0,
             p_image_url:        partData.photoUrl || null,
             p_created_at:       partData.createdAt || null
@@ -85,6 +88,7 @@ export class InventorySupabaseService implements IInventoryService {
             p_minimum_stock:    updatedPart.minStock || 0,
             p_maximum_stock:    updatedPart.maxStock || 0,
             p_location_code:    updatedPart.location || null,
+            p_sub_location:     updatedPart.subLocation || null,
             p_unit_cost:        updatedPart.cost || 0,
             p_image_url:        updatedPart.photoUrl || null,
             p_created_at:       updatedPart.createdAt || null

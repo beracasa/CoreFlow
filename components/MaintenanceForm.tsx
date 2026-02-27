@@ -111,8 +111,8 @@ const SchemaStage2 = z.object({
       position: z.string()
    })).min(1, "At least one technician is required"),
    tasks: z.array(z.object({
-      completed: z.literal(true, { errorMap: () => ({ message: "All tasks must be completed" }) })
-   }))
+      completed: z.boolean().optional()
+   })).optional()
 });
 
 interface MaintenanceFormProps {
@@ -480,12 +480,8 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
       // RBAC: Tech or Admin
       if (!hasRole([UserRole.TECNICO_MANT, UserRole.ADMIN_SOLICITANTE])) return;
 
-      // Validate Task Completion
-      const pendingTasks = formData.tasks?.filter(t => !t.completed).length || 0;
-      if (pendingTasks > 0) {
-         setValidationError(`No se puede finalizar: hay ${pendingTasks} tareas pendientes.`);
-         return;
-      }
+      // REMOVED: Mandatory Task Completion Check
+      // Some tasks might not be completed/marked as per user request.
 
       const updated = {
          ...formData,

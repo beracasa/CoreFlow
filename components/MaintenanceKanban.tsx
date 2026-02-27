@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { WorkOrderStatus, Priority } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useWorkOrderStore } from '../src/stores/useWorkOrderStore';
+import { useMasterStore } from '../src/stores/useMasterStore';
 
 // Simple calc helpers (moved back or imported if desired, keeping local)
 const calculateMTTR = (orders: any[]) => {
@@ -17,6 +19,8 @@ export const MaintenanceKanban: React.FC = () => {
   const { t } = useLanguage();
   const { hasPermission } = useAuth();
   const { workOrders, updateOrder } = useWorkOrderStore();
+  const { machines } = useMasterStore();
+  const navigate = useNavigate();
   const [draggingId, setDraggingId] = useState<string | null>(null);
 
   const columns = [
@@ -44,15 +48,6 @@ export const MaintenanceKanban: React.FC = () => {
     setDraggingId(null);
   };
 
-  const getPriorityColor = (p: Priority) => {
-    switch (p) {
-      case Priority.CRITICAL: return 'bg-red-900/50 text-red-200 border-red-700';
-      case Priority.HIGH: return 'bg-orange-900/50 text-orange-200 border-orange-700';
-      case Priority.MEDIUM: return 'bg-blue-900/50 text-blue-200 border-blue-700';
-      default: return 'bg-slate-800 text-slate-400 border-slate-700';
-    }
-  };
-
   return (
     <div className="h-full flex flex-col bg-industrial-900 p-6 overflow-hidden">
       {/* Header Metrics */}
@@ -67,7 +62,7 @@ export const MaintenanceKanban: React.FC = () => {
         </div>
         <div className="bg-industrial-800 p-4 rounded border border-industrial-700 shadow-sm flex-1 max-w-xs">
           <p className="text-industrial-500 text-xs font-bold uppercase tracking-wider">{t('kanban.active')}</p>
-          <p className="text-2xl font-mono text-industrial-accent mt-1">{workOrders.filter(o => o.type === 'PREVENTIVE' && o.status !== WorkOrderStatus.DONE).length}</p>
+          <p className="text-2xl font-mono text-industrial-accent mt-1">{workOrders.filter(o => o.formType === 'R-MANT-02' && o.status !== WorkOrderStatus.DONE).length}</p>
         </div>
       </div>
 
@@ -87,31 +82,71 @@ export const MaintenanceKanban: React.FC = () => {
               </span>
             </div>
 
-            <div className="flex-1 p-2 space-y-2 overflow-y-auto">
+            <div className="flex-1 p-2 space-y-3 overflow-y-auto">
               {workOrders
                 .filter(order => order.status === col.id)
-                .map(order => (
-                  <div
-                    key={order.id}
-                    draggable={hasPermission('edit_kanban')}
-                    onDragStart={(e) => hasPermission('edit_kanban') && handleDragStart(e, order.id)}
-                    className={`bg-industrial-700 p-3 rounded border border-industrial-600 shadow-sm transition-colors ${hasPermission('edit_kanban') ? 'hover:border-industrial-500 cursor-move active:cursor-grabbing' : 'opacity-80 cursor-not-allowed'}`}
-                  >
-                    <div className="flex justify-between items-start mb-2">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded border ${getPriorityColor(order.priority)} font-mono`}>
-                        {order.priority}
-                      </span>
-                      <span className="text-[10px] text-industrial-500 font-mono">{order.id}</span>
-                    </div>
-                    <h4 className="text-sm font-medium text-white mb-1">{order.title}</h4>
-                    <p className="text-xs text-industrial-400 truncate mb-3">{order.description}</p>
+                .map(order => {
+                  const machine = machines.find(m => m.id === order.machineId);
+                  const isMant02 = order.formType === 'R-MANT-02';
 
-                    <div className="flex justify-between items-center text-[10px] text-industrial-500 border-t border-white/5 pt-2">
-                      <span>{order.type?.substring(0, 4) || 'N/A'}</span>
-                      <span>{new Date(order.createdDate).toLocaleDateString()}</span>
+                  return (
+                    <div
+                      key={order.id}
+                      draggable={hasPermission('edit_kanban')}
+                      onDragStart={(e) => hasPermission('edit_kanban') && handleDragStart(e, order.id)}
+                      onClick={() => navigate(`/orders/${order.id}`, { state: { type: order.formType } })}
+                      className={`bg-industrial-700 p-4 rounded-xl border border-industrial-600 shadow-xl transition-all ${hasPermission('edit_kanban') ? 'hover:border-industrial-400 cursor-move active:cursor-grabbing hover:shadow-2xl' : 'opacity-80 cursor-not-allowed cursor-pointer'}`}
+                    >
+                      <div className="flex justify-between items-start mb-3">
+                        <span className={`text-[10px] px-2 py-0.5 rounded font-bold tracking-wider ${isMant02
+                          ? 'bg-blue-600 text-white border border-blue-400'
+                          : 'bg-orange-600 text-white border border-orange-400'
+                          }`}>
+                          {isMant02 ? 'R-MANT-02' : 'R-MANT-05'}
+                        </span>
+                        <span className="text-xs text-white font-mono font-bold tracking-tight">
+                          {order.displayId || `#${order.id.substring(0, 8)}`}
+                        </span>
+                      </div>
+
+                      {/* Main Info Section */}
+                      <div className="mb-4">
+                        <h4 className="text-[10px] font-bold text-industrial-400 uppercase tracking-widest mb-1">
+                          {isMant02 ? 'MANTENIMIENTO PREVENTIVO R-MANT-02' : 'MANTENIMIENTO CORRECTIVO R-MANT-05'}
+                        </h4>
+
+                        {isMant02 ? (
+                          <>
+                            <p className="text-sm font-bold text-white leading-tight">
+                              {machine?.name || '---'} - {machine?.model || '---'} - {machine?.zone || '---'}
+                            </p>
+                            <p className="text-xs text-industrial-300 mt-1 font-medium italic">
+                              {order.interval || 'Sin intervalo'}
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-sm font-bold text-white leading-tight">
+                              {machine?.name || '---'} - {order.maintenanceType || 'N/A'}
+                            </p>
+                            <p className="text-xs text-industrial-300 mt-1 font-medium font-mono uppercase">
+                              {order.failureType || 'Sin tipo de avería'}
+                            </p>
+                          </>
+                        )}
+                      </div>
+
+                      <div className="flex justify-between items-center text-[10px] text-white border-t border-white/10 pt-3">
+                        <span className="font-bold tracking-widest uppercase">
+                          {isMant02 ? 'PREVENTIVO' : 'CORRECTIVO'}
+                        </span>
+                        <span className="font-mono font-medium">
+                          {new Date(order.createdDate).toLocaleDateString()}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
             </div>
           </div>
         ))}

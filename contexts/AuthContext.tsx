@@ -120,7 +120,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // 2. Auth State Listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("AuthContext: Auth event:", event);
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'SIGNED_OUT') {
+
+      // SILENT REFRESH: Do NOT set isLoading(true) for TOKEN_REFRESHED
+      // Only set loading for SIGNED_IN if we don't already have a user (initial login)
+      // or for SIGNED_OUT to ensure a clean transition.
+      if (event === 'SIGNED_IN' && !user) {
+        if (mounted) setIsLoading(true);
+      } else if (event === 'SIGNED_OUT') {
         if (mounted) setIsLoading(true);
       }
 
@@ -140,7 +146,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             }
           })();
 
-          const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 1500));
+          // Reduce timeout for background updates
+          const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 1000));
 
           await Promise.race([fetchPromise, timeoutPromise]);
 
