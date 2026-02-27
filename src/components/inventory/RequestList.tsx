@@ -71,7 +71,10 @@ export const RequestList: React.FC<RequestListProps> = ({ onSelectRequest }) => 
         // Add Logo if available
         if (plantSettings.logoUrl) {
             try {
-                doc.addImage(plantSettings.logoUrl, 'PNG', 14, 10, 30, 15); // Adjust dimensions as needed
+                const imgProps = doc.getImageProperties(plantSettings.logoUrl);
+                const logoWidth = 30;
+                const logoHeight = (imgProps.height * logoWidth) / imgProps.width;
+                doc.addImage(plantSettings.logoUrl, 'PNG', 14, 10, logoWidth, logoHeight);
             } catch (e) {
                 console.warn('Could not add logo to PDF', e);
             }

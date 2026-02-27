@@ -8,6 +8,8 @@ import { X, Calendar, User, FileText, CheckCircle, Clock, AlertCircle, Wrench, P
 import { ProtocolViewer } from './ProtocolViewer';
 import { useMasterStore } from '../src/stores/useMasterStore';
 import { useUserStore } from '../src/stores/useUserStore';
+import { useWorkOrderStore } from '../src/stores/useWorkOrderStore';
+import { generateRMant02PDF, generateRMant05PDF } from '../src/utils/pdf/pdfGenerator';
 
 // --- 1. CONFIGURATION & MASTER DATA ENGINE ---
 
@@ -160,6 +162,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
    const [invalidFields, setInvalidFields] = useState<Set<string>>(new Set());
    const [duration, setDuration] = useState<string>('0h 0m');
    const [editingSection, setEditingSection] = useState<number | null>(null);
+   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
    // Helper UI renderers - Defined early to avoid TDZ and usage in handlers
    const isSection1Editable = (formData.currentStage === WorkOrderStage.DRAFT || editingSection === 1) && hasRole([UserRole.ADMIN_SOLICITANTE]);
@@ -226,11 +229,30 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
    // Access store
    const { maintenancePlans, categories, parts: spareParts } = useMasterStore();
    const { users, fetchUsers } = useUserStore();
+   const { deleteOrder } = useWorkOrderStore();
 
    useEffect(() => {
       // Ensure users are loaded
       if (users.length === 0) fetchUsers();
    }, []);
+
+   const handleDelete = async (e?: React.MouseEvent) => {
+      if (e) {
+         e.preventDefault();
+         e.stopPropagation();
+      }
+      if (!formData.id) return;
+
+      try {
+         await deleteOrder(formData.id);
+         onCancel(); // Navigate back
+      } catch (error: any) {
+         console.error('Error deleting order:', error);
+         alert('Error al eliminar el registro: ' + (error.message || 'Error desconocido'));
+      } finally {
+         setShowDeleteConfirm(false);
+      }
+   };
 
    // -- LOGIC ENGINE: Cumulative Tasks --
    const generateCumulativeTasks = (machineId: string, machineType: string, selectedInterval: string): MaintenanceTask[] => {
@@ -554,17 +576,31 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                </div>
             </div>
             <div className="flex items-center gap-4">
-               {type === 'R-MANT-02' && formData.currentStage === WorkOrderStage.CLOSED && (
+               {formData.id && (formData.currentStage === WorkOrderStage.CLOSED || formData.currentStage === WorkOrderStage.HANDOVER) && (
                   <button
+                     type="button"
                      onClick={() => {
-                        import('../src/utils/pdf/pdfGenerator').then(module => {
-                           module.generateRMant02PDF(formData, selectedMachine || undefined);
-                        });
+                        if (type === 'R-MANT-02') generateRMant02PDF(formData, selectedMachine || undefined);
+                        else generateRMant05PDF(formData, selectedMachine || undefined);
                      }}
                      className="bg-industrial-800 hover:bg-industrial-700 text-industrial-300 px-4 py-2 rounded flex items-center gap-2 border border-industrial-600 transition-colors text-sm font-bold"
                   >
                      <Download className="w-4 h-4" />
                      Descargar PDF
+                  </button>
+               )}
+               {formData.id && hasRole([UserRole.ADMIN_SOLICITANTE]) && (
+                  <button
+                     type="button"
+                     onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setShowDeleteConfirm(true);
+                     }}
+                     className="p-2 bg-red-900/20 hover:bg-red-900/40 text-red-500 rounded border border-red-500/30 transition-colors"
+                     title="Eliminar Registro"
+                  >
+                     <Trash2 className="w-5 h-5" />
                   </button>
                )}
                <button onClick={onCancel} className="text-industrial-400 hover:text-white"><X className="w-6 h-6" /></button>
@@ -1674,7 +1710,40 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                </section >
 
             </div >
-         </div >
-      </div >
+         </div>
+
+         {/* Custom Delete Confirmation Modal */}
+         {showDeleteConfirm && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+               <div className="bg-industrial-900 border border-red-500/50 rounded-xl p-6 max-w-md w-full shadow-2xl animate-scaleIn">
+                  <div className="flex items-center gap-4 text-red-500 mb-4">
+                     <div className="p-3 bg-red-500/10 rounded-full">
+                        <AlertCircle size={32} />
+                     </div>
+                     <h3 className="text-xl font-bold text-white">¿Eliminar Registro?</h3>
+                  </div>
+
+                  <p className="text-industrial-300 mb-8">
+                     Esta acción eliminará permanentemente este registro de mantenimiento de la base de datos. Esta operación no se puede deshacer.
+                  </p>
+
+                  <div className="flex gap-4">
+                     <button
+                        onClick={() => setShowDeleteConfirm(false)}
+                        className="flex-1 px-4 py-3 bg-industrial-800 hover:bg-industrial-700 text-industrial-300 rounded-lg font-bold transition-colors"
+                     >
+                        Cancelar
+                     </button>
+                     <button
+                        onClick={() => handleDelete()}
+                        className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-500 text-white rounded-lg font-bold shadow-lg shadow-red-900/20 transition-colors flex items-center justify-center gap-2"
+                     >
+                        <Trash2 size={18} /> Confirmar
+                     </button>
+                  </div>
+               </div>
+            </div>
+         )}
+      </div>
    );
 };

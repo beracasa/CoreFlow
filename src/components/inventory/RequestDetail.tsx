@@ -130,7 +130,10 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
         // Logo & Header
         if (plantSettings.logoUrl) {
             try {
-                doc.addImage(plantSettings.logoUrl, 'PNG', 14, 10, 30, 15);
+                const imgProps = doc.getImageProperties(plantSettings.logoUrl);
+                const width = 30;
+                const height = (imgProps.height * width) / imgProps.width;
+                doc.addImage(plantSettings.logoUrl, 'PNG', 14, 10, width, height);
             } catch (e) {
                 console.warn('Could not add logo', e);
             }

@@ -6,6 +6,7 @@ import { MachineSupabaseService } from "../src/services/implementations/machineS
 import { Clock, History, Save, FileDown, Filter, X } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { useMasterStore } from '../src/stores/useMasterStore';
 
 interface MachineHoursLogProps {
     machines: Machine[];
@@ -110,26 +111,53 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
     };
 
     const generatePDF = () => {
+        const { plantSettings } = useMasterStore.getState() as any;
         const doc = new jsPDF();
 
+        let currentY = 20;
+
+        // 1. Logo
+        if (plantSettings.logoUrl) {
+            try {
+                const imgProps = doc.getImageProperties(plantSettings.logoUrl);
+                const logoWidth = 35;
+                const logoHeight = (imgProps.height * logoWidth) / imgProps.width;
+                doc.addImage(plantSettings.logoUrl, 'PNG', 14, 10, logoWidth, logoHeight);
+                currentY = 15 + logoHeight + 10;
+            } catch (e) {
+                console.warn('Could not add logo', e);
+                currentY = 22;
+            }
+        } else {
+            currentY = 22;
+        }
+
         doc.setFontSize(18);
-        doc.text('Reporte de Horas de Máquina', 14, 22);
+        doc.text('Reporte de Horas de Máquina', 14, currentY);
 
         doc.setFontSize(11);
         doc.setTextColor(100);
-        const dateStr = startDate && endDate ? `${startDate} to ${endDate}` : 'Todos los registros';
+        const dateStr = startDate && endDate ? `${startDate} a ${endDate}` : 'Todos los registros';
         const machineStr = selectedMachine ? `Máquina: ${selectedMachine.name}` : 'Todas las máquinas';
-        doc.text(`${machineStr} | ${dateStr}`, 14, 30);
+        doc.text(`${machineStr} | ${dateStr}`, 14, currentY + 8);
 
-        const tableColumn = ["Fecha", "Máquina", "Horas", "Operador"];
+        const tableColumn = ["Fecha", "Máquina", "Alias / Matrícula", "Lectura", "Operador"];
         const tableRows: any[] = [];
 
         history.forEach(log => {
-            const machineName = machines.find(m => m.id === log.machineId)?.name || 'Unknown';
+            const machine = machines.find(m => m.id === log.machineId);
+            const machineName = machine?.name || 'Unknown';
+            const aliasPlate = machine?.alias && machine?.plate
+                ? `${machine.alias} (${machine.plate})`
+                : (machine?.alias || machine?.plate || '-');
+
+            const reading = `${new Intl.NumberFormat('en-US').format(log.hoursLogged)} ${log.unit || 'h'}`;
+
             const logData = [
                 log.date,
                 machineName,
-                new Intl.NumberFormat('en-US').format(log.hoursLogged),
+                aliasPlate,
+                reading,
                 log.operator,
             ];
             tableRows.push(logData);
@@ -138,7 +166,8 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
         autoTable(doc, {
             head: [tableColumn],
             body: tableRows,
-            startY: 40,
+            startY: currentY + 15,
+            headStyles: { fillColor: [44, 62, 80] }
         });
 
         doc.save(`reporte_uso_${new Date().toISOString().split('T')[0]}.pdf`);
@@ -346,7 +375,7 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
                                                 <td className="px-6 py-3 text-industrial-400 italic">
                                                     {machine?.alias && machine?.plate ? `${machine.alias} (${machine.plate})` : (machine?.alias || machine?.plate || '-')}
                                                 </td>
-                                                <td className="px-6 py-3 font-mono text-industrial-accent">
+                                                <td className={`px-6 py-3 font-mono ${log.unit === 'km' ? 'text-emerald-500 font-bold' : 'text-industrial-accent'}`}>
                                                     {new Intl.NumberFormat('en-US').format(log.hoursLogged)} {log.unit}
                                                 </td>
                                                 <td className="px-6 py-3">{log.operator}</td>

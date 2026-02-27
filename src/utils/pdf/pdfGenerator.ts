@@ -1,9 +1,12 @@
+// @ts-ignore
 import jsPDF from 'jspdf';
+// @ts-ignore
 import autoTable from 'jspdf-autotable';
-import { WorkOrder, Machine } from '../../types';
+import { WorkOrder, Machine } from '../../../types';
 
 // Opcional: Logo de la empresa en base64 para reemplazar el texto "RAVICARIBE INC."
 const COMPANY_LOGO_BASE64 = ''; 
+
 
 export const generateRMant02PDF = (order: WorkOrder, machine?: Machine) => {
   // Configuración inicial del PDF (A4, horizontal)
@@ -37,7 +40,14 @@ export const generateRMant02PDF = (order: WorkOrder, machine?: Machine) => {
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(0, 150, 0); // Verde estilo "RaviCaribe"
   if (COMPANY_LOGO_BASE64) {
-      doc.addImage(COMPANY_LOGO_BASE64, 'PNG', margin + 2, margin + 5, 40, 15);
+      try {
+          const imgProps = doc.getImageProperties(COMPANY_LOGO_BASE64);
+          const logoWidth = 40;
+          const logoHeight = (imgProps.height * logoWidth) / imgProps.width;
+          doc.addImage(COMPANY_LOGO_BASE64, 'PNG', margin + 2, margin + 5, logoWidth, logoHeight);
+      } catch (e) {
+          console.warn("Could not add company logo", e);
+      }
   } else {
       doc.text("COREFLOW INC.", margin + 5, margin + 15);
       doc.setFontSize(6);
@@ -346,19 +356,118 @@ export const generateRMant02PDF = (order: WorkOrder, machine?: Machine) => {
       doc.text(new Date(order.signatureSupervisorDate).toLocaleString(), pageWidth / 2 + 20, currY + 9);
   }
 
-  // --- SAVE ---
-  doc.save(`R-MANT-02-${order.displayId || order.id}.pdf`);
+  const fileName = `R-MANT-02-${order.displayId || order.id}.pdf`;
+  doc.save(fileName);
 };
 
-export const generateMaintenanceListPDF = (orders: WorkOrder[], title: string, machines: Machine[]) => {
+export const generateRMant05PDF = (order: WorkOrder, machine?: Machine) => {
   const doc = new jsPDF({
-    orientation: 'landscape',
+    orientation: 'portrait',
     unit: 'mm',
     format: 'a4',
   });
 
   const pageWidth = doc.internal.pageSize.width;
   const margin = 10;
+  
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+
+  // --- HEADER SECTION ---
+  doc.rect(margin, margin, pageWidth - 2 * margin, 25);
+  const col1Width = 45;
+  const col3Width = 40;
+  const col2Width = (pageWidth - 2 * margin) - col1Width - col3Width;
+
+  doc.line(margin + col1Width, margin, margin + col1Width, margin + 25);
+  doc.line(margin + col1Width + col2Width, margin, margin + col1Width + col2Width, margin + 25);
+  
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(0, 150, 0);
+  doc.text("COREFLOW INC.", margin + 5, margin + 15);
+  doc.setFontSize(6);
+  doc.setTextColor(150, 150, 150);
+  doc.text("SOLUCIONES INDUSTRIALES", margin + 5, margin + 18);
+
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(12);
+  doc.text("REPORTE DE MANTENIMIENTO CORRECTIVO", margin + col1Width + (col2Width/2), margin + 10, { align: 'center' });
+  doc.text(machine?.name?.toUpperCase() || '', margin + col1Width + (col2Width/2), margin + 16, { align: 'center' });
+
+  doc.setFontSize(14);
+  doc.text("R-MANT-05", margin + col1Width + col2Width + (col3Width/2), margin + 15, { align: 'center' });
+
+  // --- INFO SECTION ---
+  const infoY = margin + 30;
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+
+  // Rows and Columns
+  const drawRow = (label: string, value: string, y: number, x: number = margin, width: number = 80) => {
+    doc.text(label, x, y);
+    doc.text(value, x + 40, y);
+    doc.line(x + 40, y + 1, x + width, y + 1);
+  };
+
+  drawRow("Nº de Orden:", order.displayId || order.id, infoY);
+  drawRow("Fecha de Solicitud:", order.createdDate.split('T')[0], infoY + 6);
+  drawRow("Empresa / Sucursal:", machine?.branch || '-', infoY + 12);
+  drawRow("Departamento:", order.department || '-', infoY + 18);
+  drawRow("Equipo:", machine?.name || '-', infoY + 24);
+  drawRow("Tipo de Avería:", order.failureType || '-', infoY + 30);
+  drawRow("Condición Equipo:", order.condition || '-', infoY + 36);
+
+  // Center column
+  const centerX = margin + 90;
+  drawRow("Solicitado por:", order.assignedTo || '-', infoY, centerX, 60);
+  drawRow("Recibido por:", order.requestReceivedBy || '-', infoY + 6, centerX, 60);
+  drawRow("Fecha Inicio:", order.startDate || '-', infoY + 12, centerX, 60);
+  drawRow("Fecha Fin:", order.endDate || '-', infoY + 18, centerX, 60);
+
+  // --- ACTIVITIES TABLE ---
+  const tableStartY = infoY + 45;
+  const tableData = (order.failuresAndActivities || []).map((fa, idx) => [
+    idx + 1, fa.cause, fa.activity
+  ]);
+
+  autoTable(doc, {
+    startY: tableStartY,
+    head: [['Nº', 'Causas de la Avería', 'Actividades Realizadas']],
+    body: tableData.length > 0 ? tableData : [['1', 'No especificado', 'No especificado']],
+    theme: 'grid',
+    styles: { fontSize: 8 },
+    headStyles: { fillColor: [0, 100, 0] }
+  });
+
+  let finalY = (doc as any).lastAutoTable.finalY + 10;
+
+  // --- SIGNATURES ---
+  doc.setFont('helvetica', 'bold');
+  doc.text("SOLICITANTE / EJECUTANTE:", margin, finalY);
+  doc.setFont('helvetica', 'normal');
+  doc.text(order.signatureExecutor || '-', margin, finalY + 6);
+  if (order.signatureExecutorDate) doc.text(new Date(order.signatureExecutorDate).toLocaleString(), margin, finalY + 10);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text("SUPERVISOR / RECIBE:", margin + 100, finalY);
+  doc.setFont('helvetica', 'normal');
+  doc.text(order.signatureSupervisor || '-', margin + 100, finalY + 6);
+  if (order.signatureSupervisorDate) doc.text(new Date(order.signatureSupervisorDate).toLocaleString(), margin + 100, finalY + 10);
+
+  const fileName = `R-MANT-05-${order.displayId || order.id}.pdf`;
+  doc.save(fileName);
+};
+
+export const generateMaintenanceListPDF = (orders: WorkOrder[], title: string, machines: Machine[]) => {
+  try {
+    const doc = new jsPDF({
+      orientation: 'landscape',
+      unit: 'mm',
+      format: 'a4',
+    });
+
+    const pageWidth = doc.internal.pageSize.width;
+    const margin = 10;
 
   // --- HEADER SECTION ---
   doc.rect(margin, margin, pageWidth - 2 * margin, 20);
@@ -367,7 +476,14 @@ export const generateMaintenanceListPDF = (orders: WorkOrder[], title: string, m
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(0, 150, 0);
   if (COMPANY_LOGO_BASE64) {
-    doc.addImage(COMPANY_LOGO_BASE64, 'PNG', margin + 2, margin + 2, 35, 12);
+    try {
+      const imgProps = doc.getImageProperties(COMPANY_LOGO_BASE64);
+      const logoWidth = 35;
+      const logoHeight = (imgProps.height * logoWidth) / imgProps.width;
+      doc.addImage(COMPANY_LOGO_BASE64, 'PNG', margin + 2, margin + 2, logoWidth, logoHeight);
+    } catch (e) {
+      console.warn("Could not add company logo to list", e);
+    }
   } else {
     doc.setFontSize(14);
     doc.text("COREFLOW INC.", margin + 5, margin + 10);
@@ -422,15 +538,19 @@ export const generateMaintenanceListPDF = (orders: WorkOrder[], title: string, m
     }
   });
 
-  autoTable(doc, {
-    startY: 35,
-    head: head,
-    body: body,
-    theme: 'grid',
-    styles: { fontSize: 8, cellPadding: 2 },
-    headStyles: { fillColor: [0, 100, 0], textColor: [255, 255, 255] },
-    alternateRowStyles: { fillColor: [245, 255, 245] }
-  });
+    autoTable(doc, {
+      startY: 35,
+      head: head,
+      body: body,
+      theme: 'grid',
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [0, 100, 0], textColor: [255, 255, 255] },
+      alternateRowStyles: { fillColor: [245, 255, 245] }
+    });
 
-  doc.save(`${title.replace(/\s/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`);
+    const fileName = `${title.replace(/\s/g, '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(fileName);
+  } catch (err) {
+    console.error('ERROR during PDF generation:', err);
+  }
 };

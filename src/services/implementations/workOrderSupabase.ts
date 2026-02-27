@@ -207,4 +207,16 @@ export class WorkOrderSupabaseService implements IWorkOrderService {
             throw error;
         }
     }
+
+    async delete(id: string): Promise<void> {
+        const { error } = await supabase
+            .from('work_orders')
+            .delete()
+            .eq('id', id);
+
+        if (error) {
+            console.error(`Error deleting order ${id}:`, error);
+            throw error;
+        }
+    }
 }

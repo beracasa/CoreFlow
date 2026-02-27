@@ -129,6 +129,7 @@ export const InventoryList: React.FC = () => {
                                     <th className="px-6 py-3 text-left text-xs font-bold text-industrial-500 uppercase tracking-wider">Nombre</th>
                                     <th className="px-6 py-3 text-left text-xs font-bold text-industrial-500 uppercase tracking-wider">Categoría</th>
                                     <th className="px-6 py-3 text-left text-xs font-bold text-industrial-500 uppercase tracking-wider">Tramo</th>
+                                    <th className="px-6 py-3 text-left text-xs font-bold text-industrial-500 uppercase tracking-wider">Ubicación</th>
                                     <th className="px-6 py-3 text-right text-xs font-bold text-industrial-500 uppercase tracking-wider">Stock</th>
                                     <th className="px-6 py-3 text-right text-xs font-bold text-industrial-500 uppercase tracking-wider">Mínimo</th>
                                     <th className="px-6 py-3 text-center text-xs font-bold text-industrial-500 uppercase tracking-wider">Estado</th>
@@ -147,6 +148,7 @@ export const InventoryList: React.FC = () => {
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-white font-medium">{part.name}</td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-industrial-400">{part.category}</td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-industrial-400">{part.location}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-industrial-400 italic">{part.subLocation || '-'}</td>
                                             <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-bold ${isLowStock ? 'text-red-400' : 'text-emerald-400'}`}>
                                                 {part.currentStock} {part.unitOfMeasure}
                                             </td>

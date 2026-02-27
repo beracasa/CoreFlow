@@ -47,7 +47,7 @@ export class InventorySupabaseService implements IInventoryService {
     async getAllParts(): Promise<SparePart[]> {
         const { data, error } = await supabase
             .from('spare_parts')
-            .select('id, sku, name, description, category, unit_of_measure, current_stock, minimum_stock, maximum_stock, location_code, unit_cost, image_url, created_at')
+            .select('id, sku, name, description, category, unit_of_measure, current_stock, minimum_stock, maximum_stock, location_code, sub_location, unit_cost, image_url, created_at')
             .order('created_at', { ascending: false });
 
         if (error) throw error;

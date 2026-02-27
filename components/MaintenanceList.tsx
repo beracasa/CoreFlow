@@ -5,6 +5,9 @@ import { useWorkOrderStore } from '../src/stores/useWorkOrderStore';
 import { useMasterStore } from '../src/stores/useMasterStore';
 import { useNavigate } from 'react-router-dom';
 import { FileText, Plus, Calendar, AlertCircle, CheckCircle, Clock, Download } from 'lucide-react';
+import { generateMaintenanceListPDF, generateRMant02PDF, generateRMant05PDF } from '../src/utils/pdf/pdfGenerator';
+import { generateWorkOrderReport } from '../src/services/ReportService';
+
 
 interface MaintenanceListProps {
   type: 'R-MANT-02' | 'R-MANT-05';
@@ -13,7 +16,7 @@ interface MaintenanceListProps {
 export const MaintenanceList: React.FC<MaintenanceListProps> = ({ type }) => {
   const { t, language } = useLanguage();
   const { workOrders } = useWorkOrderStore();
-  const { machines } = useMasterStore();
+  const { machines, plantSettings } = useMasterStore();
   const navigate = useNavigate();
 
   const [searchQuery, setSearchQuery] = React.useState('');
@@ -108,6 +111,24 @@ export const MaintenanceList: React.FC<MaintenanceListProps> = ({ type }) => {
     return order.title;
   };
 
+  const getFiltersDescription = () => {
+    const parts = [];
+    if (searchQuery) parts.push(`Búsqueda: "${searchQuery}"`);
+    if (selectedStatus) {
+      const statusLabel = statusOptions.find(opt => opt.value === selectedStatus)?.label;
+      parts.push(`Estado: ${statusLabel}`);
+    }
+    if (selectedZone) parts.push(`Zona: ${selectedZone}`);
+    if (type === 'R-MANT-02' && selectedInterval) parts.push(`Intervalo: ${selectedInterval}`);
+    if (type === 'R-MANT-05' && selectedFailureType) parts.push(`Falla: ${selectedFailureType}`);
+
+    if (startDateFilter || endDateFilter) {
+      parts.push(`Rango: ${startDateFilter || 'Inicio'} a ${endDateFilter || 'Hoy'}`);
+    }
+
+    return parts.length > 0 ? parts.join(' | ') : 'Todos los registros';
+  };
+
   return (
     <div className="h-full bg-industrial-900 p-6 flex flex-col overflow-hidden">
       <div className="flex justify-between items-start mb-6">
@@ -124,16 +145,15 @@ export const MaintenanceList: React.FC<MaintenanceListProps> = ({ type }) => {
         </div>
         <div className="flex items-center gap-3">
           <button
+            type="button"
             onClick={() => {
-              import('../src/utils/pdf/pdfGenerator').then(module => {
-                const title = type === 'R-MANT-02' ? 'REPORTE MANTENIMIENTO PREVENTIVO' : 'REPORTE MANTENIMIENTO CORRECTIVO';
-                module.generateMaintenanceListPDF(filteredOrders, title, machines);
-              });
+              console.log("Click en botón Exportar PDF detectado");
+              generateWorkOrderReport(filteredOrders, getFiltersDescription(), machines, type, plantSettings.logoUrl);
             }}
-            className="bg-industrial-800 hover:bg-industrial-700 text-industrial-300 px-4 py-2 rounded text-sm font-medium border border-industrial-600 transition-colors flex items-center gap-2"
+            className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded text-sm font-medium transition-colors shadow-lg shadow-emerald-900/20 flex items-center gap-2"
           >
-            <Download className="w-4 h-4" />
-            Generar Reporte
+            <FileText className="w-4 h-4" />
+            Exportar PDF
           </button>
           <button
             onClick={() => navigate('/orders/new', { state: { type } })}
@@ -387,13 +407,12 @@ export const MaintenanceList: React.FC<MaintenanceListProps> = ({ type }) => {
                         <div className="flex items-center gap-3">
                           {getStatusBadge(order.currentStage)}
 
-                          {type === 'R-MANT-02' && order.currentStage === WorkOrderStage.CLOSED && (
+                          {order.currentStage === WorkOrderStage.CLOSED && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation(); // Prevenir navegación
-                                import('../src/utils/pdf/pdfGenerator').then(module => {
-                                  module.generateRMant02PDF(order, machine);
-                                });
+                                if (type === 'R-MANT-02') generateRMant02PDF(order, machine);
+                                else generateRMant05PDF(order, machine);
                               }}
                               className="p-1.5 bg-industrial-800 hover:bg-industrial-700 text-industrial-300 rounded border border-industrial-600 transition-colors"
                               title="Descargar PDF"

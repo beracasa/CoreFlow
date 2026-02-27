@@ -229,8 +229,6 @@ export interface WorkOrder {
   electromechanicalGroup?: string; // "Electromecánicos" select
   executors?: ExecutorInfo[];
   supervisor?: string;
-
-
   // R-MANT-02 Specifics (Image 3 - Parts)
   consumedParts?: ConsumedPart[];
   totalMaintenanceCost?: number;
@@ -246,7 +244,6 @@ export interface WorkOrder {
   };
 
   // R-MANT-02 Specifics (Image 4 - Executors)
-  executors?: ExecutorInfo[];
   observations?: string;
   assignedMechanic?: string;
   receivedBy?: string;

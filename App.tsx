@@ -387,8 +387,8 @@ const AppRoutes = () => {
       }>
         <Route index element={<Dashboard />} />
         <Route path="kanban" element={<MaintenanceKanban />} />
-        <Route path="orders/preventive" element={<MaintenanceList type="R-MANT-02" />} />
-        <Route path="orders/corrective" element={<MaintenanceList type="R-MANT-05" />} />
+        <Route path="orders/preventive" element={<MaintenanceList key="preventive" type="R-MANT-02" />} />
+        <Route path="orders/corrective" element={<MaintenanceList key="corrective" type="R-MANT-05" />} />
         <Route path="orders/new" element={<MaintenanceFormPage />} />
         <Route path="orders/:id" element={<MaintenanceFormPage />} />
 

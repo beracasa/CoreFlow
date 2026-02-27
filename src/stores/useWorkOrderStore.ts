@@ -12,6 +12,7 @@ interface WorkOrderState {
     fetchOrders: () => Promise<void>;
     addOrder: (order: Omit<WorkOrder, 'id'>) => Promise<void>;
     updateOrder: (id: string, updates: Partial<WorkOrder>) => Promise<void>;
+    deleteOrder: (id: string) => Promise<void>;
     getOrderById: (id: string) => WorkOrder | undefined;
 }
 
@@ -61,6 +62,20 @@ export const useWorkOrderStore = create<WorkOrderState>((set, get) => ({
         } catch (err: any) {
             set({ error: err.message || 'Failed to update order', loading: false });
             throw err; // Re-throw for UI handling
+        }
+    },
+
+    deleteOrder: async (id) => {
+        set({ loading: true, error: null });
+        try {
+            await workOrderService.delete(id);
+            set((state) => ({
+                workOrders: state.workOrders.filter(o => o.id !== id),
+                loading: false
+            }));
+        } catch (err: any) {
+            set({ error: err.message || 'Failed to delete order', loading: false });
+            throw err;
         }
     },
 
