@@ -536,11 +536,11 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
 
    const signSupervisor = () => {
       if (!isSection3Editable) return;
-      if (formData.signatureSupervisor) return; // Already signed
+      if (formData.signatureSupervisor && formData.signatureSupervisor !== 'false') return; // Already signed
 
       setFormData(prev => ({
          ...prev,
-         signatureSupervisor: user?.full_name || 'Admin User',
+         signatureSupervisor: user?.full_name || user?.name || 'Admin User',
          signatureSupervisorDate: new Date().toISOString()
       }));
    };
@@ -1649,17 +1649,17 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                               <label className="text-xs text-industrial-400 font-bold mb-2 block">Firma Ejecutante</label>
                               <div
                                  onClick={() => {
-                                    if (isSection3Editable && !formData.signatureExecutor) {
+                                    if (isSection3Editable && (!formData.signatureExecutor || formData.signatureExecutor === 'false')) {
                                        setFormData({
                                           ...formData,
-                                          signatureExecutor: user?.name || 'Executor Name', // Auto-sign with current user generic
+                                          signatureExecutor: user?.full_name || user?.name || 'Executor Name',
                                           signatureExecutorDate: new Date().toISOString()
                                        });
                                     }
                                  }}
-                                 className={`h-24 bg-white/5 rounded border-2 border-dashed ${isSection3Editable && !formData.signatureExecutor ? 'border-pink-500/50 cursor-pointer hover:bg-white/10' : 'border-industrial-600'} flex items-center justify-center flex-col gap-1 transition-colors`}
+                                 className={`h-24 bg-white/5 rounded border-2 border-dashed ${isSection3Editable && (!formData.signatureExecutor || formData.signatureExecutor === 'false') ? 'border-pink-500/50 cursor-pointer hover:bg-white/10' : 'border-industrial-600'} flex items-center justify-center flex-col gap-1 transition-colors`}
                               >
-                                 {formData.signatureExecutor ? (
+                                 {formData.signatureExecutor && formData.signatureExecutor !== 'false' ? (
                                     <>
                                        <span className="text-pink-400 font-script text-xl">{formData.signatureExecutor}</span>
                                        <span className="text-xs text-industrial-500">{formData.signatureExecutorDate ? new Date(formData.signatureExecutorDate).toLocaleDateString() : ''}</span>
@@ -1677,12 +1677,12 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                               <label className="text-xs text-industrial-400 font-bold mb-2 block">Firma Supervisor (Conformidad)</label>
                               <div
                                  onClick={signSupervisor}
-                                 className={`h-24 bg-white/5 rounded border-2 border-dashed ${isSection3Editable && !formData.signatureSupervisor ? 'border-emerald-500/50 cursor-pointer hover:bg-white/10' : 'border-industrial-600'} flex items-center justify-center flex-col gap-1 transition-colors`}
+                                 className={`h-24 bg-white/5 rounded border-2 border-dashed ${isSection3Editable && (!formData.signatureSupervisor || formData.signatureSupervisor === 'false') ? 'border-emerald-500/50 cursor-pointer hover:bg-white/10' : 'border-industrial-600'} flex items-center justify-center flex-col gap-1 transition-colors`}
                               >
-                                 {formData.signatureSupervisor ? (
+                                 {formData.signatureSupervisor && formData.signatureSupervisor !== 'false' ? (
                                     <>
                                        <span className="text-emerald-400 font-script text-xl">{formData.signatureSupervisor}</span>
-                                       <span className="text-xs text-industrial-500">{new Date(formData.signatureSupervisorDate!).toLocaleDateString()}</span>
+                                       <span className="text-xs text-industrial-500">{formData.signatureSupervisorDate ? new Date(formData.signatureSupervisorDate).toLocaleDateString() : ''}</span>
                                     </>
                                  ) : (
                                     <span className="text-xs text-industrial-500">

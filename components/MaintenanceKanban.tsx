@@ -22,6 +22,7 @@ export const MaintenanceKanban: React.FC = () => {
   const { machines } = useMasterStore();
   const navigate = useNavigate();
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [typeFilter, setTypeFilter] = useState<'R-MANT-02' | 'R-MANT-05' | null>(null);
 
   const columns = [
     { id: WorkOrderStatus.BACKLOG, title: t('kanban.col.backlog') },
@@ -51,18 +52,46 @@ export const MaintenanceKanban: React.FC = () => {
   return (
     <div className="h-full flex flex-col bg-industrial-900 p-6 overflow-hidden">
       {/* Header Metrics */}
-      <div className="flex gap-6 mb-8">
-        <div className="bg-industrial-800 p-4 rounded border border-industrial-700 shadow-sm flex-1 max-w-xs">
+      <div className="flex gap-6 mb-8 overflow-x-auto pb-2">
+        <div className="bg-industrial-800 p-4 rounded border border-industrial-700 shadow-sm flex-1 min-w-[200px] max-w-xs">
           <p className="text-industrial-500 text-xs font-bold uppercase tracking-wider">{t('kanban.mttr')}</p>
           <p className="text-2xl font-mono text-white mt-1">{calculateMTTR(workOrders)} <span className="text-sm text-industrial-500">hrs</span></p>
         </div>
-        <div className="bg-industrial-800 p-4 rounded border border-industrial-700 shadow-sm flex-1 max-w-xs">
+        <div className="bg-industrial-800 p-4 rounded border border-industrial-700 shadow-sm flex-1 min-w-[200px] max-w-xs">
           <p className="text-industrial-500 text-xs font-bold uppercase tracking-wider">{t('kanban.mtbf')}</p>
           <p className="text-2xl font-mono text-white mt-1">{calculateMTBF()} <span className="text-sm text-industrial-500">hrs</span></p>
         </div>
-        <div className="bg-industrial-800 p-4 rounded border border-industrial-700 shadow-sm flex-1 max-w-xs">
-          <p className="text-industrial-500 text-xs font-bold uppercase tracking-wider">{t('kanban.active')}</p>
-          <p className="text-2xl font-mono text-industrial-accent mt-1">{workOrders.filter(o => o.formType === 'R-MANT-02' && o.status !== WorkOrderStatus.DONE).length}</p>
+
+        {/* R-MANT-02 Filter Card */}
+        <div
+          onClick={() => setTypeFilter(typeFilter === 'R-MANT-02' ? null : 'R-MANT-02')}
+          className={`p-4 rounded border shadow-sm flex-1 min-w-[240px] max-w-xs cursor-pointer transition-all duration-200 ${typeFilter === 'R-MANT-02'
+            ? 'bg-blue-600/20 border-blue-500 ring-2 ring-blue-500/50'
+            : 'bg-industrial-800 border-industrial-700 hover:border-industrial-500'
+            }`}
+        >
+          <p className={`text-[10px] font-bold uppercase tracking-wider ${typeFilter === 'R-MANT-02' ? 'text-blue-400' : 'text-industrial-500'}`}>
+            R-MANT-02 PREVENTIVOS ACTIVOS
+          </p>
+          <p className="text-2xl font-mono text-white mt-1">
+            {workOrders.filter(o => o.formType === 'R-MANT-02' && o.status !== WorkOrderStatus.DONE).length}
+          </p>
+        </div>
+
+        {/* R-MANT-05 Filter Card */}
+        <div
+          onClick={() => setTypeFilter(typeFilter === 'R-MANT-05' ? null : 'R-MANT-05')}
+          className={`p-4 rounded border shadow-sm flex-1 min-w-[240px] max-w-xs cursor-pointer transition-all duration-200 ${typeFilter === 'R-MANT-05'
+            ? 'bg-orange-600/20 border-orange-500 ring-2 ring-orange-500/50'
+            : 'bg-industrial-800 border-industrial-700 hover:border-industrial-500'
+            }`}
+        >
+          <p className={`text-[10px] font-bold uppercase tracking-wider ${typeFilter === 'R-MANT-05' ? 'text-orange-400' : 'text-industrial-500'}`}>
+            R-MANT-05 CORRECTIVOS ACTIVOS
+          </p>
+          <p className="text-2xl font-mono text-white mt-1">
+            {workOrders.filter(o => o.formType === 'R-MANT-05' && o.status !== WorkOrderStatus.DONE).length}
+          </p>
         </div>
       </div>
 
@@ -78,13 +107,13 @@ export const MaintenanceKanban: React.FC = () => {
             <div className="p-3 border-b border-industrial-700 bg-industrial-800 rounded-t-lg flex justify-between items-center">
               <h3 className="font-semibold text-industrial-500 text-sm">{col.title}</h3>
               <span className="bg-industrial-900 text-xs px-2 py-0.5 rounded-full text-industrial-500 font-mono">
-                {workOrders.filter(o => o.status === col.id).length}
+                {workOrders.filter(o => o.status === col.id && (!typeFilter || o.formType === typeFilter)).length}
               </span>
             </div>
 
             <div className="flex-1 p-2 space-y-3 overflow-y-auto">
               {workOrders
-                .filter(order => order.status === col.id)
+                .filter(order => order.status === col.id && (!typeFilter || order.formType === typeFilter))
                 .map(order => {
                   const machine = machines.find(m => m.id === order.machineId);
                   const isMant02 = order.formType === 'R-MANT-02';
