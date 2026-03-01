@@ -4,6 +4,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from "../contexts/AuthContext";
 import { MachineSupabaseService } from "../src/services/implementations/machineSupabase";
 import { Clock, History, Save, FileDown, Filter, X } from 'lucide-react';
+import { TablePagination } from './shared/TablePagination';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useMasterStore } from '../src/stores/useMasterStore';
@@ -25,6 +26,11 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
     const [startDate, setStartDate] = useState<string>('');
     const [endDate, setEndDate] = useState<string>('');
 
+    // Pagination
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalLogs, setTotalLogs] = useState(0);
+    const ITEMS_PER_PAGE = 50;
+
     // Searchable Dropdown State
     const [searchTerm, setSearchTerm] = useState('');
     const [showDropdown, setShowDropdown] = useState(false);
@@ -34,21 +40,32 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
 
     const selectedMachine = machines.find(m => m.id === selectedMachineId);
 
-    // Load logs when filters change
+    // Load logs when filters or page change
     useEffect(() => {
         const fetchLogs = async () => {
             try {
-                const logs = await MachineSupabaseService.getFilteredMachineHourLogs({
+                setIsLoading(true);
+                const result = await MachineSupabaseService.getFilteredMachineHourLogs({
                     machineId: selectedMachineId || undefined,
                     startDate: startDate || undefined,
-                    endDate: endDate || undefined
+                    endDate: endDate || undefined,
+                    page: currentPage,
+                    limit: ITEMS_PER_PAGE
                 });
-                setHistory(logs);
+                setHistory(result.data);
+                setTotalLogs(result.total);
             } catch (err) {
                 console.error("Error fetching logs:", err);
+            } finally {
+                setIsLoading(false);
             }
         };
         fetchLogs();
+    }, [selectedMachineId, startDate, endDate, currentPage]);
+
+    // Reset page when filters change
+    useEffect(() => {
+        setCurrentPage(1);
     }, [selectedMachineId, startDate, endDate]);
 
     const handleLog = async (e: React.FormEvent) => {
@@ -385,6 +402,16 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
                                 </tbody>
                             </table>
                         )}
+                    </div>
+
+                    <div className="mt-auto p-4 bg-industrial-900 border-t border-industrial-700 flex justify-end">
+                        <TablePagination
+                            totalItems={totalLogs}
+                            currentPage={currentPage}
+                            itemsPerPage={ITEMS_PER_PAGE}
+                            onPageChange={setCurrentPage}
+                            isLoading={isLoading}
+                        />
                     </div>
                 </div>
             </div>

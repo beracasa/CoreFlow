@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { FileText, Plus, Calendar, AlertCircle, CheckCircle, Clock, Download } from 'lucide-react';
 import { generateMaintenanceListPDF, generateRMant02PDF, generateRMant05PDF } from '../src/utils/pdf/pdfGenerator';
 import { generateWorkOrderReport } from '../src/services/ReportService';
+import { TablePagination } from './shared/TablePagination';
 
 
 interface MaintenanceListProps {
@@ -15,9 +16,13 @@ interface MaintenanceListProps {
 
 export const MaintenanceList: React.FC<MaintenanceListProps> = ({ type }) => {
   const { t, language } = useLanguage();
-  const { workOrders } = useWorkOrderStore();
+  const { workOrders, pagination, fetchOrders, setPage, loading } = useWorkOrderStore();
   const { machines, plantSettings } = useMasterStore();
   const navigate = useNavigate();
+
+  React.useEffect(() => {
+    fetchOrders(1, 50, type);
+  }, [type, fetchOrders]);
 
   const [searchQuery, setSearchQuery] = React.useState('');
   const [selectedZone, setSelectedZone] = React.useState('');
@@ -428,6 +433,16 @@ export const MaintenanceList: React.FC<MaintenanceListProps> = ({ type }) => {
               )}
             </tbody>
           </table>
+        </div>
+
+        <div className="mt-4 flex justify-end px-6 py-4 bg-industrial-900 border-t border-industrial-700">
+          <TablePagination
+            totalItems={pagination.total}
+            currentPage={pagination.page}
+            itemsPerPage={pagination.limit}
+            onPageChange={(p) => setPage(p, type)}
+            isLoading={loading}
+          />
         </div>
       </div>
     </div>

@@ -146,18 +146,31 @@ export class WorkOrderSupabaseService implements IWorkOrderService {
         return dbRecord;
     }
 
-    async getAll(): Promise<WorkOrder[]> {
-        const { data, error } = await supabase
+    async getAll(page: number = 1, limit: number = 50, formType?: string): Promise<{ data: WorkOrder[], total: number }> {
+        const from = (page - 1) * limit;
+        const to = from + limit - 1;
+
+        let query = supabase
             .from('work_orders')
-            .select('*')
-            .order('created_date', { ascending: false });
+            .select('*', { count: 'exact' });
+
+        if (formType) {
+            query = query.eq('form_type', formType);
+        }
+
+        const { data, count, error } = await query
+            .order('created_date', { ascending: false })
+            .range(from, to);
 
         if (error) {
             console.error('Error fetching orders:', error);
             throw error;
         }
 
-        return data.map(this.mapDBToApp);
+        return {
+            data: (data || []).map(this.mapDBToApp),
+            total: count || 0
+        };
     }
 
     async getById(id: string): Promise<WorkOrder | null> {

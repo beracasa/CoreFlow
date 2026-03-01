@@ -1,33 +1,35 @@
 import { supabase } from './supabaseClient';
 import { Machine, Technician, ZoneStructure } from '../../types';
-import { MachineSupabaseService } from './implementations/machineSupabase';
+import { machineService, technicianService, configService } from './index';
 
 export const MasterDataService = {
   // MACHINES
-  async getMachines(): Promise<Machine[]> {
-    return MachineSupabaseService.getMachines();
+  async getMachines(page: number = 1, limit: number = 50, filters?: any): Promise<{ data: Machine[], total: number }> {
+    return machineService.getMachines(page, limit, filters);
   },
 
   async createMachine(machine: Omit<Machine, 'id'>): Promise<Machine> {
-    return MachineSupabaseService.createMachine(machine);
+    return machineService.createMachine(machine);
   },
 
   async updateMachine(machine: Machine): Promise<void> {
-    return MachineSupabaseService.updateMachine(machine);
+    return machineService.updateMachine(machine);
   },
 
   async deleteMachine(id: string): Promise<void> {
-    return MachineSupabaseService.deleteMachine(id);
+    return machineService.deleteMachine(id);
   },
 
   // TECHNICIANS
   async getTechnicians(): Promise<Technician[]> {
+    if (technicianService) return technicianService.getTechnicians();
     const { data, error } = await supabase.from('technicians').select('*');
     if (error) throw error;
     return data as Technician[];
   },
 
   async createTechnician(tech: Technician): Promise<Technician> {
+    if (technicianService) throw new Error("Mock does not support creating technicians yet");
     const { data, error } = await supabase.from('technicians').insert(tech).select().single();
     if (error) throw error;
     return data as Technician;
@@ -35,6 +37,7 @@ export const MasterDataService = {
 
   // ZONES
   async getZones(): Promise<ZoneStructure[]> {
+    if (configService) return configService.getZones();
     const { data, error } = await supabase.from('zones').select('*').order('order_index', { ascending: true });
     if (error) throw error;
     return data.map((z: any) => ({
@@ -100,6 +103,7 @@ export const MasterDataService = {
 
   // BRANCHES
   async getBranches(): Promise<string[]> {
+    if (configService) return configService.getBranches();
     const { data, error } = await supabase.from('branches').select('name').order('name');
     if (error) throw error;
     return data.map((b: any) => b.name);
@@ -116,6 +120,7 @@ export const MasterDataService = {
 
   // CATEGORIES
   async getCategories(): Promise<string[]> {
+    if (configService) return configService.getCategories();
     const { data, error } = await supabase.from('asset_categories').select('name').order('name');
     if (error) throw error;
     return data.map((c: any) => c.name);
@@ -132,6 +137,7 @@ export const MasterDataService = {
 
   // ASSET TYPES
   async getAssetTypes(): Promise<string[]> {
+    if (configService) return configService.getAssetTypes();
     const { data, error } = await supabase.from('asset_types').select('name').order('name');
     if (error) throw error;
     return data.map((t: any) => t.name);
@@ -180,6 +186,7 @@ export const MasterDataService = {
   // SPARE PARTS CONFIGURATION
   // Categories
   async getPartCategories(): Promise<string[]> {
+    if (configService) return configService.getPartCategories();
     const { data, error } = await supabase.from('spare_part_categories').select('name').order('name');
     if (error) throw error;
     return data.map((c: any) => c.name);
@@ -196,6 +203,7 @@ export const MasterDataService = {
 
   // Locations
   async getPartLocations(): Promise<string[]> {
+    if (configService) return configService.getPartLocations();
     const { data, error } = await supabase.from('spare_part_locations').select('name').order('name');
     if (error) throw error;
     return data.map((l: any) => l.name);
@@ -212,6 +220,7 @@ export const MasterDataService = {
 
   // Units
   async getPartUnits(): Promise<string[]> {
+    if (configService) return configService.getPartUnits();
     const { data, error } = await supabase.from('spare_part_units').select('name').order('name');
     if (error) throw error;
     return data.map((u: any) => u.name);

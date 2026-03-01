@@ -1,12 +1,53 @@
 
-import { supabase } from '../supabaseClient';
+import { supabase, getPaginationRange } from '../supabaseClient';
 import { Machine } from '../../../types';
 
 export const MachineSupabaseService = {
-  async getMachines(): Promise<Machine[]> {
-    const { data, error } = await supabase
+  async getMachines(
+    page: number = 1, 
+    limit: number = 50,
+    filters?: {
+      search?: string;
+      branch?: string;
+      category?: string;
+      type?: string;
+      zone?: string;
+      showInactive?: boolean;
+    }
+  ): Promise<{ data: Machine[], total: number }> {
+    const { from, to } = getPaginationRange(page, limit);
+    
+    let query = supabase
       .from('machines')
-      .select('*')
+      .select('*', { count: 'exact' });
+
+    if (filters) {
+      if (filters.search) {
+        query = query.or(`name.ilike.%${filters.search}%,code.ilike.%${filters.search}%,brand.ilike.%${filters.search}%,model.ilike.%${filters.search}%`);
+      }
+      if (filters.branch && filters.branch !== 'all') {
+        query = query.eq('branch', filters.branch);
+      }
+      if (filters.category && filters.category !== 'all') {
+        query = query.eq('category', filters.category);
+      }
+      if (filters.type && filters.type !== 'all') {
+        query = query.eq('type', filters.type);
+      }
+      if (filters.zone && filters.zone !== 'all') {
+        query = query.eq('zone', filters.zone);
+      }
+      if (filters.showInactive !== undefined) {
+        query = query.eq('is_active', !filters.showInactive);
+      } else {
+        query = query.eq('is_active', true);
+      }
+    } else {
+      query = query.eq('is_active', true);
+    }
+
+    const { data, count, error } = await query
+      .range(from, to)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -14,7 +55,7 @@ export const MachineSupabaseService = {
       throw error;
     }
 
-    return data.map((record: any) => {
+    const mappedData = (data || []).map((record: any) => {
       const specs = record.specifications || {};
 
       return {
@@ -36,7 +77,7 @@ export const MachineSupabaseService = {
         imageUrl: record.image_url || '',
         isIot: record.is_iot || false,
         isActive: record.is_active !== false, // Default to true if not specified
-        runningHours: record.running_hours || 0,
+        running_hours: record.running_hours || 0,
         lastMaintenance: record.last_maintenance || null,
         nextMaintenance: record.next_maintenance || null,
         specifications: specs,
@@ -53,6 +94,8 @@ export const MachineSupabaseService = {
         maintenancePlans: record.maintenance_plans || [] // ✅ FIX: Map maintenance plans
       };
     }) as Machine[];
+
+    return { data: mappedData, total: count || 0 };
   },
 
   async createMachine(machine: Omit<Machine, 'id'>): Promise<Machine> {
@@ -206,12 +249,20 @@ export const MachineSupabaseService = {
     }));
   },
 
-  async getFilteredMachineHourLogs(filters: { machineId?: string, startDate?: string, endDate?: string }): Promise<any[]> {
+  async getFilteredMachineHourLogs(filters: { 
+    machineId?: string, 
+    startDate?: string, 
+    endDate?: string,
+    page?: number,
+    limit?: number
+  }): Promise<{ data: any[], total: number }> {
+    const page = filters.page || 1;
+    const limit = filters.limit || 50;
+    const { from, to } = getPaginationRange(page, limit);
+
     let query = supabase
       .from('machine_hour_logs')
-      .select('*')
-      .order('date', { ascending: false })
-      .order('created_at', { ascending: false });
+      .select('*', { count: 'exact' });
 
     if (filters.machineId) {
       query = query.eq('machine_id', filters.machineId);
@@ -223,18 +274,17 @@ export const MachineSupabaseService = {
       query = query.lte('date', filters.endDate);
     }
 
-    if (!filters.machineId && !filters.startDate && !filters.endDate) {
-      query = query.limit(50);
-    }
-
-    const { data, error } = await query;
+    const { data, count, error } = await query
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .range(from, to);
 
     if (error) {
       console.error('Error fetching filtered logs:', error);
-      return [];
+      throw error;
     }
 
-    return data.map((log: any) => ({
+    const mappedData = (data || []).map((log: any) => ({
       id: log.id,
       machineId: log.machine_id,
       date: log.date,
@@ -243,6 +293,8 @@ export const MachineSupabaseService = {
       operator: log.operator || 'Unknown',
       comments: log.comments
     }));
+
+    return { data: mappedData, total: count || 0 };
   },
 
   async logMachineHours(log: { machineId: string, hoursLogged: number, unit: 'h' | 'km', operator: string, comments?: string }): Promise<any> {

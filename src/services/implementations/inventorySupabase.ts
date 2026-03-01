@@ -1,28 +1,26 @@
-
-import { supabase } from '../supabaseClient';
+import { supabase, getPaginationRange } from '../supabaseClient';
 import { IInventoryService } from '../inventoryService';
 import { SparePart, PartsRequest } from '../../types/inventory';
 
 export class InventorySupabaseService implements IInventoryService {
-
-    // --- Mappers ---
     private mapDBToPart(record: any): SparePart {
+        if (!record) return {} as SparePart;
         return {
             id: record.id,
-            name: record.name || '',
+            name: record.name,
             partNumber: record.sku,
             description: record.description || '',
-            category: record.category,
-            unitOfMeasure: record.unit_of_measure || 'Unidad',
+            category: record.category || '',
+            unitOfMeasure: record.unit_of_measure || 'PCS',
             currentStock: Number(record.current_stock || 0),
-            minStock: Number(record.minimum_stock ?? record.min_safety_stock ?? 0),
+            minStock: Number(record.minimum_stock || 0),
             maxStock: Number(record.maximum_stock || 0),
             location: record.location_code || '',
             subLocation: record.sub_location || '',
             cost: Number(record.unit_cost || 0),
-            photoUrl: record.image_url,
+            photoUrl: record.image_url || null,
             createdAt: record.created_at
-        } as SparePart;
+        };
     }
 
     private mapPartToDB(part: Partial<SparePart>): any {
@@ -42,16 +40,51 @@ export class InventorySupabaseService implements IInventoryService {
         };
     }
 
-    // --- Parts API ---
+    async getAllParts(
+        page: number = 1, 
+        limit: number = 50,
+        filters?: {
+            search?: string;
+            category?: string;
+            location?: string;
+            status?: 'all' | 'low' | 'normal';
+        }
+    ): Promise<{ data: SparePart[], total: number }> {
+        const { from, to } = getPaginationRange(page, limit);
 
-    async getAllParts(): Promise<SparePart[]> {
-        const { data, error } = await supabase
+        let query = supabase
             .from('spare_parts')
-            .select('id, sku, name, description, category, unit_of_measure, current_stock, minimum_stock, maximum_stock, location_code, sub_location, unit_cost, image_url, created_at')
-            .order('created_at', { ascending: false });
+            .select('id, sku, name, description, category, unit_of_measure, current_stock, minimum_stock, maximum_stock, location_code, sub_location, unit_cost, image_url, created_at', { count: 'exact' });
+
+        if (filters) {
+            if (filters.search) {
+                query = query.or(`name.ilike.%${filters.search}%,sku.ilike.%${filters.search}%,description.ilike.%${filters.search}%`);
+            }
+            if (filters.category && filters.category !== 'all') {
+                query = query.eq('category', filters.category);
+            }
+            if (filters.location && filters.location !== 'all') {
+                query = query.eq('location_code', filters.location);
+            }
+            if (filters.status === 'low') {
+                query = query.lt('current_stock', supabase.raw('minimum_stock')); // Note: Supabase might need a comparison column vs column if supported or a raw filter
+                // Alternatively, if Supabase doesn't support col vs col in .lt(), we might need a stored procedure or special filter.
+                // For now, let's use a standard filter if possible.
+                query = query.filter('current_stock', 'lt', 'minimum_stock');
+            } else if (filters.status === 'normal') {
+                query = query.filter('current_stock', 'gte', 'minimum_stock');
+            }
+        }
+
+        const { data, count, error } = await query
+            .order('created_at', { ascending: false })
+            .range(from, to);
 
         if (error) throw error;
-        return data.map(this.mapDBToPart);
+        return { 
+            data: (data || []).map(this.mapDBToPart),
+            total: count || 0
+        };
     }
 
     async createPart(partData: Omit<SparePart, 'id' | 'currentStock'> & { initialStock?: number }): Promise<SparePart> {
@@ -378,15 +411,46 @@ export class InventorySupabaseService implements IInventoryService {
         };
     }
 
-    async getReceptions(): Promise<any[]> {
-        const { data, error } = await supabase
+    async getReceptions(page: number = 1, limit: number = 50, filters?: { searchTerm?: string; partId?: string }): Promise<{ data: any[], total: number }> {
+        const { from, to } = getPaginationRange(page, limit);
+
+        if (!filters?.searchTerm && !filters?.partId) {
+            // Normal pagination flow
+            const { data, count, error } = await supabase
+                .from('stock_receptions')
+                .select('*', { count: 'exact' })
+                .order('reception_date', { ascending: false })
+                .range(from, to);
+
+            if (error) throw error;
+
+            const mappedData = (data || []).map((record: any) => ({
+                id: record.id,
+                receptionDate: record.reception_date,
+                documentNumber: record.document_number,
+                receivedBy: record.received_by,
+                items: record.items || [],
+                notes: record.notes
+            }));
+
+            return { data: mappedData, total: count || 0 };
+        }
+
+        // --- Robust Search Flow ---
+        // Fetch a large window of recent records and filter in memory
+        // This bypasses complex JSONB operator limitations in PostgREST
+        const term = filters.searchTerm?.toLowerCase() || '';
+        const exactPartId = filters.partId;
+        
+        const { data: allData, error } = await supabase
             .from('stock_receptions')
             .select('*')
-            .order('reception_date', { ascending: false });
+            .order('reception_date', { ascending: false })
+            .limit(2000); // Practical limit for client-side filtering of recent history
 
         if (error) throw error;
 
-        return (data || []).map((record: any) => ({
+        const mappedAllData = (allData || []).map((record: any) => ({
             id: record.id,
             receptionDate: record.reception_date,
             documentNumber: record.document_number,
@@ -394,5 +458,37 @@ export class InventorySupabaseService implements IInventoryService {
             items: record.items || [],
             notes: record.notes
         }));
+
+        // Filter the mapped data
+        const filteredData = mappedAllData.filter(rec => {
+            // If we have an exact part ID, we ONLY want to check if the items array contains it
+            if (exactPartId) {
+                if (rec.items && Array.isArray(rec.items)) {
+                    return rec.items.some((item: any) => item.partId === exactPartId);
+                }
+                return false;
+            }
+
+            // Otherwise, we do the robust text search
+            if (term) {
+                if (rec.documentNumber && rec.documentNumber.toLowerCase().includes(term)) return true;
+                if (rec.notes && rec.notes.toLowerCase().includes(term)) return true;
+                
+                // Check nested items for partName or partNumber match
+                if (rec.items && Array.isArray(rec.items)) {
+                    return rec.items.some((item: any) => 
+                        (item.partName && item.partName.toLowerCase().includes(term)) ||
+                        (item.partNumber && item.partNumber.toLowerCase().includes(term))
+                    );
+                }
+            }
+            return false;
+        });
+
+        // Manual Pagination
+        const total = filteredData.length;
+        const pagedData = filteredData.slice(from, to + 1);
+
+        return { data: pagedData, total };
     }
 }

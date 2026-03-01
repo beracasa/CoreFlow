@@ -6,12 +6,14 @@ import { DocumentService } from '../src/services/documentService';
 import {
   Box, Wifi, Plus, X, Camera, FileText, Server, Clock, Calendar, Pencil, Eye, Download, Trash2
 } from 'lucide-react';
+import { TablePagination } from './shared/TablePagination';
 
 export const MachinesList: React.FC = () => {
   const {
     machines, addMachine, updateMachine,
     branches, categories, assetTypes, zones: zoneStructures,
-    maintenancePlans
+    maintenancePlans,
+    machinePagination: pagination, setMachinePage: setPage, machineFilters, setMachineFilters, isLoading
   } = useMasterStore();
 
   const { t } = useLanguage();
@@ -23,13 +25,13 @@ export const MachinesList: React.FC = () => {
       : [z.name]
   );
 
-  // Equipment Filters
-  const [assetSearch, setAssetSearch] = useState('');
-  const [filterBranch, setFilterBranch] = useState('');
-  const [filterCategory, setFilterCategory] = useState('');
-  const [filterType, setFilterType] = useState('');
-  const [filterZone, setFilterZone] = useState('');
-  const [showInactive, setShowInactive] = useState(false);
+  // Filters (Sync with store)
+  const assetSearch = machineFilters.search || '';
+  const filterBranch = machineFilters.branch || '';
+  const filterCategory = machineFilters.category || '';
+  const filterType = machineFilters.type || '';
+  const filterZone = machineFilters.zone || '';
+  const showInactive = machineFilters.showInactive || false;
 
   // Editing State
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -341,14 +343,14 @@ export const MachinesList: React.FC = () => {
                   placeholder="Buscar por Nombre, Matrícula, Marca o Modelo..."
                   className="w-full bg-industrial-900 border border-industrial-600 rounded px-4 py-2 text-white outline-none focus:border-emerald-500 transition-colors pl-10"
                   value={assetSearch}
-                  onChange={(e) => setAssetSearch(e.target.value)}
+                  onChange={(e) => setMachineFilters({ search: e.target.value })}
                 />
                 <div className="absolute left-3 top-2.5 text-industrial-500">
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
                 </div>
               </div>
               <button
-                onClick={() => setShowInactive(!showInactive)}
+                onClick={() => setMachineFilters({ showInactive: !showInactive })}
                 className={`px-4 py-2 rounded text-sm font-medium border transition-colors flex items-center gap-2 whitespace-nowrap ${showInactive
                   ? 'bg-red-900/40 text-red-400 border-red-500/50 hover:bg-red-900/60'
                   : 'bg-industrial-900 text-industrial-400 border-industrial-600 hover:bg-industrial-800'
@@ -362,7 +364,7 @@ export const MachinesList: React.FC = () => {
               <select
                 className="bg-industrial-900 border border-industrial-600 rounded px-3 py-2 text-white text-sm outline-none focus:border-emerald-500"
                 value={filterBranch}
-                onChange={(e) => setFilterBranch(e.target.value)}
+                onChange={(e) => setMachineFilters({ branch: e.target.value })}
               >
                 <option value="">Todas las Sucursales</option>
                 {branches.map(b => (
@@ -372,7 +374,7 @@ export const MachinesList: React.FC = () => {
               <select
                 className="bg-industrial-900 border border-industrial-600 rounded px-3 py-2 text-white text-sm outline-none focus:border-emerald-500"
                 value={filterCategory}
-                onChange={(e) => setFilterCategory(e.target.value)}
+                onChange={(e) => setMachineFilters({ category: e.target.value })}
               >
                 <option value="">Todas las Categorías</option>
                 {categories.map(c => (
@@ -382,7 +384,7 @@ export const MachinesList: React.FC = () => {
               <select
                 className="bg-industrial-900 border border-industrial-600 rounded px-3 py-2 text-white text-sm outline-none focus:border-emerald-500"
                 value={filterType}
-                onChange={(e) => setFilterType(e.target.value)}
+                onChange={(e) => setMachineFilters({ type: e.target.value })}
               >
                 <option value="">Todos los Tipos</option>
                 {assetTypes.map(t => (
@@ -392,7 +394,7 @@ export const MachinesList: React.FC = () => {
               <select
                 className="bg-industrial-900 border border-industrial-600 rounded px-3 py-2 text-white text-sm outline-none focus:border-emerald-500"
                 value={filterZone}
-                onChange={(e) => setFilterZone(e.target.value)}
+                onChange={(e) => setMachineFilters({ zone: e.target.value })}
               >
                 <option value="">Todas las Ubicaciones</option>
                 {zones.map(z => (
@@ -459,6 +461,16 @@ export const MachinesList: React.FC = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+
+          <div className="mt-4 flex justify-end">
+            <TablePagination
+              totalItems={pagination.total}
+              currentPage={pagination.page}
+              itemsPerPage={pagination.limit}
+              onPageChange={setPage}
+              isLoading={isLoading}
+            />
           </div>
 
           {/* --- DETAIL VIEW MODAL --- */}

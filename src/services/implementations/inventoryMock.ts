@@ -1,14 +1,42 @@
 import { SparePart, PartsRequest, InventoryTransaction, RequestStatus, TransactionType, PurchaseRequest } from '../../types/inventory';
 import { saveToStorage, loadFromStorage } from '../../utils/persistence';
 
-const PARTS_KEY = 'v1_inventory_parts';
-const REQUESTS_KEY = 'v1_inventory_requests';
-const TRANSACTIONS_KEY = 'v1_inventory_transactions';
+const PARTS_KEY = 'v2_inventory_parts';
+const REQUESTS_KEY = 'v2_inventory_requests';
+const TRANSACTIONS_KEY = 'v2_inventory_transactions';
+const RECEPTIONS_KEY = 'v2_inventory_receptions';
 
 const INITIAL_PARTS: SparePart[] = [
-    { id: 'p1', name: 'Ball Bearing 6204', partNumber: 'BB-6204', description: 'Deep groove ball bearing', category: 'Bearings', unitOfMeasure: 'PCS', currentStock: 15, minStock: 5, location: 'A-01', cost: 5.50 },
-    { id: 'p2', name: 'Hydraulic Hose 1/2"', partNumber: 'HH-050', description: 'High pressure hose', category: 'Hydraulics', unitOfMeasure: 'M', currentStock: 2, minStock: 10, location: 'B-03', cost: 12.00 },
-    { id: 'p3', name: 'Limit Switch', partNumber: 'LS-001', description: 'Industrial limit switch', category: 'Electronics', unitOfMeasure: 'PCS', currentStock: 8, minStock: 3, location: 'C-02', cost: 45.00 },
+    { id: 'p1', name: 'Ball Bearing 6204', partNumber: 'BB-6204', description: 'Deep groove ball bearing', category: 'Bearings', unitOfMeasure: 'PCS', currentStock: 15, minStock: 5, location: 'A-01', cost: 5.50, createdAt: new Date().toISOString() },
+    { id: 'p2', name: 'Hydraulic Hose 1/2"', partNumber: 'HH-050', description: 'High pressure hose', category: 'Hydraulics', unitOfMeasure: 'M', currentStock: 2, minStock: 10, location: 'B-03', cost: 12.00, createdAt: new Date().toISOString() },
+    { id: 'p3', name: 'Limit Switch', partNumber: 'LS-001', description: 'Industrial limit switch', category: 'Electronics', unitOfMeasure: 'PCS', currentStock: 8, minStock: 3, location: 'C-02', cost: 45.00, createdAt: new Date().toISOString() },
+    { id: 'p4', name: 'V-Belt A-48', partNumber: 'VB-A48', description: 'Industrial drive belt', category: 'Transmission', unitOfMeasure: 'PCS', currentStock: 12, minStock: 4, location: 'A-05', cost: 8.75, createdAt: new Date().toISOString() },
+    { id: 'p5', name: 'Air Filter Element', partNumber: 'AF-500', description: 'Engine air intake filter', category: 'Filters', unitOfMeasure: 'PCS', currentStock: 20, minStock: 10, location: 'D-01', cost: 15.30, createdAt: new Date().toISOString() },
+];
+
+const INITIAL_REQUESTS: PartsRequest[] = [
+    {
+        id: 'r1',
+        requestNumber: 'REQ-1001',
+        technicianId: 'T1',
+        status: 'OPEN',
+        priority: 'NORMAL',
+        createdDate: new Date().toISOString(),
+        items: [
+            { partId: 'p1', quantityRequested: 5, quantityDelivered: 0 }
+        ]
+    },
+    {
+        id: 'r2',
+        requestNumber: 'REQ-1002',
+        technicianId: 'T2',
+        status: 'PENDING_STOCK',
+        priority: 'HIGH',
+        createdDate: new Date().toISOString(),
+        items: [
+            { partId: 'p2', quantityRequested: 10, quantityDelivered: 0 }
+        ]
+    }
 ];
 
 import { IInventoryService } from '../inventoryService';
@@ -17,7 +45,8 @@ export class InventoryMockService implements IInventoryService {
 
     // --- Persistence Helpers ---
     private getParts(): SparePart[] {
-        return loadFromStorage(PARTS_KEY, INITIAL_PARTS);
+        const parts = loadFromStorage(PARTS_KEY, INITIAL_PARTS);
+        return parts.length > 0 ? parts : INITIAL_PARTS;
     }
 
     private saveParts(parts: SparePart[]) {
@@ -25,7 +54,8 @@ export class InventoryMockService implements IInventoryService {
     }
 
     private getRequests(): PartsRequest[] {
-        return loadFromStorage(REQUESTS_KEY, []);
+        const reqs = loadFromStorage(REQUESTS_KEY, INITIAL_REQUESTS);
+        return reqs.length > 0 ? reqs : INITIAL_REQUESTS;
     }
 
     private saveRequests(requests: PartsRequest[]) {
@@ -42,22 +72,57 @@ export class InventoryMockService implements IInventoryService {
 
     // --- Public API ---
 
-    async getAllParts(): Promise<SparePart[]> {
-        const parts = this.getParts();
-        // Sort by createdAt desc (if available), otherwise by ID desc (as ID is timestamp based)
-        return parts.sort((a, b) => {
-            // Newest first
+    async getAllParts(
+        page: number = 1, 
+        limit: number = 50,
+        filters?: {
+            search?: string;
+            category?: string;
+            location?: string;
+            status?: 'all' | 'low' | 'normal';
+        }
+    ): Promise<{ data: SparePart[], total: number }> {
+        let parts = this.getParts();
+
+        // 1. Filtering
+        if (filters) {
+            if (filters.search) {
+                const s = filters.search.toLowerCase();
+                parts = parts.filter(p => 
+                    p.name.toLowerCase().includes(s) || 
+                    p.partNumber.toLowerCase().includes(s) || 
+                    (p.description && p.description.toLowerCase().includes(s))
+                );
+            }
+            if (filters.category && filters.category !== 'all') {
+                parts = parts.filter(p => p.category === filters.category);
+            }
+            if (filters.location && filters.location !== 'all') {
+                parts = parts.filter(p => p.location === filters.location);
+            }
+            if (filters.status === 'low') {
+                parts = parts.filter(p => p.currentStock < p.minStock);
+            } else if (filters.status === 'normal' && filters.status !== 'all') {
+                parts = parts.filter(p => p.currentStock >= p.minStock);
+            }
+        }
+
+        // 2. Sorting
+        parts.sort((a, b) => {
             const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
             const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-
-            if (dateA !== dateB) {
-                return dateB - dateA;
-            }
-
-            // Fallback to ID if dates are equal (or both missing)
-            // Assuming ID format contains timestamp for created items, or arbitrary string for others
+            if (dateA !== dateB) return dateB - dateA;
             return b.id.localeCompare(a.id);
         });
+
+        const total = parts.length;
+
+        // 3. Pagination
+        const from = (page - 1) * limit;
+        const to = from + limit;
+        const pagedData = parts.slice(from, to);
+
+        return { data: pagedData, total };
     }
 
     async getAllRequests(): Promise<PartsRequest[]> {
@@ -389,5 +454,55 @@ export class InventoryMockService implements IInventoryService {
 
         this.saveParts(parts);
         this.saveTransactions(transactions);
+    }
+
+    async saveReception(reception: Omit<StockReception, 'id' | 'receptionDate'>): Promise<StockReception> {
+        const receptions = loadFromStorage<StockReception>(RECEPTIONS_KEY, []);
+        const newReception: StockReception = {
+            id: `REC-${Date.now()}`,
+            receptionDate: new Date().toISOString(),
+            ...reception,
+            receivedBy: 'current-user' // Default for mock
+        };
+        receptions.unshift(newReception);
+        saveToStorage(RECEPTIONS_KEY, receptions);
+        return newReception;
+    }
+
+    async getReceptions(page: number = 1, limit: number = 50, filters?: { searchTerm?: string; partId?: string }): Promise<{ data: StockReception[], total: number }> {
+        let receptions = loadFromStorage<StockReception>(RECEPTIONS_KEY, []);
+
+        if (filters?.searchTerm || filters?.partId) {
+            const s = filters.searchTerm?.toLowerCase() || '';
+            const exactPartId = filters.partId;
+            
+            receptions = receptions.filter(r => {
+                if (exactPartId) {
+                    if (r.items && Array.isArray(r.items)) {
+                        return r.items.some(i => i.partId === exactPartId);
+                    }
+                    return false;
+                }
+                
+                if (s) {
+                    if (r.documentNumber && r.documentNumber.toLowerCase().includes(s)) return true;
+                    if (r.notes && r.notes.toLowerCase().includes(s)) return true;
+                    
+                    if (r.items && Array.isArray(r.items)) {
+                        return r.items.some(i => 
+                            (i.partName && i.partName.toLowerCase().includes(s)) || 
+                            (i.partNumber && i.partNumber.toLowerCase().includes(s))
+                        );
+                    }
+                }
+                return false;
+            });
+        }
+
+        const total = receptions.length;
+        const from = (page - 1) * limit;
+        const to = from + limit;
+        const data = receptions.slice(from, to);
+        return { data, total };
     }
 }

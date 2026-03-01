@@ -9,6 +9,8 @@ import { SparePart } from '../../types/inventory'; // Need this to lookup part n
 
 import { useMasterStore } from '../../stores/useMasterStore';
 
+import { TablePagination } from '../shared/TablePagination';
+
 // Service initialized in index.ts
 
 interface RequestListProps {
@@ -19,6 +21,7 @@ export const RequestList: React.FC<RequestListProps> = ({ onSelectRequest }) => 
     const [requests, setRequests] = useState<PartsRequest[]>([]);
     const [parts, setParts] = useState<SparePart[]>([]); // Need parts to show names in report
     const { plantSettings } = useMasterStore();
+    const [loading, setLoading] = useState(false);
 
     // Refs for date pickers
     const startDateRef = React.useRef<HTMLInputElement>(null);
@@ -31,15 +34,29 @@ export const RequestList: React.FC<RequestListProps> = ({ onSelectRequest }) => 
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
 
+    // Pagination state
+    const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0 });
+
     useEffect(() => {
-        Promise.all([
-            inventoryService.getAllRequests(),
-            inventoryService.getAllParts()
-        ]).then(([reqs, partsData]) => {
+        loadData();
+    }, [pagination.page]);
+
+    const loadData = async () => {
+        setLoading(true);
+        try {
+            const [reqs, partsData] = await Promise.all([
+                inventoryService.getAllRequests(),
+                inventoryService.getAllParts(1, 1000) // Fetch many for lookup
+            ]);
             setRequests(reqs);
-            setParts(partsData);
-        });
-    }, []);
+            setParts(partsData.data);
+            setPagination(prev => ({ ...prev, total: reqs.length }));
+        } catch (error) {
+            console.error("Error loading requests:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     // Filter Logic
     const filteredRequests = requests.filter(req => {
@@ -345,6 +362,16 @@ export const RequestList: React.FC<RequestListProps> = ({ onSelectRequest }) => 
                         )}
                     </tbody>
                 </table>
+            </div>
+
+            <div className="mt-4 flex justify-end">
+                <TablePagination
+                    totalItems={pagination.total}
+                    currentPage={pagination.page}
+                    itemsPerPage={pagination.limit}
+                    onPageChange={(p) => setPagination(prev => ({ ...prev, page: p }))}
+                    isLoading={loading}
+                />
             </div>
         </div >
     );

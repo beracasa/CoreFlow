@@ -1,7 +1,12 @@
 import { SparePart, PartsRequest, InventoryTransaction, PurchaseRequest, StockReception, StockReceptionItem } from '../types/inventory';
 
 export interface IInventoryService {
-    getAllParts(): Promise<SparePart[]>;
+    getAllParts(page?: number, limit?: number, filters?: {
+        search?: string;
+        category?: string;
+        location?: string;
+        status?: 'all' | 'low' | 'normal';
+    }): Promise<{ data: SparePart[], total: number }>;
     getAllRequests(): Promise<PartsRequest[]>;
     createRequest(requestData: Omit<PartsRequest, 'id' | 'createdDate' | 'status' | 'requestNumber' | 'items'> & { items: { partId: string; quantity: number }[] }): Promise<PartsRequest>;
     deliverParts(requestId: string, itemsToDeliver: { partId: string; quantity: number }[], receiverId?: string): Promise<PartsRequest>;
@@ -20,5 +25,5 @@ export interface IInventoryService {
 
     // Reception History
     saveReception(reception: Omit<StockReception, 'id' | 'receptionDate'>): Promise<StockReception>;
-    getReceptions(): Promise<StockReception[]>;
+    getReceptions(page?: number, limit?: number, filters?: { searchTerm?: string; partId?: string }): Promise<{ data: StockReception[], total: number }>;
 }

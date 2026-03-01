@@ -5,41 +5,36 @@ import { SparePart } from '../../types/inventory';
 import { Search, AlertCircle } from 'lucide-react';
 import { SparePartDetail } from './SparePartDetail';
 import { useMasterStore } from '../../stores/useMasterStore';
+import { TablePagination } from '../shared/TablePagination';
 
 // Service initialized in index.ts
 
 export const InventoryList: React.FC = () => {
-    const { parts, isLoading: loading, fetchMasterData, partCategories: categories, partLocations: locations } = useMasterStore();
-    const [searchTerm, setSearchTerm] = useState('');
+    const {
+        parts,
+        isLoading: loading,
+        fetchMasterData,
+        partCategories: categories,
+        partLocations: locations,
+        inventoryPagination: pagination,
+        setInventoryPage: setPage,
+        inventoryFilters,
+        setInventoryFilters
+    } = useMasterStore();
     const [selectedPart, setSelectedPart] = useState<SparePart | null>(null);
     const [showImportModal, setShowImportModal] = useState(false);
 
-    // Filters
-    const [categoryFilter, setCategoryFilter] = useState('');
-    const [locationFilter, setLocationFilter] = useState('');
-    const [statusFilter, setStatusFilter] = useState<'all' | 'low' | 'normal'>('all');
-
-    // Derived options
-    const matchSearch = (part: SparePart) =>
-        part.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        part.partNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        part.description.toLowerCase().includes(searchTerm.toLowerCase());
+    // Filters (Sync with store)
+    const searchTerm = inventoryFilters.search || '';
+    const categoryFilter = inventoryFilters.category || '';
+    const locationFilter = inventoryFilters.location || '';
+    const statusFilter = inventoryFilters.status || 'all';
 
     useEffect(() => {
         fetchMasterData();
     }, []);
 
-    const filteredParts = parts.filter(part => {
-        const matchesSearch = matchSearch(part);
-        const matchesCategory = categoryFilter ? part.category === categoryFilter : true;
-        const matchesLocation = locationFilter ? part.location === locationFilter : true;
-        const isLowStock = part.currentStock <= part.minStock;
-        const matchesStatus = statusFilter === 'all'
-            ? true
-            : statusFilter === 'low' ? isLowStock : !isLowStock;
-
-        return matchesSearch && matchesCategory && matchesLocation && matchesStatus;
-    });
+    const filteredParts = parts;
 
     return (
         <div className="bg-industrial-800 rounded-lg shadow-xl border border-industrial-700 p-6">
@@ -70,7 +65,7 @@ export const InventoryList: React.FC = () => {
                             placeholder="Buscar repuesto..."
                             className="w-full pl-10 pr-4 py-2 bg-industrial-900 border border-industrial-600 rounded-lg focus:ring-2 focus:ring-industrial-accent focus:border-transparent outline-none text-white placeholder-industrial-500"
                             value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
+                            onChange={(e) => setInventoryFilters({ search: e.target.value })}
                         />
                     </div>
                 </div>
@@ -80,7 +75,7 @@ export const InventoryList: React.FC = () => {
                     <select
                         className="w-full px-4 py-2 bg-industrial-900 border border-industrial-600 rounded-lg focus:ring-2 focus:ring-industrial-accent focus:border-transparent outline-none text-white appearance-none cursor-pointer"
                         value={categoryFilter}
-                        onChange={(e) => setCategoryFilter(e.target.value)}
+                        onChange={(e) => setInventoryFilters({ category: e.target.value })}
                     >
                         <option value="">Todas</option>
                         {categories.map(cat => (
@@ -94,7 +89,7 @@ export const InventoryList: React.FC = () => {
                     <select
                         className="w-full px-4 py-2 bg-industrial-900 border border-industrial-600 rounded-lg focus:ring-2 focus:ring-industrial-accent focus:border-transparent outline-none text-white appearance-none cursor-pointer"
                         value={locationFilter}
-                        onChange={(e) => setLocationFilter(e.target.value)}
+                        onChange={(e) => setInventoryFilters({ location: e.target.value })}
                     >
                         <option value="">Todas</option>
                         {locations.map(loc => (
@@ -108,7 +103,7 @@ export const InventoryList: React.FC = () => {
                     <select
                         className="w-full px-4 py-2 bg-industrial-900 border border-industrial-600 rounded-lg focus:ring-2 focus:ring-industrial-accent focus:border-transparent outline-none text-white appearance-none cursor-pointer"
                         value={statusFilter}
-                        onChange={(e) => setStatusFilter(e.target.value as any)}
+                        onChange={(e) => setInventoryFilters({ status: e.target.value as any })}
                     >
                         <option value="all">Todos</option>
                         <option value="low">Bajo Stock</option>
@@ -173,6 +168,16 @@ export const InventoryList: React.FC = () => {
                     </div>
                 )
             }
+
+            <div className="mt-6 flex justify-end">
+                <TablePagination
+                    totalItems={pagination.total}
+                    currentPage={pagination.page}
+                    itemsPerPage={pagination.limit}
+                    onPageChange={setPage}
+                    isLoading={loading}
+                />
+            </div>
 
             {
                 selectedPart && (

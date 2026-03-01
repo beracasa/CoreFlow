@@ -44,7 +44,8 @@ export const PartRequestForm: React.FC<PartRequestFormProps> = ({ initialData, o
     const [feedback, setFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
     useEffect(() => {
-        inventoryService.getAllParts().then(data => {
+        inventoryService.getAllParts(1, 1000).then(res => {
+            const data = res.data;
             setParts(data);
             // Update part names if editing
             if (initialData) {

@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { inventoryService } from '../../services';
 import { SparePart, StockReception } from '../../types/inventory';
-import { ArrowDownCircle, Clock, FileText, Package, ChevronDown, ChevronRight } from 'lucide-react';
+import { ArrowDownCircle, Clock, FileText, Package, ChevronDown, ChevronRight, Search, FileDown, Filter, X } from 'lucide-react';
+import { TablePagination } from '../shared/TablePagination';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { useMasterStore } from '../../stores/useMasterStore';
 
 export const ReceptionForm: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'new' | 'history'>('new');
@@ -21,25 +25,45 @@ export const ReceptionForm: React.FC = () => {
     const [receptions, setReceptions] = useState<StockReception[]>([]);
     const [loadingHistory, setLoadingHistory] = useState(false);
     const [expandedId, setExpandedId] = useState<string | null>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalHistory, setTotalHistory] = useState(0);
+    const ITEMS_PER_PAGE = 50;
+    const [historySearchTerm, setHistorySearchTerm] = useState('');
+    const [showHistoryDropdown, setShowHistoryDropdown] = useState(false);
+    const [selectedHistoryPartId, setSelectedHistoryPartId] = useState('');
 
     useEffect(() => {
-        inventoryService.getAllParts().then(setParts);
+        inventoryService.getAllParts(1, 1000).then(res => setParts(res.data));
     }, []);
 
-    const loadHistory = () => {
+    const loadHistory = (page: number = currentPage) => {
         setLoadingHistory(true);
-        inventoryService.getReceptions()
-            .then(data => setReceptions(data))
+        inventoryService.getReceptions(page, ITEMS_PER_PAGE, {
+            searchTerm: historySearchTerm || undefined,
+            partId: selectedHistoryPartId || undefined
+        })
+            .then(res => {
+                setReceptions(res.data);
+                setTotalHistory(res.total);
+            })
             .catch(err => console.error('Error loading reception history:', err))
             .finally(() => setLoadingHistory(false));
     };
 
-    // Load history whenever switching to that tab
+    // Load history whenever switching to that tab, page changes, or search term (if no part selected) or partId changes
     useEffect(() => {
         if (activeTab === 'history') {
-            loadHistory();
+            const timeoutId = setTimeout(() => {
+                loadHistory(currentPage);
+            }, 300); // Debounce search
+            return () => clearTimeout(timeoutId);
         }
-    }, [activeTab]);
+    }, [activeTab, currentPage, historySearchTerm, selectedHistoryPartId]);
+
+    // Reset page on search
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [historySearchTerm, selectedHistoryPartId]);
 
     const handleAddItem = () => {
         if (!selectedPartId || quantity <= 0) return;
@@ -47,7 +71,7 @@ export const ReceptionForm: React.FC = () => {
         if (!part) return;
         setItemsToReceive(prev => [
             ...prev,
-            { partId: part.id, partName: part.name, partNumber: part.partNumber, quantity }
+            { partId: part.id, partName: part.name, partNumber: part.partNumber || part.sku || '', quantity }
         ]);
         setSelectedPartId('');
         setSearchTerm('');
@@ -56,6 +80,82 @@ export const ReceptionForm: React.FC = () => {
 
     const handleRemoveItem = (index: number) => {
         setItemsToReceive(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const generatePDF = () => {
+        const { plantSettings } = useMasterStore.getState() as any;
+        const doc = new jsPDF();
+
+        let currentY = 15;
+
+        // 1. Logo (No distortion)
+        if (plantSettings.logoUrl) {
+            try {
+                const imgProps = doc.getImageProperties(plantSettings.logoUrl);
+                const logoWidth = 35;
+                const logoHeight = (imgProps.height * logoWidth) / imgProps.width;
+                doc.addImage(plantSettings.logoUrl, 'PNG', 14, 10, logoWidth, logoHeight);
+                currentY = 10 + logoHeight + 10;
+            } catch (e) {
+                console.warn('Could not add logo', e);
+                currentY = 20;
+            }
+        } else {
+            currentY = 20;
+        }
+
+        // 2. Title (14pt)
+        doc.setFontSize(14);
+        doc.setTextColor(40);
+        doc.text('Reporte de Recepción de Mercadería', 14, currentY);
+        currentY += 8;
+
+        // 3. Filters
+        doc.setFontSize(10);
+        doc.setTextColor(100);
+
+        let filterStr = 'Filtros: Todos los registros';
+        if (selectedHistoryPartId) {
+            const selectedPart = parts.find(p => p.id === selectedHistoryPartId);
+            filterStr = `Filtros: Repuesto Seleccionado - ${selectedPart ? `${selectedPart.sku || selectedPart.partNumber} ${selectedPart.name}` : historySearchTerm}`;
+        } else if (historySearchTerm) {
+            filterStr = `Búsqueda: "${historySearchTerm}"`;
+        }
+
+        doc.text(filterStr, 14, currentY);
+        currentY += 10;
+
+        // 4. Content Table
+        const tableColumn = ["Fecha", "Documento", "Repuestos (Código - Nombre - Cantidad)", "Notas"];
+        const tableRows: any[] = [];
+
+        receptions.forEach(rec => {
+            const itemsStr = rec.items.map(i => `${i.partNumber} - ${i.partName} (${i.quantity})`).join('\n');
+            const date = new Date(rec.receptionDate).toLocaleDateString('es-DO', {
+                day: '2-digit', month: '2-digit', year: 'numeric',
+                hour: '2-digit', minute: '2-digit'
+            });
+
+            tableRows.push([
+                date,
+                rec.documentNumber || 'N/A',
+                itemsStr,
+                rec.notes || '-'
+            ]);
+        });
+
+        autoTable(doc, {
+            head: [tableColumn],
+            body: tableRows,
+            startY: currentY,
+            headStyles: { fillColor: [16, 185, 129] }, // Emerald-500
+            styles: { fontSize: 9, cellPadding: 3 },
+            columnStyles: {
+                2: { cellWidth: 80 } // Give more space to items list
+            }
+        });
+
+        doc.save(`reporte_recepciones_${new Date().toISOString().split('T')[0]}.pdf`);
     };
 
     const handleReceive = async (e: React.FormEvent) => {
@@ -85,7 +185,7 @@ export const ReceptionForm: React.FC = () => {
             setQuantity(0);
             setSearchTerm('');
             setSelectedPartId('');
-            inventoryService.getAllParts().then(setParts);
+            inventoryService.getAllParts(1, 1000).then(res => setParts(res.data));
         } catch (err) {
             console.error(err);
             setMessage({ type: 'error', text: 'Error al procesar la recepción.' });
@@ -95,6 +195,12 @@ export const ReceptionForm: React.FC = () => {
     const filteredParts = parts.filter(p =>
         p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.partNumber.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    const historyFilteredParts = parts.filter(p =>
+        p.name.toLowerCase().includes(historySearchTerm.toLowerCase()) ||
+        p.partNumber.toLowerCase().includes(historySearchTerm.toLowerCase()) ||
+        (p.sku && p.sku.toLowerCase().includes(historySearchTerm.toLowerCase()))
     );
 
     return (
@@ -259,15 +365,80 @@ export const ReceptionForm: React.FC = () => {
 
             {/* ── TAB: Historial ── */}
             {activeTab === 'history' && (
-                <div className="p-6">
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-white font-bold text-sm">Historial de Recepciones</h3>
-                        <button
-                            onClick={loadHistory}
-                            className="text-xs text-industrial-400 hover:text-white transition-colors flex items-center gap-1"
-                        >
-                            <Clock className="w-3 h-3" /> Actualizar
-                        </button>
+                <div className="p-6 flex flex-col h-[calc(100vh-250px)]">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                        <div className="relative flex-1 w-full max-w-md">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-industrial-400" />
+                            <input
+                                type="text"
+                                className={`w-full bg-industrial-900 border border-industrial-600 rounded-lg pl-10 ${historySearchTerm ? 'pr-10' : 'pr-4'} py-2 text-white text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all`}
+                                placeholder="Buscar OC, Notas, o Repuesto..."
+                                value={historySearchTerm}
+                                onChange={(e) => {
+                                    setHistorySearchTerm(e.target.value);
+                                    setSelectedHistoryPartId('');
+                                    setShowHistoryDropdown(true);
+                                }}
+                                onFocus={() => setShowHistoryDropdown(true)}
+                                onBlur={() => setTimeout(() => setShowHistoryDropdown(false), 200)}
+                            />
+                            {historySearchTerm && (
+                                <button
+                                    onClick={() => {
+                                        setHistorySearchTerm('');
+                                        setSelectedHistoryPartId('');
+                                    }}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-industrial-400 hover:text-white"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            )}
+
+                            {showHistoryDropdown && historySearchTerm && !selectedHistoryPartId && (
+                                <div className="absolute z-10 w-full mt-1 bg-industrial-800 border border-industrial-600 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                                    {historyFilteredParts.length > 0 ? (
+                                        <>
+                                            <div className="px-4 py-2 text-xs font-bold text-industrial-400 bg-industrial-900/50 uppercase">
+                                                Filtrar por Repuesto Específico
+                                            </div>
+                                            {historyFilteredParts.map(p => (
+                                                <div
+                                                    key={p.id}
+                                                    className="px-4 py-2 hover:bg-industrial-700 cursor-pointer text-white text-sm border-b border-industrial-700/50 last:border-0"
+                                                    onClick={() => {
+                                                        setSelectedHistoryPartId(p.id);
+                                                        setHistorySearchTerm(`${p.sku || p.partNumber} - ${p.name}`);
+                                                        setShowHistoryDropdown(false);
+                                                    }}
+                                                >
+                                                    <span className="font-bold text-emerald-400">{p.sku || p.partNumber}</span> - {p.name}
+                                                </div>
+                                            ))}
+                                        </>
+                                    ) : (
+                                        <div className="px-4 py-2 text-industrial-400 text-sm">
+                                            Se buscará texto libre en Documentos y Notas...
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={generatePDF}
+                                disabled={receptions.length === 0}
+                                className="flex items-center gap-2 px-3 py-2 bg-industrial-700 hover:bg-industrial-600 disabled:opacity-50 text-white text-sm font-semibold rounded-lg border border-industrial-600 transition-colors"
+                            >
+                                <FileDown className="w-4 h-4" /> Exportar PDF
+                            </button>
+                            <button
+                                onClick={() => loadHistory(currentPage)}
+                                className="p-2 bg-industrial-700 hover:bg-industrial-600 text-industrial-400 hover:text-white rounded-lg border border-industrial-600 transition-colors"
+                                title="Actualizar"
+                            >
+                                <Clock className="w-4 h-4" />
+                            </button>
+                        </div>
                     </div>
 
                     {loadingHistory ? (
@@ -343,6 +514,18 @@ export const ReceptionForm: React.FC = () => {
                                     )}
                                 </div>
                             ))}
+                        </div>
+                    )}
+
+                    {!loadingHistory && receptions.length > 0 && (
+                        <div className="mt-6 flex justify-end">
+                            <TablePagination
+                                totalItems={totalHistory}
+                                currentPage={currentPage}
+                                itemsPerPage={ITEMS_PER_PAGE}
+                                onPageChange={setCurrentPage}
+                                isLoading={loadingHistory}
+                            />
                         </div>
                     )}
                 </div>

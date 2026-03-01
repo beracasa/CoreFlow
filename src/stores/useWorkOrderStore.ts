@@ -8,8 +8,14 @@ interface WorkOrderState {
     loading: boolean;
     isInitialized: boolean;
     error: string | null;
+    pagination: {
+        page: number;
+        limit: number;
+        total: number;
+    };
 
-    fetchOrders: () => Promise<void>;
+    fetchOrders: (page?: number, limit?: number, formType?: string) => Promise<void>;
+    setPage: (page: number, formType?: string) => Promise<void>;
     addOrder: (order: Omit<WorkOrder, 'id'>) => Promise<void>;
     updateOrder: (id: string, updates: Partial<WorkOrder>) => Promise<void>;
     deleteOrder: (id: string) => Promise<void>;
@@ -21,18 +27,30 @@ export const useWorkOrderStore = create<WorkOrderState>((set, get) => ({
     loading: false,
     isInitialized: false, // Add flag
     error: null,
+    pagination: {
+        page: 1,
+        limit: 50,
+        total: 0
+    },
 
-    fetchOrders: async () => {
-        const state = get();
-        if (state.loading || state.isInitialized) return;
-
+    fetchOrders: async (page = 1, limit = 50, formType) => {
         set({ loading: true, error: null });
         try {
-            const orders = await workOrderService.getAll();
-            set({ workOrders: orders, loading: false, isInitialized: true });
+            const result = await workOrderService.getAll(page, limit, formType);
+            set({
+                workOrders: result.data,
+                pagination: { page, limit, total: result.total },
+                loading: false,
+                isInitialized: true
+            });
         } catch (err: any) {
             set({ error: err.message || 'Failed to fetch orders', loading: false, isInitialized: true });
         }
+    },
+
+    setPage: async (page, formType) => {
+        const { pagination } = get();
+        await get().fetchOrders(page, pagination.limit, formType);
     },
 
     addOrder: async (orderData) => {

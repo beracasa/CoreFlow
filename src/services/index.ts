@@ -8,7 +8,7 @@ import { InventorySupabaseService } from './implementations/inventorySupabase';
 
 // New Implementations
 import { MachineSupabaseService } from './implementations/machineSupabase';
-// import { MachineMockService } from './implementations/machineMock'; // If existed
+import { masterMockService } from './implementations/masterMock';
 import { SparePartSupabaseService } from './implementations/sparePartSupabase';
 import { ProtocolSupabaseService } from './implementations/protocolSupabase';
 
@@ -24,13 +24,21 @@ export const inventoryService: IInventoryService = useMock
     ? new InventoryMockService()
     : new InventorySupabaseService();
 
-// Master Data Exports (No interface abstraction yet for these specific ones, calling directly or via MasterDataService wrapper)
+// Master Data Exports
 export const machineService = useMock 
-    ? null // MachineMockService not standardized yet, assuming existing store logic handled it
+    ? masterMockService 
     : MachineSupabaseService;
 
+export const technicianService = useMock
+    ? masterMockService
+    : null; // Direct supabase calls in MasterDataService for now
+
+export const configService = useMock
+    ? masterMockService
+    : null;
+
 export const sparePartService = useMock 
-    ? null // InventoryMockService handles parts?
+    ? inventoryService
     : SparePartSupabaseService;
 
 export const protocolService = useMock
