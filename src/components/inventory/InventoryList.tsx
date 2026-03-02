@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { inventoryService } from '../../services';
-import { ImportSpareParts } from './ImportSpareParts';
 import { SparePart } from '../../types/inventory';
-import { Search, AlertCircle } from 'lucide-react';
+import { Search, AlertCircle, FileDown } from 'lucide-react';
 import { SparePartDetail } from './SparePartDetail';
 import { useMasterStore } from '../../stores/useMasterStore';
 import { TablePagination } from '../shared/TablePagination';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 // Service initialized in index.ts
 
@@ -19,10 +20,10 @@ export const InventoryList: React.FC = () => {
         inventoryPagination: pagination,
         setInventoryPage: setPage,
         inventoryFilters,
-        setInventoryFilters
+        setInventoryFilters,
+        plantSettings
     } = useMasterStore();
     const [selectedPart, setSelectedPart] = useState<SparePart | null>(null);
-    const [showImportModal, setShowImportModal] = useState(false);
 
     // Filters (Sync with store)
     const searchTerm = inventoryFilters.search || '';
@@ -33,6 +34,83 @@ export const InventoryList: React.FC = () => {
     useEffect(() => {
         fetchMasterData();
     }, []);
+
+    const generatePDF = () => {
+        const doc = new jsPDF();
+
+        // Logo & Header
+        if (plantSettings.logoUrl) {
+            try {
+                const imgProps = doc.getImageProperties(plantSettings.logoUrl);
+                const logoWidth = 30;
+                const logoHeight = (imgProps.height * logoWidth) / imgProps.width;
+                doc.addImage(plantSettings.logoUrl, 'PNG', 14, 10, logoWidth, logoHeight);
+            } catch (e) {
+                console.warn('Could not add logo to PDF', e);
+            }
+        } else {
+            doc.setFontSize(14);
+            doc.text(plantSettings.plantName || 'CoreFlow', 14, 20);
+        }
+
+        // Title
+        doc.setFontSize(14);
+        doc.text('Reporte de Inventario de Repuestos', 14, 35);
+
+        // Date
+        doc.setFontSize(10);
+        const dateStr = new Date().toLocaleDateString();
+        doc.text(`Fecha de Emisión: ${dateStr}`, 14, 42);
+
+        // Filters Info
+        let yPos = 52;
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Filtros aplicados:', 14, yPos);
+        doc.setFont('helvetica', 'normal');
+
+        const filterTexts = [];
+        if (searchTerm) filterTexts.push(`Búsqueda: ${searchTerm}`);
+        if (categoryFilter) filterTexts.push(`Categoría: ${categoryFilter}`);
+        if (locationFilter) filterTexts.push(`Tramo: ${locationFilter}`);
+        if (statusFilter !== 'all') {
+            filterTexts.push(`Estado: ${statusFilter === 'low' ? 'Bajo Stock' : 'Normal'}`);
+        }
+
+        const filterStr = filterTexts.length > 0 ? filterTexts.join(' | ') : 'Ninguno';
+        doc.text(filterStr, 42, yPos);
+        yPos += 8;
+
+        // Table
+        const tableBody = parts.map(part => {
+            const isLowStock = part.currentStock < part.minStock;
+            return [
+                part.partNumber,
+                part.name,
+                part.location,
+                part.subLocation || '-',
+                `${part.currentStock} ${part.unitOfMeasure}`,
+                part.minStock,
+                isLowStock ? 'Bajo Stock' : 'Normal'
+            ];
+        });
+
+        autoTable(doc, {
+            startY: yPos,
+            head: [['Código', 'Nombre', 'Tramo', 'Ubicación', 'Stock', 'Mínimo', 'Estado']],
+            body: tableBody,
+            theme: 'grid',
+            headStyles: { fillColor: [40, 40, 40], textColor: 255, fontStyle: 'bold' },
+            styles: { fontSize: 8 },
+            columnStyles: {
+                4: { halign: 'right' },
+                5: { halign: 'right' },
+                6: { halign: 'center' }
+            }
+        });
+
+        doc.save(`Inventario_Repuestos_${new Date().toISOString().split('T')[0]}.pdf`);
+    };
 
     const filteredParts = parts;
 
@@ -46,10 +124,12 @@ export const InventoryList: React.FC = () => {
                     Inventario de Repuestos
                 </h2>
                 <button
-                    onClick={() => setShowImportModal(true)}
-                    className="px-4 py-2 bg-industrial-600 text-white rounded-lg hover:bg-industrial-500 transition-colors text-sm font-medium flex items-center gap-2"
+                    onClick={generatePDF}
+                    disabled={parts.length === 0}
+                    className="px-4 py-2 bg-industrial-700 hover:bg-industrial-600 border border-industrial-600 text-white rounded-lg transition-colors text-sm font-medium flex items-center gap-2"
                 >
-                    Importar Excel/CSV
+                    <FileDown className="w-4 h-4" />
+                    Exportar PDF
                 </button>
             </div>
 
@@ -187,14 +267,6 @@ export const InventoryList: React.FC = () => {
                     />
                 )
             }
-            {showImportModal && (
-                <ImportSpareParts
-                    onClose={() => setShowImportModal(false)}
-                    onSuccess={() => {
-                        fetchMasterData();
-                    }}
-                />
-            )}
         </div >
     );
 };

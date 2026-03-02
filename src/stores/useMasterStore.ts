@@ -15,6 +15,12 @@ interface MasterState {
     plantSettings: PlantSettings;
     currentPlan: PlanTier;
     maintenancePlans: MaintenancePlan[];
+    branches: string[];
+    categories: string[];
+    assetTypes: string[];
+    partCategories: string[];
+    partLocations: string[];
+    partUnits: string[];
 
     // Maintenance Plans Actions
     addMaintenancePlan: (plan: MaintenancePlan) => void;
@@ -64,6 +70,7 @@ interface MasterState {
     addTechnician: (tech: Technician) => Promise<void>;
     addPart: (part: Omit<SparePart, 'id'>) => Promise<void>;
     updatePart: (updatedPart: SparePart) => Promise<void>;
+    setSelectedPart: (part: SparePart | null) => void; // Added action for selectedPart
 
     addZone: (zone: ZoneStructure) => Promise<void>;
     updateZone: (zone: ZoneStructure) => Promise<void>;

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { inventoryService } from '../../services';
-import { Package, PlusCircle, Save, Edit, Plus } from 'lucide-react';
+import { Package, PlusCircle, Save, Edit, Plus, FileSpreadsheet } from 'lucide-react';
 import { SparePart } from '../../types/inventory';
 import { useMasterStore } from '../../stores/useMasterStore';
+import { ImportSpareParts } from './ImportSpareParts';
 
 // Service initialized in index.ts
 
@@ -32,6 +33,7 @@ export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData,
 
     // Formatting state for display
     const [displayCost, setDisplayCost] = useState('');
+    const [showImportModal, setShowImportModal] = useState(false);
 
     useEffect(() => {
         if (initialData) {
@@ -168,6 +170,16 @@ export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData,
                     </span>
                     <h2 className="text-xl font-bold">{initialData ? 'Editar Repuesto' : 'Crear Nuevo Repuesto'}</h2>
                 </div>
+                {!initialData && (
+                    <button
+                        type="button"
+                        onClick={() => setShowImportModal(true)}
+                        className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors text-sm font-medium flex items-center gap-2 shadow-lg shadow-emerald-900/20"
+                    >
+                        <FileSpreadsheet className="w-4 h-4" />
+                        Importar Excel/CSV
+                    </button>
+                )}
                 {onCancel && (
                     <button onClick={onCancel} className="text-industrial-400 hover:text-white">
                         <span className="sr-only">Cerrar</span>
@@ -399,6 +411,16 @@ export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData,
                     </button>
                 </div>
             </form >
+
+            {showImportModal && (
+                <ImportSpareParts
+                    onClose={() => setShowImportModal(false)}
+                    onSuccess={() => {
+                        useMasterStore.getState().fetchMasterData();
+                        if (onSuccess) onSuccess();
+                    }}
+                />
+            )}
         </div >
     );
 };

@@ -54,7 +54,7 @@ export class InventorySupabaseService implements IInventoryService {
 
         let query = supabase
             .from('spare_parts')
-            .select('id, sku, name, description, category, unit_of_measure, current_stock, minimum_stock, maximum_stock, location_code, sub_location, unit_cost, image_url, created_at', { count: 'exact' });
+            .select('*', { count: 'exact' });
 
         if (filters) {
             if (filters.search) {
@@ -66,14 +66,10 @@ export class InventorySupabaseService implements IInventoryService {
             if (filters.location && filters.location !== 'all') {
                 query = query.eq('location_code', filters.location);
             }
-            if (filters.status === 'low') {
-                query = query.lt('current_stock', supabase.raw('minimum_stock')); // Note: Supabase might need a comparison column vs column if supported or a raw filter
-                // Alternatively, if Supabase doesn't support col vs col in .lt(), we might need a stored procedure or special filter.
-                // For now, let's use a standard filter if possible.
-                query = query.filter('current_stock', 'lt', 'minimum_stock');
-            } else if (filters.status === 'normal') {
-                query = query.filter('current_stock', 'gte', 'minimum_stock');
-            }
+            // Note: status 'low' or 'normal' requires column vs column comparison 
+            // which standard PostgREST .lt() doesn't support with column names.
+            // For now, we will handle this via RPC or client-side if needed, 
+            // but to restore visibility, we'll skip these specific server-side filters.
         }
 
         const { data, count, error } = await query
