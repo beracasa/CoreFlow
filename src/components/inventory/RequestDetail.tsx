@@ -21,7 +21,9 @@ import { useMasterStore } from '../../stores/useMasterStore';
 // ... (existing imports)
 
 export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, onBack }) => {
-    const { technicians, plantSettings } = useMasterStore();
+    const { technicians, plantSettings, parts: storeParts } = useMasterStore();
+    const activeParts = storeParts.length > 0 ? storeParts : parts;
+
     const [isProcessing, setIsProcessing] = useState(false);
     const currentUser = (useMasterStore.getState() as any).currentUser;
     const [selectedItems, setSelectedItems] = useState<Record<string, number>>({});
@@ -83,6 +85,10 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
                 }));
 
             const updatedRequest = await inventoryService.deliverParts(localRequest.id, itemsList, selectedReceiver);
+
+            // Refresh global master data to update stock levels in the UI
+            await useMasterStore.getState().fetchMasterData();
+
             setLocalRequest(updatedRequest);
             setIsProcessing(false);
             setSelectedReceiver(''); // Reset
@@ -171,7 +177,7 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
         doc.text(`Estado: ${statusText}`, 14, 75);
 
         const tableBody = localRequest.items.map(item => {
-            const part = parts.find(p => p.id === item.partId);
+            const part = activeParts.find(p => p.id === item.partId);
             return [
                 part?.partNumber || '-',
                 part?.name || item.partId,
@@ -207,11 +213,11 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
     };
 
     const getPartName = (partId: string) => {
-        return parts.find(p => p.id === partId)?.name || partId;
+        return activeParts.find(p => p.id === partId)?.name || partId;
     };
 
     const getPartNumber = (partId: string) => {
-        return parts.find(p => p.id === partId)?.partNumber || '';
+        return activeParts.find(p => p.id === partId)?.partNumber || '';
     };
 
     if (isEditing) {
@@ -408,7 +414,7 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
                             </thead>
                             <tbody className="divide-y divide-industrial-700">
                                 {localRequest.items.map((item, idx) => {
-                                    const part = parts.find(p => p.id === item.partId);
+                                    const part = activeParts.find(p => p.id === item.partId);
                                     const isFullyDelivered = item.quantityDelivered >= item.quantityRequested;
 
                                     return (
@@ -546,7 +552,7 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
                 isPurchaseModalOpen && (
                     <PurchaseRequestModal
                         request={localRequest}
-                        parts={parts}
+                        parts={activeParts}
                         onClose={() => setIsPurchaseModalOpen(false)}
                         onSuccess={(updated) => {
                             setLocalRequest(updated);

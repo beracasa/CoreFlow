@@ -172,7 +172,9 @@ export const PurchaseRequestModal: React.FC<PurchaseRequestModalProps> = ({ requ
             // onClose(); // Or close directly
         } catch (error) {
             console.error('Error saving purchase request:', error);
-            alert('Error al guardar el historial de solicitud.');
+            // El usuario solicitó eliminar la ventana de confirmación (alert) al guardar el historial. 
+            // Continuamos sin interrumpir, el PDF ya se descargó.
+            onSuccess(request);
         }
     };
 

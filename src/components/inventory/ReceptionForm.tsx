@@ -36,13 +36,14 @@ export const ReceptionForm: React.FC = () => {
         inventoryService.getAllParts(1, 1000).then(res => setParts(res.data));
     }, []);
 
-    const loadHistory = (page: number = currentPage) => {
+    const loadHistory = () => {
         setLoadingHistory(true);
-        inventoryService.getReceptions(page, ITEMS_PER_PAGE, {
+        inventoryService.getReceptions({
             searchTerm: historySearchTerm || undefined,
             partId: selectedHistoryPartId || undefined
         })
             .then(res => {
+                console.log("HISTORY LOAD RET", res.data.length, res.total);
                 setReceptions(res.data);
                 setTotalHistory(res.total);
             })
@@ -50,15 +51,15 @@ export const ReceptionForm: React.FC = () => {
             .finally(() => setLoadingHistory(false));
     };
 
-    // Load history whenever switching to that tab, page changes, or search term (if no part selected) or partId changes
+    // Load history whenever switching to that tab, or search term (if no part selected) or partId changes
     useEffect(() => {
         if (activeTab === 'history') {
             const timeoutId = setTimeout(() => {
-                loadHistory(currentPage);
+                loadHistory();
             }, 300); // Debounce search
             return () => clearTimeout(timeoutId);
         }
-    }, [activeTab, currentPage, historySearchTerm, selectedHistoryPartId]);
+    }, [activeTab, historySearchTerm, selectedHistoryPartId]);
 
     // Reset page on search
     useEffect(() => {
@@ -202,6 +203,10 @@ export const ReceptionForm: React.FC = () => {
         p.partNumber.toLowerCase().includes(historySearchTerm.toLowerCase()) ||
         (p.sku && p.sku.toLowerCase().includes(historySearchTerm.toLowerCase()))
     );
+
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    const currentReceptions = receptions.slice(startIndex, endIndex);
 
     return (
         <div className="bg-industrial-800 rounded-lg shadow-xl border border-industrial-700 overflow-hidden">
@@ -365,7 +370,7 @@ export const ReceptionForm: React.FC = () => {
 
             {/* ── TAB: Historial ── */}
             {activeTab === 'history' && (
-                <div className="p-6 flex flex-col h-[calc(100vh-250px)]">
+                <div className="p-6">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                         <div className="relative flex-1 w-full max-w-md">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-industrial-400" />
@@ -432,7 +437,7 @@ export const ReceptionForm: React.FC = () => {
                                 <FileDown className="w-4 h-4" /> Exportar PDF
                             </button>
                             <button
-                                onClick={() => loadHistory(currentPage)}
+                                onClick={() => loadHistory()}
                                 className="p-2 bg-industrial-700 hover:bg-industrial-600 text-industrial-400 hover:text-white rounded-lg border border-industrial-600 transition-colors"
                                 title="Actualizar"
                             >
@@ -450,7 +455,7 @@ export const ReceptionForm: React.FC = () => {
                         </div>
                     ) : (
                         <div className="space-y-2">
-                            {receptions.map(rec => (
+                            {currentReceptions.map(rec => (
                                 <div key={rec.id} className="border border-industrial-700 rounded-lg overflow-hidden">
                                     {/* Row header */}
                                     <button
@@ -518,7 +523,7 @@ export const ReceptionForm: React.FC = () => {
                     )}
 
                     {!loadingHistory && receptions.length > 0 && (
-                        <div className="mt-6 flex justify-end">
+                        <div className="mt-4 pt-4 border-t border-industrial-700 flex justify-end">
                             <TablePagination
                                 totalItems={totalHistory}
                                 currentPage={currentPage}

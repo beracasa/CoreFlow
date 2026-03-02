@@ -469,7 +469,7 @@ export class InventoryMockService implements IInventoryService {
         return newReception;
     }
 
-    async getReceptions(page: number = 1, limit: number = 50, filters?: { searchTerm?: string; partId?: string }): Promise<{ data: StockReception[], total: number }> {
+    async getReceptions(filters?: { searchTerm?: string; partId?: string }): Promise<{ data: StockReception[], total: number }> {
         let receptions = loadFromStorage<StockReception>(RECEPTIONS_KEY, []);
 
         if (filters?.searchTerm || filters?.partId) {
@@ -499,10 +499,6 @@ export class InventoryMockService implements IInventoryService {
             });
         }
 
-        const total = receptions.length;
-        const from = (page - 1) * limit;
-        const to = from + limit;
-        const data = receptions.slice(from, to);
-        return { data, total };
+        return { data: receptions, total: receptions.length };
     }
 }

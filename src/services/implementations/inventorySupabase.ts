@@ -131,23 +131,32 @@ export class InventorySupabaseService implements IInventoryService {
     }
 
     async addStock(partId: string, quantity: number, relatedDocId?: string): Promise<void> {
-        // Optimistic update for now, ideally use RPC for atomic increment
-        const { data: part, error: getError } = await supabase
-            .from('spare_parts')
-            .select('current_stock')
-            .eq('id', partId)
-            .single();
+        // Use RPC for atomic increment to prevent race conditions
+        const { error } = await supabase.rpc('increment_part_stock', {
+            p_part_id: partId,
+            p_quantity: quantity
+        });
 
-        if (getError) throw getError;
+        if (error) {
+            console.error('Error in addStock atomic increment:', error);
+            // Fallback for missing RPC or error
+            const { data: part, error: getError } = await supabase
+                .from('spare_parts')
+                .select('current_stock')
+                .eq('id', partId)
+                .single();
 
-        const newStock = (part.current_stock || 0) + quantity;
+            if (getError) throw getError;
 
-        const { error: updateError } = await supabase
-            .from('spare_parts')
-            .update({ current_stock: newStock })
-            .eq('id', partId);
+            const newStock = (part.current_stock || 0) + quantity;
 
-        if (updateError) throw updateError;
+            const { error: updateError } = await supabase
+                .from('spare_parts')
+                .update({ current_stock: newStock })
+                .eq('id', partId);
+
+            if (updateError) throw updateError;
+        }
     }
 
     async bulkCreate(parts: Omit<SparePart, 'id'>[]): Promise<void> {
@@ -263,7 +272,7 @@ export class InventorySupabaseService implements IInventoryService {
                     .update({ quantity_delivered: newDelivered })
                     .eq('id', requestItem.id);
 
-                // Create inventory transaction (this trigger will update spare_parts stock)
+                // Create inventory transaction
                 await supabase
                     .from('inventory_transactions')
                     .insert({
@@ -274,6 +283,31 @@ export class InventorySupabaseService implements IInventoryService {
                         notes: `Entrega para solicitud ${requestId}`,
                         delivered_to: receiverId
                     });
+
+                // Atomic decrement of spare_parts stock
+                const { error: rpcError } = await supabase.rpc('increment_part_stock', {
+                    p_part_id: item.partId,
+                    p_quantity: -item.quantity
+                });
+                
+                if (rpcError) {
+                    console.error('Error in deliverParts atomic decrement, using fallback:', rpcError);
+                    // Fallback for missing RPC
+                    const { data: part, error: getError } = await supabase
+                        .from('spare_parts')
+                        .select('current_stock')
+                        .eq('id', item.partId)
+                        .single();
+
+                    if (!getError && part) {
+                        const newStock = (part.current_stock || 0) - item.quantity;
+                        await supabase
+                            .from('spare_parts')
+                            .update({ current_stock: newStock })
+                            .eq('id', item.partId);
+                    }
+                }
+
             }
         }
 
@@ -369,15 +403,20 @@ export class InventorySupabaseService implements IInventoryService {
     }
 
     async savePurchaseRequest(requestId: string, purchaseRequest: any): Promise<PartsRequest> {
-         const { error } = await supabase
-            .from('purchase_requests')
-            .insert({
+         const payload: any = {
                 request_id: requestId,
                 purchase_request_number: purchaseRequest.purchaseRequestNumber,
-                requested_by: purchaseRequest.requestedBy,
                 items: purchaseRequest.items,
                 request_date: purchaseRequest.requestDate
-            });
+         };
+
+         if (purchaseRequest.requestedBy && purchaseRequest.requestedBy !== 'System') {
+             payload.requested_by = purchaseRequest.requestedBy;
+         }
+
+         const { error } = await supabase
+            .from('purchase_requests')
+            .insert(payload);
 
         if (error) throw error;
 
@@ -411,36 +450,10 @@ export class InventorySupabaseService implements IInventoryService {
         };
     }
 
-    async getReceptions(page: number = 1, limit: number = 50, filters?: { searchTerm?: string; partId?: string }): Promise<{ data: any[], total: number }> {
-        const { from, to } = getPaginationRange(page, limit);
+    async getReceptions(filters?: { searchTerm?: string; partId?: string }): Promise<{ data: any[], total: number }> {
 
-        if (!filters?.searchTerm && !filters?.partId) {
-            // Normal pagination flow
-            const { data, count, error } = await supabase
-                .from('stock_receptions')
-                .select('*', { count: 'exact' })
-                .order('reception_date', { ascending: false })
-                .range(from, to);
-
-            if (error) throw error;
-
-            const mappedData = (data || []).map((record: any) => ({
-                id: record.id,
-                receptionDate: record.reception_date,
-                documentNumber: record.document_number,
-                receivedBy: record.received_by,
-                items: record.items || [],
-                notes: record.notes
-            }));
-
-            return { data: mappedData, total: count || 0 };
-        }
-
-        // --- Robust Search Flow ---
-        // Fetch a large window of recent records and filter in memory
-        // This bypasses complex JSONB operator limitations in PostgREST
-        const term = filters.searchTerm?.toLowerCase() || '';
-        const exactPartId = filters.partId;
+        const term = filters?.searchTerm?.toLowerCase() || '';
+        const exactPartId = filters?.partId;
         
         const { data: allData, error } = await supabase
             .from('stock_receptions')
@@ -460,7 +473,7 @@ export class InventorySupabaseService implements IInventoryService {
         }));
 
         // Filter the mapped data
-        const filteredData = mappedAllData.filter(rec => {
+        const filteredData = (!exactPartId && !term) ? mappedAllData : mappedAllData.filter(rec => {
             // If we have an exact part ID, we ONLY want to check if the items array contains it
             if (exactPartId) {
                 if (rec.items && Array.isArray(rec.items)) {
@@ -485,10 +498,8 @@ export class InventorySupabaseService implements IInventoryService {
             return false;
         });
 
-        // Manual Pagination
         const total = filteredData.length;
-        const pagedData = filteredData.slice(from, to + 1);
 
-        return { data: pagedData, total };
+        return { data: filteredData, total };
     }
 }

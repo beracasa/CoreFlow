@@ -125,13 +125,13 @@ export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData,
 
             if (initialData) {
                 // Edit mode
+                const { initialStock, ...dataWithoutStock } = formData;
                 const updated = await updatePart({
                     ...initialData,
-                    ...formData,
-                    currentStock: formData.initialStock
+                    ...dataWithoutStock
                 });
                 setFeedback({ type: 'success', message: 'Repuesto actualizado exitosamente.' });
-                if (onSuccess) onSuccess(updated as any); // Cast as updated might be void in store but it actually returns if we change it or we can just rely on the fact that it's updated in store
+                if (onSuccess) onSuccess(updated as any);
             } else {
                 const created = await addPart(formData);
                 setFeedback({ type: 'success', message: 'Repuesto creado exitosamente.' });
@@ -289,12 +289,13 @@ export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData,
 
                     {/* Initial Stock / Current Stock */}
                     <div>
-                        <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">{initialData ? 'Stock Actual' : 'Stock Inicial'}</label>
+                        <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">{initialData ? 'Stock Actual (No editable)' : 'Stock Inicial'}</label>
                         <input
                             type="number"
                             name="initialStock"
                             min="0"
-                            className="w-full bg-industrial-900 border border-industrial-600 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-blue-500 transition-colors font-mono"
+                            disabled={!!initialData}
+                            className={`w-full bg-industrial-900 border border-industrial-600 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-blue-500 transition-colors font-mono ${initialData ? 'opacity-50 cursor-not-allowed' : ''}`}
                             value={formData.initialStock === 0 ? '' : formData.initialStock}
                             onChange={handleChange}
                             placeholder="0"

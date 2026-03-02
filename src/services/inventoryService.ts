@@ -25,5 +25,5 @@ export interface IInventoryService {
 
     // Reception History
     saveReception(reception: Omit<StockReception, 'id' | 'receptionDate'>): Promise<StockReception>;
-    getReceptions(page?: number, limit?: number, filters?: { searchTerm?: string; partId?: string }): Promise<{ data: StockReception[], total: number }>;
+    getReceptions(filters?: { searchTerm?: string; partId?: string }): Promise<{ data: StockReception[], total: number }>;
 }
