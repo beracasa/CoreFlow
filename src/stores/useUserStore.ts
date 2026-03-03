@@ -12,7 +12,7 @@ interface UserState {
 
   // Actions
   fetchUsers: () => Promise<void>;
-  addUser: (email: string, fullName: string, role: string, jobTitle: string, companyCode?: string) => Promise<void>;
+  addUser: (email: string, fullName: string, role: string, jobTitle: string, companyCode?: string, tenantId?: string) => Promise<void>;
   updateUser: (user: UserProfile) => Promise<void>;
   deleteUser: (id: string) => Promise<void>;
 
@@ -74,10 +74,10 @@ export const useUserStore = create<UserState>((set, get) => ({
     }
   },
 
-  addUser: async (email, fullName, role, jobTitle, companyCode) => {
+  addUser: async (email, fullName, role, jobTitle, companyCode, tenantId) => {
     set({ isLoading: true, error: null });
     try {
-      const newUser = await UserSupabaseService.inviteUser(email, fullName, role, jobTitle, companyCode);
+      const newUser = await UserSupabaseService.inviteUser(email, fullName, role, jobTitle, companyCode, tenantId);
       set((state) => ({
         users: [...state.users, newUser],
         isLoading: false

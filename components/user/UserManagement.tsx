@@ -4,6 +4,7 @@ import { UserProfile, UserRole } from '../../types';
 import { Plus, Mail, Shield, UserCheck, MoreVertical, Search, CheckCircle, Pencil, X, Trash2, BadgeCheck, Briefcase } from 'lucide-react';
 
 import { useUserStore } from '../../src/stores/useUserStore';
+import { useAuth } from '../../contexts/AuthContext';
 
 export const UserManagement: React.FC = () => {
     const { users, roles, fetchUsers, fetchRoles, addUser, updateUser, deleteUser, isLoading } = useUserStore();
@@ -24,6 +25,8 @@ export const UserManagement: React.FC = () => {
 
     // --- ACTIONS ---
 
+    const { user } = useAuth();
+
     const handleInvite = async (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -34,8 +37,15 @@ export const UserManagement: React.FC = () => {
 
         if (newUser.email && newUser.fullName) {
             try {
-                // Configurar rol temporalmente en la UI como 'INVITED' o algo, o depender de la DB
-                await addUser(newUser.email, newUser.fullName, newUser.role, newUser.title, newUser.companyCode);
+                // Pass current user's tenant_id to ensure the invited user is in the same tenant
+                await addUser(
+                    newUser.email,
+                    newUser.fullName,
+                    newUser.role,
+                    newUser.title,
+                    newUser.companyCode,
+                    user?.tenant_id
+                );
 
                 alert(`✅ Invitación enviada existosamente a: ${newUser.email}`);
                 setShowInviteModal(false);

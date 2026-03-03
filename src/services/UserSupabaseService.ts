@@ -32,12 +32,12 @@ export const UserSupabaseService = {
   // Invite user (Mock implementation for now as Supabase Invite requires Admin API)
   // For now we just create a profile row if we want to "reserve" a spot, or we skipping auth
   // In a real app we'd call an Edge Function to supabase.auth.admin.inviteUserByEmail
-  async inviteUser(email: string, fullName: string, role: string, jobTitle: string, companyCode?: string): Promise<UserProfile> {
-    console.log(`[UserSupabaseService] Inviting user: ${email} with role: ${role}`);
+  async inviteUser(email: string, fullName: string, role: string, jobTitle: string, companyCode?: string, tenantId?: string): Promise<UserProfile> {
+    console.log(`[UserSupabaseService] Inviting user: ${email} with role: ${role}, tenant: ${tenantId}`);
     
     // Call the Edge Function to send the invitation
     const { data, error } = await supabase.functions.invoke('invite-user', {
-      body: { email, fullName, roleId: role }
+      body: { email, fullName, roleId: role, tenantId }
     });
 
     if (error) {

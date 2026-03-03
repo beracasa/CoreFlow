@@ -122,9 +122,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.log("AuthContext: Auth event:", event);
 
       // SILENT REFRESH: Do NOT set isLoading(true) for TOKEN_REFRESHED
-      // Only set loading for SIGNED_IN if we don't already have a user (initial login)
+      // Only set loading for SIGNED_IN if we don't already have a current session (initial login)
       // or for SIGNED_OUT to ensure a clean transition.
-      if (event === 'SIGNED_IN' && !user) {
+      if (event === 'SIGNED_IN' && !session?.user) {
         if (mounted) setIsLoading(true);
       } else if (event === 'SIGNED_OUT') {
         if (mounted) setIsLoading(true);
@@ -167,6 +167,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
   }, []);
 
+  // 3. Subscribe to roles for reactivity in hasRole/hasPermission
+  const roles = useUserStore(state => state.roles);
+
   const login = async (email: string, password: string) => {
     // Do not set global loading here. Let the UI handle its own loading state.
     // setIsLoading(true); 
@@ -196,7 +199,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (allowedRoles.includes(user.role as UserRole)) return true;
 
     // Si el rol es un UUID, buscar en los roles dinámicos
-    const roles = useUserStore.getState().roles;
     const userRoleDef = roles.find(r => r.id === user.role);
 
     if (userRoleDef) {
@@ -229,7 +231,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (user.role === UserRole.ADMIN_SOLICITANTE) return true;
 
     // 2. Check Dynamic Roles
-    const roles = useUserStore.getState().roles;
     const userRoleDef = roles.find(r => r.id === user.role);
 
     if (!userRoleDef) return false;

@@ -18,8 +18,8 @@ serve(async (req) => {
     console.log(`[invite-user] Request received: ${req.method}`);
     
     // 5. Extraer campos del body
-    const { email, fullName, roleId } = await req.json();
-    console.log(`[invite-user] Parsed payload - Email: ${email}, RoleID: ${roleId}, FullName: ${fullName}`);
+    const { email, fullName, roleId, tenantId } = await req.json();
+    console.log(`[invite-user] Parsed payload - Email: ${email}, RoleID: ${roleId}, FullName: ${fullName}, TenantID: ${tenantId}`);
 
     if (!email || !fullName || !roleId) {
        console.warn("[invite-user] Missing required fields in payload");
@@ -43,16 +43,21 @@ serve(async (req) => {
 
     // 5. Lógica de Invitación
     console.log(`[invite-user] Calling inviteUserByEmail for ${email}...`);
+    // NOTE: The database trigger 'handle_new_user' expects 'role' and 'tenant_id' in metadata
     const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
       data: { 
         full_name: fullName, 
-        role_id: roleId 
+        role: roleId, // Changed from role_id to role to match handle_new_user trigger
+        tenant_id: tenantId || 'primary'
       }
     });
 
     if (inviteError) {
       console.error("[invite-user] Error from Supabase Admin API:", inviteError);
-      throw inviteError;
+      return new Response(JSON.stringify({ error: inviteError.message, details: inviteError }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      });
     }
     
     console.log(`[invite-user] Invitation sent successfully to ${email}. ID: ${inviteData?.user?.id}`);

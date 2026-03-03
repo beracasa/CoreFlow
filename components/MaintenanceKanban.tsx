@@ -18,11 +18,16 @@ const calculateMTBF = () => 148.5;
 export const MaintenanceKanban: React.FC = () => {
   const { t } = useLanguage();
   const { hasPermission } = useAuth();
-  const { workOrders, updateOrder } = useWorkOrderStore();
+  const { workOrders, updateOrder, fetchOrders } = useWorkOrderStore();
   const { machines } = useMasterStore();
   const navigate = useNavigate();
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<'R-MANT-02' | 'R-MANT-05' | null>(null);
+
+  // Reset global filters on mount to ensure all orders are visible
+  React.useEffect(() => {
+    fetchOrders(); // Default fetch without formType filter
+  }, [fetchOrders]);
 
   const columns = [
     { id: WorkOrderStatus.BACKLOG, title: t('kanban.col.backlog') },

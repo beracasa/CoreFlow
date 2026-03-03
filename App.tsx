@@ -282,9 +282,7 @@ const AppLayout = () => {
 
         <main className="flex-1 overflow-hidden relative">
           <AppInitializer />
-          {/* <ErrorBoundary> Removed inner boundary */}
           <Outlet />
-          {/* </ErrorBoundary> */}
         </main>
       </div>
     </ErrorBoundary>
@@ -379,12 +377,7 @@ const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/login" element={<Navigate to="/" replace />} />
-      <Route path="/" element={
-        <AppLayout>
-          <AppInitializer />
-          <Outlet />
-        </AppLayout>
-      }>
+      <Route path="/" element={<AppLayout />}>
         <Route index element={<Dashboard />} />
         <Route path="kanban" element={<MaintenanceKanban />} />
         <Route path="orders/preventive" element={<MaintenanceList key="preventive" type="R-MANT-02" />} />
