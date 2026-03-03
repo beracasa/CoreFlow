@@ -261,6 +261,10 @@ export class InventoryMockService implements IInventoryService {
         throw new Error('Request not found');
     }
 
+    async getAllPurchaseRequests(page: number = 1, limit: number = 50, filters?: { searchTerm?: string }): Promise<{ data: ExtendedPurchaseRequest[], total: number }> {
+        return { data: [], total: 0 };
+    }
+
     async closeRequest(requestId: string): Promise<PartsRequest> {
         const requests = this.getRequests();
         const index = requests.findIndex(r => r.id === requestId);

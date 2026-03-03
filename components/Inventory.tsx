@@ -4,13 +4,14 @@ import { PartRequestForm } from '../src/components/inventory/PartRequestForm';
 import { ReceptionForm } from '../src/components/inventory/ReceptionForm';
 import { PartCreationForm } from '../src/components/inventory/PartCreationForm';
 import { RequestList } from '../src/components/inventory/RequestList';
+import { PurchaseRequestList } from '../src/components/inventory/PurchaseRequestList';
 import { RequestDetail } from '../src/components/inventory/RequestDetail';
 import { inventoryService } from '../src/services';
 import { PartsRequest, SparePart } from '../src/types/inventory';
 import { Layers, FileText, ArrowDownCircle, PlusCircle, List } from 'lucide-react';
 
 export const Inventory: React.FC<any> = () => {
-  const [activeTab, setActiveTab] = useState<'list' | 'request' | 'requests_list' | 'receive' | 'create'>('list');
+  const [activeTab, setActiveTab] = useState<'list' | 'request' | 'requests_list' | 'receive' | 'create' | 'purchase_requests'>('list');
   const [selectedRequest, setSelectedRequest] = useState<PartsRequest | null>(null);
   const [parts, setParts] = useState<SparePart[]>([]);
 
@@ -90,6 +91,16 @@ export const Inventory: React.FC<any> = () => {
           <PlusCircle className="w-4 h-4 mr-2" />
           Nuevo Repuesto
         </button>
+        <button
+          onClick={() => { setActiveTab('purchase_requests'); setSelectedRequest(null); }}
+          className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${activeTab === 'purchase_requests'
+            ? 'bg-industrial-800 text-white border-industrial-600 shadow-md'
+            : 'bg-transparent text-industrial-500 border-transparent hover:text-industrial-300 hover:bg-industrial-800/50'
+            }`}
+        >
+          <FileText className="w-4 h-4 mr-2" />
+          Solicitudes Compras
+        </button>
       </div>
 
       <div className="bg-industrial-900 rounded-xl min-h-[500px]">
@@ -97,6 +108,7 @@ export const Inventory: React.FC<any> = () => {
         {activeTab === 'request' && <PartRequestForm />}
         {activeTab === 'receive' && <ReceptionForm />}
         {activeTab === 'create' && <PartCreationForm />}
+        {activeTab === 'purchase_requests' && <PurchaseRequestList />}
         {activeTab === 'requests_list' && (
           selectedRequest ? (
             <RequestDetail request={selectedRequest} parts={parts} onBack={handleBackToRequestList} />

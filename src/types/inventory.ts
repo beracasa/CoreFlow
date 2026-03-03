@@ -50,12 +50,27 @@ export interface PartsRequest {
     purchaseHistory?: PurchaseRequest[];
 }
 
+export interface PurchaseRequestItem {
+    partId: string;
+    quantity: number;
+    partName?: string;
+    partNumber?: string;
+}
+
 export interface PurchaseRequest {
     id: string;
     requestDate: string;
-    items: { partId: string; quantity: number }[];
+    items: PurchaseRequestItem[];
     requestedBy: string; // User ID
     purchaseRequestNumber: string; // e.g. "SC-001"
+    requestId?: string; // Optional link to the SPR
+    status?: 'Pendiente' | 'Parcial' | 'Recibido' | 'Cancelado';
+}
+
+export interface ExtendedPurchaseRequest extends PurchaseRequest {
+    sparePartName?: string;
+    sparePartNumber?: string;
+    sourceRequestNumber?: string;
 }
 
 export interface StockReceptionItem {

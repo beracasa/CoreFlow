@@ -964,7 +964,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                               type="text"
                               readOnly
                               className="w-full bg-industrial-900/50 border border-industrial-700 rounded p-2 text-industrial-300 text-sm font-mono text-right"
-                              value={selectedMachine?.runningHours ? selectedMachine.runningHours.toLocaleString('en-US') : '0'}
+                              value={selectedMachine?.runningHours ? selectedMachine.runningHours?.toLocaleString('en-US') : '0'}
                            />
                         </div>
 
@@ -975,7 +975,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                               type="text"
                               readOnly
                               className="w-full bg-industrial-900/50 border border-industrial-700 rounded p-2 text-emerald-400 font-bold text-sm font-mono text-right"
-                              value={selectedMachine?.runningHours ? (selectedMachine.runningHours + 360).toLocaleString('en-US') : '0'}
+                              value={selectedMachine?.runningHours ? (selectedMachine.runningHours + 360)?.toLocaleString('en-US') : '0'}
                            />
                         </div>
 

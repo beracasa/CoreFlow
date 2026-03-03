@@ -451,7 +451,7 @@ export const MachinesList: React.FC = () => {
                       {maintenancePlans.find(p => p.machineId === m.id)?.intervals
                         .filter(i => i.hours > 0 || i.label)
                         .sort((a, b) => a.hours - b.hours)
-                        .map(i => i.label || `${i.hours.toLocaleString()} h`)
+                        .map(i => i.label || `${i.hours?.toLocaleString() || i.hours} h`)
                         .join(', ') || <span className="text-industrial-600 italic">Sin Programa</span>}
                     </td>
                     <td className="px-6 py-4">
@@ -565,7 +565,7 @@ export const MachinesList: React.FC = () => {
                         <Clock className="text-industrial-500" size={20} />
                         <div>
                           <label className="text-[10px] text-industrial-500 uppercase">Horas de Uso</label>
-                          <p className="text-lg font-mono text-white">{viewingMachine.runningHours.toLocaleString()} h</p>
+                          <p className="text-lg font-mono text-white">{viewingMachine.runningHours?.toLocaleString() || '0'} h</p>
                         </div>
                       </div>
                       <div className="flex-1 bg-industrial-900/30 p-3 rounded border border-industrial-700/50 flex items-center gap-3">
@@ -880,7 +880,7 @@ export const MachinesList: React.FC = () => {
                           .sort((a, b) => a.hours - b.hours)
                           .map(i => (
                             <span key={i.id} className="bg-blue-900/50 text-blue-200 px-2 py-0.5 rounded text-xs border border-blue-800">
-                              {i.label || `${i.hours.toLocaleString()} Horas`}
+                              {i.label || `${i.hours?.toLocaleString() || i.hours} Horas`}
                             </span>
                           ))}
                       </div>
@@ -1148,7 +1148,7 @@ export const MachinesList: React.FC = () => {
                       <div className="flex flex-wrap gap-2">
                         {maintenancePlans.find(p => p.machineId === editingId)?.intervals.map(i => (
                           <span key={i.id} className="bg-blue-900/50 text-blue-200 px-2 py-0.5 rounded text-xs border border-blue-800">
-                            {i.label || `${i.hours.toLocaleString()} Horas`}
+                            {i.label || `${i.hours?.toLocaleString() || i.hours} Horas`}
                           </span>
                         ))}
                       </div>

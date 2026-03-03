@@ -22,6 +22,9 @@ export interface IInventoryService {
 
     // Purchase Request
     savePurchaseRequest(requestId: string, purchaseRequest: any): Promise<PartsRequest>;
+    getAllPurchaseRequests(page?: number, limit?: number, filters?: { searchTerm?: string }): Promise<{ data: ExtendedPurchaseRequest[], total: number }>;
+    createDirectPurchaseRequest(items: { partId: string; quantity: number }[]): Promise<void>;
+    updatePurchaseRequestStatus(requestId: string, status: 'Pendiente' | 'Parcial' | 'Recibido' | 'Cancelado'): Promise<void>;
 
     // Reception History
     saveReception(reception: Omit<StockReception, 'id' | 'receptionDate'>): Promise<StockReception>;

@@ -179,7 +179,7 @@ export const Configuration: React.FC<ConfigurationProps> = ({
     const newInterval: MaintenanceInterval = {
       id: `i-${Date.now()}`,
       hours: hours,
-      label: `${hours.toLocaleString()} Horas`,
+      label: `${hours?.toLocaleString() || hours} Horas`,
       tasks: []
     };
 

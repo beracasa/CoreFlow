@@ -135,7 +135,21 @@ export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData,
                 setFeedback({ type: 'success', message: 'Repuesto actualizado exitosamente.' });
                 if (onSuccess) onSuccess(updated as any);
             } else {
-                const created = await addPart(formData);
+                let finalCreatedAt = formData.createdAt;
+                const todayStr = new Date().toISOString().split('T')[0];
+
+                // If they didn't touch it or left it as today's date, inject current time to ensure sorting
+                if (finalCreatedAt === todayStr) {
+                    finalCreatedAt = new Date().toISOString();
+                } else if (!finalCreatedAt.includes('T')) {
+                    finalCreatedAt = `${finalCreatedAt}T00:00:00.000Z`;
+                }
+
+                const created = await addPart({
+                    ...formData,
+                    createdAt: finalCreatedAt
+                });
+
                 setFeedback({ type: 'success', message: 'Repuesto creado exitosamente.' });
                 // Reset only if create
                 setFormData({

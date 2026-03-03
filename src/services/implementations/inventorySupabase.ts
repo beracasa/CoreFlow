@@ -66,10 +66,11 @@ export class InventorySupabaseService implements IInventoryService {
             if (filters.location && filters.location !== 'all') {
                 query = query.eq('location_code', filters.location);
             }
-            // Note: status 'low' or 'normal' requires column vs column comparison 
-            // which standard PostgREST .lt() doesn't support with column names.
-            // For now, we will handle this via RPC or client-side if needed, 
-            // but to restore visibility, we'll skip these specific server-side filters.
+            if (filters.status === 'low') {
+                query = query.eq('is_low_stock', true);
+            } else if (filters.status === 'normal') {
+                query = query.eq('is_low_stock', false);
+            }
         }
 
         const { data, count, error } = await query
@@ -446,20 +447,24 @@ export class InventorySupabaseService implements IInventoryService {
         };
     }
 
-    async getReceptions(filters?: { searchTerm?: string; partId?: string }): Promise<{ data: any[], total: number }> {
-
-        const term = filters?.searchTerm?.toLowerCase() || '';
-        const exactPartId = filters?.partId;
-        
-        const { data: allData, error } = await supabase
+    async getReceptions(filters?: { searchTerm?: string; partId?: string }): Promise<{ data: StockReception[], total: number }> {
+        let query = supabase
             .from('stock_receptions')
-            .select('*')
-            .order('reception_date', { ascending: false })
-            .limit(2000); // Practical limit for client-side filtering of recent history
+            .select('*', { count: 'exact' })
+            .order('reception_date', { ascending: false });
 
-        if (error) throw error;
+        if (filters?.searchTerm) {
+            query = query.or(`document_number.ilike.%${filters.searchTerm}%,notes.ilike.%${filters.searchTerm}%`);
+        }
 
-        const mappedAllData = (allData || []).map((record: any) => ({
+        const { data, error, count } = await query;
+
+        if (error) {
+            console.error('Error fetching receptions:', error);
+            throw error;
+        }
+
+        let filteredData = (data || []).map(record => ({
             id: record.id,
             receptionDate: record.reception_date,
             documentNumber: record.document_number,
@@ -468,34 +473,111 @@ export class InventorySupabaseService implements IInventoryService {
             notes: record.notes
         }));
 
-        // Filter the mapped data
-        const filteredData = (!exactPartId && !term) ? mappedAllData : mappedAllData.filter(rec => {
-            // If we have an exact part ID, we ONLY want to check if the items array contains it
-            if (exactPartId) {
-                if (rec.items && Array.isArray(rec.items)) {
-                    return rec.items.some((item: any) => item.partId === exactPartId);
-                }
-                return false;
-            }
+        // Filter by partId if provided (since items is JSONB, it's easier to filter here if the dataset isn't huge, or use a complex PostgREST query)
+        if (filters?.partId) {
+            filteredData = filteredData.filter(rec => 
+                rec.items.some((item: any) => item.partId === filters.partId)
+            );
+        }
 
-            // Otherwise, we do the robust text search
-            if (term) {
-                if (rec.documentNumber && rec.documentNumber.toLowerCase().includes(term)) return true;
-                if (rec.notes && rec.notes.toLowerCase().includes(term)) return true;
-                
-                // Check nested items for partName or partNumber match
-                if (rec.items && Array.isArray(rec.items)) {
-                    return rec.items.some((item: any) => 
-                        (item.partName && item.partName.toLowerCase().includes(term)) ||
-                        (item.partNumber && item.partNumber.toLowerCase().includes(term))
-                    );
-                }
-            }
-            return false;
+        return { data: filteredData, total: count || 0 };
+    }
+
+    async getAllPurchaseRequests(page: number = 1, limit: number = 50, filters?: { searchTerm?: string }): Promise<{ data: ExtendedPurchaseRequest[], total: number }> {
+        let query = supabase
+            .from('purchase_requests')
+            .select(`
+                *,
+                spare_part_requests (
+                    request_number
+                )
+            `, { count: 'exact' })
+            .order('request_date', { ascending: false });
+
+        if (filters?.searchTerm) {
+            query = query.or(`purchase_request_number.ilike.%${filters.searchTerm}%`);
+        }
+
+        const from = (page - 1) * limit;
+        const to = from + limit - 1;
+        query = query.range(from, to);
+
+        const { data, error, count } = await query;
+
+        if (error) {
+            console.error('Error fetching all purchase requests:', error);
+            throw error;
+        }
+
+        const { data: parts } = await supabase.from('spare_parts').select('id, name, sku');
+        const partsMap = new Map((parts || []).map(p => [p.id, p]));
+
+        const mappedData = (data || []).map(record => {
+            const rawItems = record.items || [];
+            
+            const mappedItems = rawItems.map((item: any) => {
+                const partInfo = partsMap.get(item.partId);
+                return {
+                    ...item,
+                    partName: partInfo?.name || 'Repuesto Desconocido',
+                    partNumber: partInfo?.sku || 'N/A'
+                };
+            });
+
+            const firstItem = mappedItems[0] || {};
+
+            return {
+                id: record.id,
+                purchaseRequestNumber: record.purchase_request_number,
+                requestDate: record.request_date,
+                requestedBy: record.requested_by,
+                items: mappedItems,
+                requestId: record.request_id,
+                sourceRequestNumber: record.spare_part_requests?.request_number,
+                sparePartName: firstItem.partName || 'N/A',
+                sparePartNumber: firstItem.partNumber || 'N/A',
+                status: record.status || 'Pendiente'
+            };
         });
 
-        const total = filteredData.length;
+        return {
+            data: mappedData,
+            total: count || 0
+        };
+    }
 
-        return { data: filteredData, total };
+    async createDirectPurchaseRequest(items: { partId: string; quantity: number }[]): Promise<void> {
+        const scNumber = `SC-DIR-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+        
+        const payload: any = {
+            request_id: null,
+            purchase_request_number: scNumber,
+            items: items,
+            request_date: new Date().toISOString()
+        };
+
+        // Don't explicitly set requested_by to 'System' as it's a UUID column
+        // Letting it be null will use the database default (auth.uid()) or remain null
+
+        const { error } = await supabase
+            .from('purchase_requests')
+            .insert(payload);
+
+        if (error) {
+            console.error('Error creating direct purchase request:', error);
+            throw error;
+        }
+    }
+
+    async updatePurchaseRequestStatus(requestId: string, status: 'Pendiente' | 'Parcial' | 'Recibido' | 'Cancelado'): Promise<void> {
+        const { error } = await supabase
+            .from('purchase_requests')
+            .update({ status })
+            .eq('id', requestId);
+
+        if (error) {
+            console.error('Error updating purchase request status:', error);
+            throw error;
+        }
     }
 }
