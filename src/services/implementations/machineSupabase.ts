@@ -77,7 +77,7 @@ export const MachineSupabaseService = {
         imageUrl: record.image_url || '',
         isIot: record.is_iot || false,
         isActive: record.is_active !== false, // Default to true if not specified
-        running_hours: record.running_hours || 0,
+        runningHours: record.running_hours || 0,
         lastMaintenance: record.last_maintenance || null,
         nextMaintenance: record.next_maintenance || null,
         specifications: specs,

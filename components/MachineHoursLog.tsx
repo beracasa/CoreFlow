@@ -94,7 +94,8 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
                 startDate: startDate || undefined,
                 endDate: endDate || undefined
             });
-            setHistory(logs);
+            setHistory(logs.data);
+            setTotalLogs(logs.total);
 
             // Update local machine running hours immediately for UI feedback
             selectedMachine.runningHours = currentReading;
