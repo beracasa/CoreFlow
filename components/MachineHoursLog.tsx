@@ -54,6 +54,12 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
                 });
                 setHistory(result.data);
                 setTotalLogs(result.total);
+
+                // Auto-select unit from most recent log if available
+                if (result.data && result.data.length > 0) {
+                    const latestUnit = result.data[0].unit as 'h' | 'km';
+                    setSelectedUnit(latestUnit);
+                }
             } catch (err) {
                 console.error("Error fetching logs:", err);
             } finally {
@@ -192,7 +198,7 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
     };
 
     return (
-        <div className="h-full bg-industrial-900 p-6 flex flex-col">
+        <div className="h-full bg-industrial-900 p-6 flex flex-col overflow-hidden">
             <div className="flex justify-between items-center mb-6">
                 <div>
                     <h2 className="text-2xl font-bold text-white mb-1 flex items-center gap-2">
@@ -202,7 +208,7 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Entry Form */}
                 <div className="bg-industrial-800 p-6 rounded-lg border border-industrial-700 shadow-xl">
                     <h3 className="text-white font-bold mb-4 border-b border-industrial-700 pb-2">{t('hours.log')}</h3>
@@ -274,7 +280,9 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
                         {selectedMachine && (
                             <div className="bg-industrial-900/50 p-3 rounded border border-industrial-600 mb-4">
                                 <span className="text-xs text-industrial-500 block">{t('hours.last')}</span>
-                                <span className="text-xl font-mono text-white">{new Intl.NumberFormat('en-US').format(selectedMachine.runningHours)} {selectedUnit}</span>
+                                <span className="text-xl font-mono text-white">
+                                    {new Intl.NumberFormat('en-US').format(selectedMachine.runningHours)} {history.length > 0 && history[0].machineId === selectedMachine.id ? history[0].unit : selectedUnit}
+                                </span>
                             </div>
                         )}
 
@@ -314,7 +322,7 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
                 </div>
 
                 {/* History List */}
-                <div className="lg:col-span-2 bg-industrial-800 rounded-lg border border-industrial-700 shadow-xl flex flex-col">
+                <div className="lg:col-span-2 bg-industrial-800 rounded-lg border border-industrial-700 shadow-xl flex flex-col min-h-0">
                     <div className="p-4 border-b border-industrial-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                         <h3 className="text-white font-bold flex items-center gap-2">
                             <History size={16} /> Historial de Registros (Registros Recientes)
