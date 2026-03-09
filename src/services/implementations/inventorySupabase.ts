@@ -453,7 +453,10 @@ export class InventorySupabaseService implements IInventoryService {
             .select('*', { count: 'exact' })
             .order('reception_date', { ascending: false });
 
-        if (filters?.searchTerm) {
+        if (filters?.partId) {
+            // Filter by part_id inside the items JSONB array
+            query = query.contains('items', [{ partId: filters.partId }]);
+        } else if (filters?.searchTerm) {
             query = query.or(`document_number.ilike.%${filters.searchTerm}%,notes.ilike.%${filters.searchTerm}%`);
         }
 
@@ -464,23 +467,17 @@ export class InventorySupabaseService implements IInventoryService {
             throw error;
         }
 
-        let filteredData = (data || []).map(record => ({
-            id: record.id,
-            receptionDate: record.reception_date,
-            documentNumber: record.document_number,
-            receivedBy: record.received_by,
-            items: record.items || [],
-            notes: record.notes
-        }));
-
-        // Filter by partId if provided (since items is JSONB, it's easier to filter here if the dataset isn't huge, or use a complex PostgREST query)
-        if (filters?.partId) {
-            filteredData = filteredData.filter(rec => 
-                rec.items.some((item: any) => item.partId === filters.partId)
-            );
-        }
-
-        return { data: filteredData, total: count || 0 };
+        return { 
+            data: (data || []).map(record => ({
+                id: record.id,
+                receptionDate: record.reception_date,
+                documentNumber: record.document_number,
+                receivedBy: record.received_by,
+                items: record.items || [],
+                notes: record.notes
+            })), 
+            total: count || 0 
+        };
     }
 
     async getAllPurchaseRequests(page: number = 1, limit: number = 50, filters?: { searchTerm?: string }): Promise<{ data: ExtendedPurchaseRequest[], total: number }> {

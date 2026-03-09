@@ -258,7 +258,7 @@ export const PurchaseRequestList: React.FC = () => {
             {/* Modal: Nueva Solicitud Directa */}
             {showDirectModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fade-in">
-                    <div className="bg-industrial-800 rounded-xl shadow-2xl border border-industrial-600 w-full max-w-2xl overflow-hidden animate-slide-up">
+                    <div className="bg-industrial-800 rounded-xl shadow-2xl border border-industrial-600 w-full max-w-2xl animate-slide-up">
                         <div className="bg-industrial-900 p-6 border-b border-industrial-700 flex justify-between items-center">
                             <h3 className="text-xl font-bold text-white flex items-center gap-2">
                                 <Plus className="w-6 h-6 text-industrial-accent" />
@@ -268,7 +268,7 @@ export const PurchaseRequestList: React.FC = () => {
                                 <X className="w-6 h-6" />
                             </button>
                         </div>
-                        <div className="p-6 max-h-[60vh] overflow-y-auto space-y-4">
+                        <div className="p-6 min-h-[400px] max-h-[60vh] overflow-y-auto space-y-4">
                             {selectedItems.map((item, index) => (
                                 <div key={index} className="flex gap-4 items-end bg-industrial-900/50 p-4 rounded-lg border border-industrial-700/50">
                                     <div className="flex-1">
@@ -288,7 +288,7 @@ export const PurchaseRequestList: React.FC = () => {
                                             />
                                             {/* Custom Dropdown Results */}
                                             {!item.partId && item.partName && (
-                                                <div className="absolute left-0 top-full mt-1 w-full z-50 bg-industrial-800 border border-industrial-600 rounded-md shadow-xl max-h-60 overflow-y-auto">
+                                                <div className="absolute left-0 top-full mt-1 w-full z-[100] bg-industrial-800 border border-industrial-600 rounded-md shadow-xl max-h-60 overflow-y-auto">
                                                     {availableParts.filter(p =>
                                                         p.name.toLowerCase().includes(item.partName.toLowerCase()) ||
                                                         p.partNumber.toLowerCase().includes(item.partName.toLowerCase())
