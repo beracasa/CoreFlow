@@ -204,8 +204,7 @@ const AppLayout = () => {
   const path = location.pathname;
 
   return (
-    <ErrorBoundary>
-      <div className="flex h-screen bg-industrial-900 text-slate-100 font-sans">
+    <div className="flex h-screen bg-industrial-900 text-slate-100 font-sans">
         {/* Sidebar */}
         <aside className="w-64 bg-industrial-900 border-r border-industrial-800 flex flex-col">
           <div className="p-6">
@@ -282,11 +281,10 @@ const AppLayout = () => {
 
         <main className="flex-1 overflow-hidden relative">
           <AppInitializer />
-          <Outlet />
-        </main>
-      </div>
-    </ErrorBoundary>
-  );
+      <Outlet />
+    </main>
+  </div>
+);
 };
 
 // --- AUTH GUARD ---
@@ -400,9 +398,11 @@ const AppRoutes = () => {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
+      <ErrorBoundary>
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
+      </ErrorBoundary>
     </BrowserRouter>
   );
 }
