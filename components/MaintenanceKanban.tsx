@@ -21,7 +21,6 @@ export const MaintenanceKanban: React.FC = () => {
   const { workOrders, updateOrder, fetchOrders } = useWorkOrderStore();
   const { machines } = useMasterStore();
   const navigate = useNavigate();
-  const [draggingId, setDraggingId] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<'R-MANT-02' | 'R-MANT-05' | null>(null);
 
   // Reset global filters on mount to ensure all orders are visible
@@ -36,23 +35,7 @@ export const MaintenanceKanban: React.FC = () => {
     { id: WorkOrderStatus.DONE, title: t('kanban.col.done') },
   ];
 
-  const handleDragStart = (e: React.DragEvent, id: string) => {
-    e.dataTransfer.setData('text/plain', id);
-    setDraggingId(id);
-  };
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
-
-  const handleDrop = (e: React.DragEvent, status: WorkOrderStatus) => {
-    e.preventDefault();
-    const id = e.dataTransfer.getData('text/plain');
-    if (id) {
-      updateOrder(id, { status });
-    }
-    setDraggingId(null);
-  };
 
   return (
     <div className="h-full flex flex-col bg-industrial-900 p-6 overflow-hidden">
@@ -102,34 +85,35 @@ export const MaintenanceKanban: React.FC = () => {
 
       {/* Kanban Board */}
       <div className="flex-1 flex gap-4 overflow-x-auto pb-4">
-        {columns.map(col => (
-          <div
-            key={col.id}
-            className="flex-1 min-w-[300px] bg-industrial-800/50 rounded-lg flex flex-col border border-industrial-700/50"
-            onDragOver={handleDragOver}
-            onDrop={(e) => handleDrop(e, col.id)}
-          >
-            <div className="p-3 border-b border-industrial-700 bg-industrial-800 rounded-t-lg flex justify-between items-center">
-              <h3 className="font-semibold text-industrial-500 text-sm">{col.title}</h3>
-              <span className="bg-industrial-900 text-xs px-2 py-0.5 rounded-full text-industrial-500 font-mono">
-                {workOrders.filter(o => o.status === col.id && (!typeFilter || o.formType === typeFilter)).length}
-              </span>
-            </div>
+        {columns.map(col => {
+          const filteredOrders = workOrders
+            .filter(order => order.status === col.id && (!typeFilter || order.formType === typeFilter));
+          
+          const isDoneColumn = col.id === WorkOrderStatus.DONE;
+          const displayOrders = isDoneColumn ? filteredOrders.slice(0, 30) : filteredOrders;
+          
+          return (
+            <div
+              key={col.id}
+              className="flex-1 min-w-[300px] bg-industrial-800/50 rounded-lg flex flex-col border border-industrial-700/50"
+            >
+              <div className="p-3 border-b border-industrial-700 bg-industrial-800 rounded-t-lg flex justify-between items-center">
+                <h3 className="font-semibold text-industrial-500 text-sm">{col.title}</h3>
+                <span className="bg-industrial-900 text-xs px-2 py-0.5 rounded-full text-industrial-500 font-mono">
+                  {isDoneColumn ? `${displayOrders.length}${filteredOrders.length > 30 ? '+' : ''}` : filteredOrders.length}
+                </span>
+              </div>
 
-            <div className="flex-1 p-2 space-y-3 overflow-y-auto">
-              {workOrders
-                .filter(order => order.status === col.id && (!typeFilter || order.formType === typeFilter))
-                .map(order => {
+              <div className="flex-1 p-2 space-y-3 overflow-y-auto">
+                {displayOrders.map(order => {
                   const machine = machines.find(m => m.id === order.machineId);
                   const isMant02 = order.formType === 'R-MANT-02';
 
                   return (
                     <div
                       key={order.id}
-                      draggable={hasPermission('edit_kanban')}
-                      onDragStart={(e) => hasPermission('edit_kanban') && handleDragStart(e, order.id)}
                       onClick={() => navigate(`/orders/${order.id}`, { state: { type: order.formType } })}
-                      className={`bg-industrial-700 p-4 rounded-xl border border-industrial-600 shadow-xl transition-all ${hasPermission('edit_kanban') ? 'hover:border-industrial-400 cursor-move active:cursor-grabbing hover:shadow-2xl' : 'opacity-80 cursor-not-allowed cursor-pointer'}`}
+                      className="bg-industrial-700 p-4 rounded-xl border border-industrial-600 shadow-xl transition-all hover:border-industrial-400 cursor-pointer hover:shadow-2xl"
                     >
                       <div className="flex justify-between items-start mb-3">
                         <span className={`text-[10px] px-2 py-0.5 rounded font-bold tracking-wider ${isMant02
@@ -181,9 +165,10 @@ export const MaintenanceKanban: React.FC = () => {
                     </div>
                   );
                 })}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
