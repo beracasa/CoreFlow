@@ -1,7 +1,8 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Settings, Cpu, AlertTriangle, Battery, Gauge, Move, Trash2 } from 'lucide-react';
-import { Machine, MachineStatus } from '../../types';
+import { Machine, MachineStatus, WorkOrderStatus } from '../../types';
+import { useWorkOrderStore } from '../../src/stores/useWorkOrderStore';
 
 export type MapLayer = 'OPERATIONAL' | 'MAINTENANCE' | 'INVENTORY' | 'EFFICIENCY';
 
@@ -16,6 +17,7 @@ interface AssetNodeProps {
 }
 
 export const AssetNode: React.FC<AssetNodeProps> = ({ machine, layer, onClick, isSelected, isEditMode, onMouseDown, onDelete }) => {
+  const { workOrders } = useWorkOrderStore();
 
   // Logic to determine color state based on Active Layer
   const getStateColor = () => {
@@ -41,7 +43,13 @@ export const AssetNode: React.FC<AssetNodeProps> = ({ machine, layer, onClick, i
         return 'bg-slate-500 border-slate-400';
 
       case 'OPERATIONAL':
-      default:
+      default: {
+        const hasActiveMaint = workOrders.some(wo => wo.machineId === machine.id && wo.status !== WorkOrderStatus.DONE);
+        
+        if (hasActiveMaint) {
+          return 'bg-industrial-danger border-red-500 animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.5)]';
+        }
+
         switch (machine.status) {
           case MachineStatus.RUNNING: return 'bg-industrial-success border-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.5)]';
           case MachineStatus.WARNING: return 'bg-industrial-warning border-yellow-400 animate-pulse';
@@ -49,6 +57,7 @@ export const AssetNode: React.FC<AssetNodeProps> = ({ machine, layer, onClick, i
           case MachineStatus.IDLE: return 'bg-industrial-500 border-slate-400';
           default: return 'bg-industrial-700 border-slate-600';
         }
+      }
     }
   };
 

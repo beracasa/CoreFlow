@@ -176,8 +176,10 @@ const MaintenanceFormPage = () => {
           const existing = getOrderById(order.id);
           if (existing) {
             await updateOrder(order.id, order);
+            return existing;
           } else {
-            await addOrder(order);
+            const newOrder = await addOrder(order);
+            return newOrder;
           }
           // Optional: Show success toast/alert?
           console.log("Auto-saved (Stay on page)");

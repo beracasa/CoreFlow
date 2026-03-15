@@ -16,7 +16,7 @@ interface WorkOrderState {
 
     fetchOrders: (page?: number, limit?: number, formType?: string) => Promise<void>;
     setPage: (page: number, formType?: string) => Promise<void>;
-    addOrder: (order: Omit<WorkOrder, 'id'>) => Promise<void>;
+    addOrder: (order: Omit<WorkOrder, 'id'>) => Promise<WorkOrder>;
     updateOrder: (id: string, updates: Partial<WorkOrder>) => Promise<void>;
     deleteOrder: (id: string) => Promise<void>;
     getOrderById: (id: string) => WorkOrder | undefined;
@@ -61,6 +61,7 @@ export const useWorkOrderStore = create<WorkOrderState>((set, get) => ({
                 workOrders: [newOrder, ...state.workOrders],
                 loading: false
             }));
+            return newOrder;
         } catch (err: any) {
             set({ error: err.message || 'Failed to create order', loading: false });
             throw err; // Re-throw for UI handling

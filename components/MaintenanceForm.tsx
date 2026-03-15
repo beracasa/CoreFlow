@@ -122,7 +122,7 @@ interface MaintenanceFormProps {
    machines: Machine[];
    technicians: Technician[];
    onSave: (order: WorkOrder) => void;
-   onSaveAndStay?: (order: WorkOrder) => void;
+   onSaveAndStay?: (order: WorkOrder) => Promise<WorkOrder | void> | void;
    onCancel: () => void;
    initialMachineId?: string;
    initialData?: Partial<WorkOrder>;
@@ -414,7 +414,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
       }));
    };
 
-   const handleInternalSave = (order: WorkOrder, stay: boolean = false) => {
+   const handleInternalSave = async (order: WorkOrder, stay: boolean = false) => {
       const orderToSave = {
          ...order,
          formType: type,
@@ -432,7 +432,19 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
          }
       }
       if (stay && onSaveAndStay) {
-         onSaveAndStay(orderToSave);
+         try {
+            const savedOrder = await onSaveAndStay(orderToSave);
+            if (savedOrder && savedOrder.id && savedOrder.id !== formData.id) {
+               console.log("Synchronizing Local ID from DB:", savedOrder.id);
+               setFormData(prev => ({
+                  ...prev,
+                  id: savedOrder.id,
+                  displayId: savedOrder.displayId
+               }));
+            }
+         } catch(error) {
+             console.error("Error internally saving and staying", error);
+         }
       } else {
          onSave(orderToSave);
       }
