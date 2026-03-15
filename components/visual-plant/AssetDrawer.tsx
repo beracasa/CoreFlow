@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Activity, Box, Calendar, Clock, AlertTriangle, Gauge } from 'lucide-react';
 import { Machine, MachineStatus } from '../../types';
 import { PredictiveAnalysis } from '../../services/geminiService';
+import { useMasterStore } from '../../src/stores/useMasterStore';
 
 interface AssetDrawerProps {
   machine: Machine | null;
@@ -14,14 +15,14 @@ interface AssetDrawerProps {
 }
 
 export const AssetDrawer: React.FC<AssetDrawerProps> = ({ machine, onClose, analysis, onRunAnalysis, isAnalyzing, onCreateWorkOrder }) => {
+  const { parts } = useMasterStore();
+  
   if (!machine) return null;
 
-  // Mock Data for "Kardex Health"
-  const criticalSpares = [
-    { name: 'Servo Motor Axis-X', status: 'IN_STOCK', qty: 2 },
-    { name: 'Hydraulic Seal Kit', status: 'LOW_STOCK', qty: 1 },
-    { name: 'PLC IO Module', status: 'OUT_OF_STOCK', qty: 0 },
-  ];
+  // Real Kardex Data mapped from machine's `criticalParts`
+  const actualCriticalParts = (machine.criticalParts || [])
+    .map(partId => parts.find(p => p.id === partId))
+    .filter(p => p !== undefined) as typeof parts;
 
   return (
     <AnimatePresence>
@@ -40,7 +41,9 @@ export const AssetDrawer: React.FC<AssetDrawerProps> = ({ machine, onClose, anal
               <span className="text-xs font-mono text-industrial-400">{machine.id.toUpperCase()}</span>
             </div>
             <h2 className="text-2xl font-bold text-white font-sans">{machine.name}</h2>
-            <p className="text-sm text-industrial-500">{machine.type} Unidad de Alta Precisión</p>
+            <p className="text-sm text-white font-medium mt-1">
+              {machine.alias || 'Sin Alias'} • {machine.plate || 'Sin Matrícula'}
+            </p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-industrial-700 rounded-full text-industrial-400 hover:text-white transition-colors">
             <X size={20} />
@@ -120,24 +123,32 @@ export const AssetDrawer: React.FC<AssetDrawerProps> = ({ machine, onClose, anal
           </div>
 
           {/* Critical Spares (Kardex Integration) */}
-          <div>
-            <h3 className="text-sm font-bold text-industrial-400 uppercase mb-3 flex items-center gap-2">
-              <Box size={14} /> Repuestos Críticos (Kardex)
-            </h3>
-            <div className="space-y-2">
-              {criticalSpares.map((part, idx) => (
-                <div key={idx} className="flex justify-between items-center p-3 bg-industrial-900 rounded border border-industrial-700">
-                  <span className="text-sm text-gray-300">{part.name}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono text-industrial-500">Cant: {part.qty}</span>
-                    <span className={`w-2 h-2 rounded-full ${part.status === 'IN_STOCK' ? 'bg-emerald-500' :
-                        part.status === 'LOW_STOCK' ? 'bg-yellow-500' : 'bg-red-500 animate-pulse'
-                      }`}></span>
-                  </div>
-                </div>
-              ))}
+          {actualCriticalParts.length > 0 && (
+            <div>
+              <h3 className="text-sm font-bold text-industrial-400 uppercase mb-3 flex items-center gap-2">
+                <Box size={14} /> Repuestos Críticos (Kardex)
+              </h3>
+              <div className="space-y-2">
+                {actualCriticalParts.map((part) => {
+                  const isStockGood = part.currentStock > part.minStock;
+                  const isLowStock = part.currentStock <= part.minStock;
+                  
+                  return (
+                    <div key={part.id} className="flex justify-between items-center p-3 bg-industrial-900 rounded border border-industrial-700">
+                      <div>
+                        <span className="block text-sm text-gray-300">{part.name}</span>
+                        <span className="block text-[10px] text-industrial-500 font-mono mt-0.5">{part.sku}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-mono text-industrial-400 font-bold">Stock: {part.currentStock}</span>
+                        <span className={`w-2 h-2 rounded-full ${isLowStock ? 'bg-red-500' : 'bg-emerald-500'}`}></span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Maintenance Countdown */}
           <div>

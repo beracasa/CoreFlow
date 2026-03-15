@@ -267,21 +267,21 @@ export const PlantMapContainer: React.FC<PlantMapContainerProps> = ({ machines, 
 
   // Helper to render layer buttons with tooltips
   const renderLayerButton = (layer: MapLayer, icon: React.ReactNode, label: string, descKey: string) => (
-    <div className="group relative w-full">
+    <div className="group relative">
       <button
         onClick={() => setActiveLayer(layer)}
         disabled={isEditMode}
-        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all ${activeLayer === layer ? 'bg-industrial-accent text-white shadow-lg' : 'text-industrial-400 hover:bg-industrial-700 hover:text-white'} ${isEditMode ? 'opacity-50 cursor-not-allowed' : ''}`}
+        className={`flex items-center justify-center gap-3 px-4 py-2 rounded-lg text-xs font-medium transition-all ${activeLayer === layer ? 'bg-industrial-accent text-white shadow-lg' : 'text-industrial-400 hover:bg-industrial-700 hover:text-white'} ${isEditMode ? 'opacity-50 cursor-not-allowed' : ''}`}
       >
         {icon} {label}
       </button>
 
-      {/* Tooltip */}
+      {/* Tooltip (Dropdown) */}
       {!isEditMode && (
-        <div className="absolute left-full top-1/2 ml-3 -translate-y-1/2 w-48 bg-industrial-900/95 backdrop-blur text-white text-[10px] p-2 rounded border border-industrial-600 shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 z-50 invisible group-hover:visible translate-x-[-10px] group-hover:translate-x-0">
-          <p className="font-semibold text-industrial-accent mb-1">{label}</p>
+        <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 w-56 bg-industrial-900/95 backdrop-blur text-white text-[10px] p-3 rounded border border-industrial-600 shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 z-50 invisible group-hover:visible translate-y-[-10px] group-hover:translate-y-0">
+          <p className="font-semibold text-industrial-accent mb-1 text-xs">{label}</p>
           <p className="text-industrial-300 leading-tight">{t(descKey)}</p>
-          <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-industrial-600 border-t-transparent border-b-transparent"></div>
+          <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-4 border-transparent border-b-industrial-600 border-l-transparent border-r-transparent"></div>
         </div>
       )}
     </div>

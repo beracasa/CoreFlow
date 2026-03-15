@@ -50,13 +50,8 @@ export const AssetNode: React.FC<AssetNodeProps> = ({ machine, layer, onClick, i
           return 'bg-industrial-danger border-red-500 animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.5)]';
         }
 
-        switch (machine.status) {
-          case MachineStatus.RUNNING: return 'bg-industrial-success border-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.5)]';
-          case MachineStatus.WARNING: return 'bg-industrial-warning border-yellow-400 animate-pulse';
-          case MachineStatus.CRITICAL: return 'bg-industrial-danger border-red-500 animate-ping';
-          case MachineStatus.IDLE: return 'bg-industrial-500 border-slate-400';
-          default: return 'bg-industrial-700 border-slate-600';
-        }
+        // Si no tiene mantenimiento activo, se considera operativo (verde)
+        return 'bg-industrial-success border-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.5)]';
       }
     }
   };

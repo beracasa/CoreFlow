@@ -3,6 +3,7 @@ import { Machine, MachineStatus, MachineDocument } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useMasterStore } from '../src/stores/useMasterStore';
 import { DocumentService } from '../src/services/documentService';
+import { supabase } from '../src/services/supabaseClient';
 import {
   Box, Wifi, Plus, X, Camera, FileText, Server, Clock, Calendar, Pencil, Eye, Download, Trash2
 } from 'lucide-react';
@@ -13,6 +14,7 @@ export const MachinesList: React.FC = () => {
     machines, addMachine, updateMachine,
     branches, categories, assetTypes, zones: zoneStructures,
     maintenancePlans,
+    parts, // To load parts for Kardex
     machinePagination: pagination, setMachinePage: setPage, machineFilters, setMachineFilters, isLoading
   } = useMasterStore();
 
@@ -36,6 +38,49 @@ export const MachinesList: React.FC = () => {
   // Editing State
   const [editingId, setEditingId] = useState<string | null>(null);
   const [viewingMachine, setViewingMachine] = useState<Machine | null>(null);
+  
+  // Dynamic detail states
+  const [machineUnit, setMachineUnit] = useState<string>('h');
+  const [lastMaintenanceDate, setLastMaintenanceDate] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    let isMounted = true;
+    if (viewingMachine) {
+      // 1. Fetch unit from machine_hour_logs
+      supabase
+        .from('machine_hour_logs')
+        .select('unit')
+        .eq('machine_id', viewingMachine.id)
+        .order('date', { ascending: false })
+        .limit(1)
+        .then(({ data }) => {
+          if (isMounted && data && data.length > 0) {
+            setMachineUnit(data[0].unit || 'h');
+          } else if (isMounted) {
+            setMachineUnit('h');
+          }
+        });
+
+      // 2. Fetch latest maintenance (R-MANT-02 or R-MANT-05) completed_date
+      supabase
+        .from('work_orders')
+        .select('completed_date')
+        .eq('machine_id', viewingMachine.id)
+        .eq('status', 'COMPLETED')
+        .in('form_type', ['R-MANT-02', 'R-MANT-05'])
+        .order('completed_date', { ascending: false })
+        .limit(1)
+        .then(({ data }) => {
+          // If no completed_date is exactly set on db somehow fallback to created_date via same query logic if you prefer, but typical schema says completed_date is what's stored on finish
+          if (isMounted && data && data.length > 0 && data[0].completed_date) {
+            setLastMaintenanceDate(data[0].completed_date);
+          } else if (isMounted) {
+            setLastMaintenanceDate(null);
+          }
+        });
+    }
+    return () => { isMounted = false; };
+  }, [viewingMachine]);
 
   // Gateway Modal State (IoT)
   const [showGatewayModal, setShowGatewayModal] = useState(false);
@@ -58,11 +103,20 @@ export const MachinesList: React.FC = () => {
     power: 0,
     imageUrl: '',
     isActive: true, // Default
-    documents: []
+    documents: [],
+    criticalParts: [] // Initial Kardex state
   });
 
+  const [selectedKardexPartIot, setSelectedKardexPartIot] = useState<string>('');
+  const [searchKardexPartIot, setSearchKardexPartIot] = useState<string>('');
+  const [isKardexDropdownOpenIot, setIsKardexDropdownOpenIot] = useState(false);
+  
   // Visual Asset Modal State (Non-IoT)
   const [showManualAssetModal, setShowManualAssetModal] = useState(false);
+  const [selectedKardexPartManual, setSelectedKardexPartManual] = useState<string>('');
+  const [searchKardexPartManual, setSearchKardexPartManual] = useState<string>('');
+  const [isKardexDropdownOpenManual, setIsKardexDropdownOpenManual] = useState(false);
+
   const [newManualAsset, setNewManualAsset] = useState<Partial<Machine> & { customIntervals?: string }>({
     name: '',
     plate: '',
@@ -82,7 +136,8 @@ export const MachinesList: React.FC = () => {
     power: 0,
     imageUrl: '',
     isActive: true, // Default
-    documents: []
+    documents: [],
+    criticalParts: [] // Initial Kardex state
   });
 
   // Logic
@@ -153,7 +208,8 @@ export const MachinesList: React.FC = () => {
       voltage: m.voltage || 480,
       power: m.power || 0,
       imageUrl: m.imageUrl || '',
-      documents: m.documents || []
+      documents: m.documents || [],
+      criticalParts: m.criticalParts || []
     };
 
     if (m.isIot) {
@@ -208,7 +264,8 @@ export const MachinesList: React.FC = () => {
       voltage: Number(newMachine.voltage),
       power: Number(newMachine.power),
       imageUrl: newMachine.imageUrl,
-      documents: newMachine.documents
+      documents: newMachine.documents,
+      criticalParts: newMachine.criticalParts
     };
 
     if (editingId) {
@@ -270,7 +327,8 @@ export const MachinesList: React.FC = () => {
       voltage: Number(newManualAsset.voltage),
       power: Number(newManualAsset.power),
       imageUrl: newManualAsset.imageUrl,
-      documents: newManualAsset.documents
+      documents: newManualAsset.documents,
+      criticalParts: newManualAsset.criticalParts
     };
 
     try {
@@ -564,19 +622,59 @@ export const MachinesList: React.FC = () => {
                       <div className="flex-1 bg-industrial-900/30 p-3 rounded border border-industrial-700/50 flex items-center gap-3">
                         <Clock className="text-industrial-500" size={20} />
                         <div>
-                          <label className="text-[10px] text-industrial-500 uppercase">Horas de Uso</label>
-                          <p className="text-lg font-mono text-white">{viewingMachine.runningHours?.toLocaleString() || '0'} h</p>
+                          <label className="text-[10px] text-industrial-500 uppercase">Registro de Uso</label>
+                          <p className="text-lg font-mono text-white">{viewingMachine.runningHours?.toLocaleString() || '0'} {machineUnit}</p>
                         </div>
                       </div>
                       <div className="flex-1 bg-industrial-900/30 p-3 rounded border border-industrial-700/50 flex items-center gap-3">
                         <Calendar className="text-industrial-500" size={20} />
                         <div>
                           <label className="text-[10px] text-industrial-500 uppercase">Último Mantenimiento</label>
-                          <p className="text-sm text-white">{new Date(viewingMachine.lastMaintenance).toLocaleDateString()}</p>
+                          <p className="text-sm text-white">
+                            {lastMaintenanceDate ? new Date(lastMaintenanceDate).toLocaleDateString() : ''}
+                          </p>
                         </div>
                       </div>
                     </div>
                   </div>
+
+                  {/* Critical Parts (Kardex) Section */}
+                  {viewingMachine.criticalParts && viewingMachine.criticalParts.length > 0 && (
+                    <div className="mb-6">
+                      <h4 className="text-xs font-bold text-industrial-400 uppercase border-b border-industrial-700 pb-2 mb-3">
+                        Repuestos Críticos (Kardex)
+                      </h4>
+                      <div className="bg-industrial-900/50 rounded border border-industrial-700/50 overflow-hidden">
+                        <table className="w-full text-left text-sm text-white">
+                          <thead className="bg-industrial-800 text-xs text-industrial-400">
+                            <tr>
+                              <th className="px-4 py-2 font-medium">SKU / Repuesto</th>
+                              <th className="px-4 py-2 font-medium text-right">Stock Actual</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-industrial-700/50">
+                            {viewingMachine.criticalParts.map(partId => {
+                              const partData = parts.find(p => p.id === partId);
+                              if (!partData) return null;
+                              return (
+                                <tr key={partId} className="hover:bg-industrial-800/50 transition-colors">
+                                  <td className="px-4 py-3">
+                                    <p className="font-medium text-white">{partData.name}</p>
+                                    <p className="text-[10px] text-industrial-500 font-mono mt-0.5">{partData.sku}</p>
+                                  </td>
+                                  <td className="px-4 py-3 text-right">
+                                    <span className={`inline-flex px-2 py-1 rounded text-xs font-bold ${partData.currentStock <= partData.minStock ? 'bg-red-900/50 text-red-400 border border-red-800/50' : 'bg-emerald-900/50 text-emerald-400 border border-emerald-800/50'}`}>
+                                      {partData.currentStock} {partData.unitOfMeasure ? partData.unitOfMeasure : 'Und'}
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Documents Section */}
                   {viewingMachine.documents && viewingMachine.documents.length > 0 && (
@@ -904,6 +1002,108 @@ export const MachinesList: React.FC = () => {
                 </div>
               </div>
 
+              {/* Critical Spare Parts Section (Kardex) */}
+              <div className="pt-4 mt-4 border-t border-industrial-700">
+                <h4 className="text-sm font-bold text-white mb-3">Repuestos Críticos (Kardex)</h4>
+                
+                <div className="bg-industrial-900/50 p-4 rounded border border-industrial-700/50 space-y-4">
+                  <div className="flex gap-2 items-end relative">
+                    <div className="flex-1 space-y-1">
+                      <label className="text-xs text-industrial-400 font-medium">Buscar y Seleccionar Repuesto</label>
+                      <input 
+                        type="text"
+                        placeholder="Buscar por nombre o SKU..."
+                        className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm focus:border-industrial-400 focus:outline-none"
+                        value={searchKardexPartIot}
+                        onChange={(e) => {
+                          setSearchKardexPartIot(e.target.value);
+                          setIsKardexDropdownOpenIot(true);
+                          if (!e.target.value) setSelectedKardexPartIot('');
+                        }}
+                        onFocus={() => setIsKardexDropdownOpenIot(true)}
+                        onBlur={() => setTimeout(() => setIsKardexDropdownOpenIot(false), 200)}
+                      />
+                      {isKardexDropdownOpenIot && (
+                        <ul className="absolute z-50 w-[calc(100%-46px)] bg-industrial-800 border border-industrial-600 rounded mt-1 max-h-48 overflow-y-auto shadow-xl">
+                          {parts.filter(p => (p.name || '').toLowerCase().includes((searchKardexPartIot || '').toLowerCase()) || (p.sku || '').toLowerCase().includes((searchKardexPartIot || '').toLowerCase())).length === 0 ? (
+                            <li className="p-2 text-sm text-industrial-500 italic">No se encontraron repuestos</li>
+                          ) : (
+                            parts
+                              .filter(p => (p.name || '').toLowerCase().includes((searchKardexPartIot || '').toLowerCase()) || (p.sku || '').toLowerCase().includes((searchKardexPartIot || '').toLowerCase()))
+                              .map(p => (
+                                <li 
+                                  key={p.id} 
+                                  className={`p-2 text-sm cursor-pointer border-b border-industrial-700/50 last:border-0 hover:bg-industrial-700 ${selectedKardexPartIot === p.id ? 'bg-industrial-700 text-white' : 'text-industrial-300'}`}
+                                  onClick={() => {
+                                    setSelectedKardexPartIot(p.id);
+                                    setSearchKardexPartIot(p.sku ? `${p.sku} - ${p.name}` : p.name);
+                                    setIsKardexDropdownOpenIot(false);
+                                  }}
+                                >
+                                  <div className="font-medium text-white">{p.name}</div>
+                                  <div className="text-[10px] text-industrial-400 font-mono flex justify-between">
+                                    <span>{p.sku}</span>
+                                    <span className={p.currentStock > p.minStock ? 'text-emerald-400' : 'text-yellow-400'}>Stock: {p.currentStock}</span>
+                                  </div>
+                                </li>
+                              ))
+                          )}
+                        </ul>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!selectedKardexPartIot || (newMachine.criticalParts?.includes(selectedKardexPartIot))}
+                      onClick={() => {
+                        if (selectedKardexPartIot && !newMachine.criticalParts?.includes(selectedKardexPartIot)) {
+                          setNewMachine(prev => ({ ...prev, criticalParts: [...(prev.criticalParts || []), selectedKardexPartIot] }));
+                          setSelectedKardexPartIot('');
+                          setSearchKardexPartIot('');
+                        }
+                      }}
+                      className="px-3 py-2 bg-industrial-700 hover:bg-industrial-600 text-white rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed border border-industrial-600 h-[38px] flex items-center justify-center transition-colors"
+                    >
+                      <Plus size={16} />
+                    </button>
+                  </div>
+
+                  {newMachine.criticalParts && newMachine.criticalParts.length > 0 && (
+                    <div className="space-y-2 mt-4 max-h-48 overflow-y-auto pr-2">
+                      {newMachine.criticalParts.map(partId => {
+                        const partObj = parts.find(p => p.id === partId);
+                        if (!partObj) return null;
+                        
+                        return (
+                          <div key={partId} className="flex items-center justify-between bg-industrial-800 p-2 rounded border border-industrial-700">
+                            <div className="flex items-center gap-3">
+                              <Box className="text-industrial-400" size={16} />
+                              <div>
+                                <p className="text-sm text-white font-medium">{partObj.name}</p>
+                                <p className="text-[10px] text-industrial-500 font-mono">{partObj.sku}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <div className="text-right">
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${partObj.currentStock <= partObj.minStock ? 'bg-red-900/50 text-red-400 border border-red-800' : 'bg-emerald-900/50 text-emerald-400 border border-emerald-800'}`}>
+                                  Stock: {partObj.currentStock}
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setNewMachine(prev => ({ ...prev, criticalParts: prev.criticalParts?.filter(id => id !== partId) }))}
+                                className="text-industrial-500 hover:text-red-400 transition-colors p-1"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* Files Section */}
               <div className="grid grid-cols-2 gap-4 pt-2 border-t border-industrial-700">
                 {/* Image Upload */}
@@ -1163,6 +1363,108 @@ export const MachinesList: React.FC = () => {
                     <Box className="w-3 h-3" />
                     Este equipo no es IoT. Se verá en el mapa, pero requiere entrada de data manual.
                   </p>
+                </div>
+              </div>
+
+              {/* Critical Spare Parts Section (Kardex) */}
+              <div className="pt-4 mt-4 border-t border-industrial-700">
+                <h4 className="text-sm font-bold text-white mb-3">Repuestos Críticos (Kardex)</h4>
+                
+                <div className="bg-industrial-900/50 p-4 rounded border border-industrial-700/50 space-y-4">
+                  <div className="flex gap-2 items-end relative">
+                    <div className="flex-1 space-y-1">
+                      <label className="text-xs text-industrial-400 font-medium">Buscar y Seleccionar Repuesto</label>
+                      <input 
+                        type="text"
+                        placeholder="Buscar por nombre o SKU..."
+                        className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm focus:border-industrial-400 focus:outline-none"
+                        value={searchKardexPartManual}
+                        onChange={(e) => {
+                          setSearchKardexPartManual(e.target.value);
+                          setIsKardexDropdownOpenManual(true);
+                          if (!e.target.value) setSelectedKardexPartManual('');
+                        }}
+                        onFocus={() => setIsKardexDropdownOpenManual(true)}
+                        onBlur={() => setTimeout(() => setIsKardexDropdownOpenManual(false), 200)}
+                      />
+                      {isKardexDropdownOpenManual && (
+                        <ul className="absolute z-50 w-[calc(100%-46px)] bg-industrial-800 border border-industrial-600 rounded mt-1 max-h-48 overflow-y-auto shadow-xl">
+                          {parts.filter(p => (p.name || '').toLowerCase().includes((searchKardexPartManual || '').toLowerCase()) || (p.sku || '').toLowerCase().includes((searchKardexPartManual || '').toLowerCase())).length === 0 ? (
+                            <li className="p-2 text-sm text-industrial-500 italic">No se encontraron repuestos</li>
+                          ) : (
+                            parts
+                              .filter(p => (p.name || '').toLowerCase().includes((searchKardexPartManual || '').toLowerCase()) || (p.sku || '').toLowerCase().includes((searchKardexPartManual || '').toLowerCase()))
+                              .map(p => (
+                                <li 
+                                  key={p.id} 
+                                  className={`p-2 text-sm cursor-pointer border-b border-industrial-700/50 last:border-0 hover:bg-industrial-700 ${selectedKardexPartManual === p.id ? 'bg-industrial-700 text-white' : 'text-industrial-300'}`}
+                                  onClick={() => {
+                                    setSelectedKardexPartManual(p.id);
+                                    setSearchKardexPartManual(p.sku ? `${p.sku} - ${p.name}` : p.name);
+                                    setIsKardexDropdownOpenManual(false);
+                                  }}
+                                >
+                                  <div className="font-medium text-white">{p.name}</div>
+                                  <div className="text-[10px] text-industrial-400 font-mono flex justify-between">
+                                    <span>{p.sku}</span>
+                                    <span className={p.currentStock > p.minStock ? 'text-emerald-400' : 'text-yellow-400'}>Stock: {p.currentStock}</span>
+                                  </div>
+                                </li>
+                              ))
+                          )}
+                        </ul>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!selectedKardexPartManual || (newManualAsset.criticalParts?.includes(selectedKardexPartManual))}
+                      onClick={() => {
+                        if (selectedKardexPartManual && !newManualAsset.criticalParts?.includes(selectedKardexPartManual)) {
+                          setNewManualAsset(prev => ({ ...prev, criticalParts: [...(prev.criticalParts || []), selectedKardexPartManual] }));
+                          setSelectedKardexPartManual('');
+                          setSearchKardexPartManual('');
+                        }
+                      }}
+                      className="px-3 py-2 bg-industrial-700 hover:bg-industrial-600 text-white rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed border border-industrial-600 h-[38px] flex items-center justify-center transition-colors"
+                    >
+                      <Plus size={16} />
+                    </button>
+                  </div>
+
+                  {newManualAsset.criticalParts && newManualAsset.criticalParts.length > 0 && (
+                    <div className="space-y-2 mt-4 max-h-48 overflow-y-auto pr-2">
+                      {newManualAsset.criticalParts.map(partId => {
+                        const partObj = parts.find(p => p.id === partId);
+                        if (!partObj) return null;
+                        
+                        return (
+                          <div key={partId} className="flex items-center justify-between bg-industrial-800 p-2 rounded border border-industrial-700">
+                            <div className="flex items-center gap-3">
+                              <Box className="text-industrial-400" size={16} />
+                              <div>
+                                <p className="text-sm text-white font-medium">{partObj.name}</p>
+                                <p className="text-[10px] text-industrial-500 font-mono">{partObj.sku}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <div className="text-right">
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${partObj.currentStock <= partObj.minStock ? 'bg-red-900/50 text-red-400 border border-red-800' : 'bg-emerald-900/50 text-emerald-400 border border-emerald-800'}`}>
+                                  Stock: {partObj.currentStock}
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setNewManualAsset(prev => ({ ...prev, criticalParts: prev.criticalParts?.filter(id => id !== partId) }))}
+                                className="text-industrial-500 hover:text-red-400 transition-colors p-1"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
 

@@ -91,7 +91,8 @@ export const MachineSupabaseService = {
         history: [],
         telemetry: { timestamp: new Date().toISOString(), temperature: 0, vibration: 0, pressure: 0, powerConsumption: 0 },
         documents: record.documents || [], // ✅ FIX: Map documents field
-        maintenancePlans: record.maintenance_plans || [] // ✅ FIX: Map maintenance plans
+        maintenancePlans: record.maintenance_plans || [], // ✅ FIX: Map maintenance plans
+        criticalParts: record.critical_parts || [] // ✅ FIX: Map Kardex
       };
     }) as Machine[];
 
@@ -136,7 +137,8 @@ export const MachineSupabaseService = {
         last_maintenance: machine.lastMaintenance || null,
         next_maintenance: machine.nextMaintenance || null,
         documents: machine.documents || [], // ✅ FIX: Persist documents field
-        maintenance_plans: machine.maintenancePlans || [] // ✅ FIX: Persist maintenance plans
+        maintenance_plans: machine.maintenancePlans || [], // ✅ FIX: Persist maintenance plans
+        critical_parts: machine.criticalParts || [] // ✅ FIX: Persist Kardex
       })
       .select()
       .single();
@@ -189,7 +191,8 @@ export const MachineSupabaseService = {
         next_maintenance: machine.nextMaintenance || null,
         updated_at: new Date().toISOString(),
         documents: machine.documents || [], // ✅ FIX: Persist documents field
-        maintenance_plans: machine.maintenancePlans || [] // ✅ FIX: Persist maintenance plans
+        maintenance_plans: machine.maintenancePlans || [], // ✅ FIX: Persist maintenance plans
+        critical_parts: machine.criticalParts || [] // ✅ FIX: Persist Kardex
       })
       .eq('id', machine.id);
 

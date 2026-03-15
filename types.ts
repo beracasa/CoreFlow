@@ -104,6 +104,7 @@ export interface Machine {
   imageUrl?: string;      // Imagen del Equipo
   documents?: MachineDocument[] | string[];   // Documentos adjuntos (soporta ambos formatos)
   maintenancePlans?: MaintenancePlan[]; // R-MANT-02 Protocols inside JSONB
+  criticalParts?: string[]; // IDs of critical spare parts for this machine
 }
 
 /**
@@ -296,11 +297,12 @@ export interface SparePart {
   name: string;
   category?: 'MECHANICAL' | 'ELECTRICAL' | 'HYDRAULIC' | 'PNEUMATIC' | 'CONSUMABLE' | 'SENSOR' | 'PLC' | 'OTHER';
   currentStock: number;
-  minimumStock: number;
+  minStock: number;
   reorderPoint?: number;
   locationCode?: string;
   unitCost: number;
   currency?: string;
+  unitOfMeasure?: string;
   supplier: string;
   leadTimeDays: number;
 }
