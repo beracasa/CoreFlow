@@ -148,6 +148,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
       currentStage: WorkOrderStage.DRAFT,
       priority: Priority.MEDIUM,
       createdDate: new Date().toISOString(),
+      startDate: new Date().toISOString().split('T')[0],
       maintenanceType: 'Preventive',
       checklist: { pointClean: null, areaClean: null, guardsComplete: null, toolsRemoved: null, greaseCleaned: null, safetyActivated: null },
       consumedParts: [],
@@ -194,7 +195,8 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                ...initialData,
                formType: type,
                // Initialize assignedTo for new records if not present
-               assignedTo: initialData.assignedTo || prev.assignedTo || user?.id
+               assignedTo: initialData.assignedTo || prev.assignedTo || user?.id,
+               startDate: (initialData.startDate || initialData.createdDate || prev.startDate || prev.createdDate || new Date().toISOString()).split('T')[0]
             };
             // Deep check to prevent infinite React render loops if initialData reference keeps changing from parent
             if (JSON.stringify(prev) === JSON.stringify(nextData)) {
@@ -947,7 +949,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                               type="date"
                               disabled={!isSection1Editable}
                               className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm focus:border-emerald-500 outline-none [color-scheme:dark]"
-                              value={formData.startDate || new Date().toISOString().split('T')[0]}
+                              value={formData.startDate || ''}
                               onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
                            />
                         </div>

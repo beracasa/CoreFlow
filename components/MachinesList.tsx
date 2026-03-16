@@ -64,16 +64,20 @@ export const MachinesList: React.FC = () => {
       // 2. Fetch latest maintenance (R-MANT-02 or R-MANT-05) completed_date
       supabase
         .from('work_orders')
-        .select('completed_date')
+        .select('completed_date, closing_date')
         .eq('machine_id', viewingMachine.id)
-        .eq('status', 'COMPLETED')
+        .eq('status', 'DONE')
         .in('form_type', ['R-MANT-02', 'R-MANT-05'])
         .order('completed_date', { ascending: false })
         .limit(1)
         .then(({ data }) => {
-          // If no completed_date is exactly set on db somehow fallback to created_date via same query logic if you prefer, but typical schema says completed_date is what's stored on finish
-          if (isMounted && data && data.length > 0 && data[0].completed_date) {
-            setLastMaintenanceDate(data[0].completed_date);
+          if (isMounted && data && data.length > 0) {
+            const date = data[0].completed_date || data[0].closing_date;
+            if (date) {
+              setLastMaintenanceDate(date);
+            } else {
+              setLastMaintenanceDate(null);
+            }
           } else if (isMounted) {
             setLastMaintenanceDate(null);
           }
