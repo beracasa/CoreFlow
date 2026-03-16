@@ -17,11 +17,11 @@ interface AssetNodeProps {
 }
 
 export const AssetNode: React.FC<AssetNodeProps> = ({ machine, layer, onClick, isSelected, isEditMode, onMouseDown, onDelete }) => {
-  const { workOrders } = useWorkOrderStore();
-
   // Logic to determine color state based on Active Layer
   const getStateColor = () => {
     if (isEditMode) return 'bg-industrial-700 border-dashed border-2 border-industrial-400 opacity-90';
+
+    const { allOrders } = useWorkOrderStore.getState(); // Get global state for indicators
 
     switch (layer) {
       case 'MAINTENANCE':
@@ -44,7 +44,7 @@ export const AssetNode: React.FC<AssetNodeProps> = ({ machine, layer, onClick, i
 
       case 'OPERATIONAL':
       default: {
-        const hasActiveMaint = workOrders.some(wo => wo.machineId === machine.id && wo.status !== WorkOrderStatus.DONE);
+        const hasActiveMaint = allOrders.some(wo => wo.machineId === machine.id && wo.status !== WorkOrderStatus.DONE);
         
         if (hasActiveMaint) {
           return 'bg-industrial-danger border-red-500 animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.5)]';

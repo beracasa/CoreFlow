@@ -5,6 +5,7 @@ import { workOrderService } from '../services';
 
 interface WorkOrderState {
     workOrders: WorkOrder[];
+    allOrders: WorkOrder[]; // Global list for indicators (all types, all pages)
     loading: boolean;
     isInitialized: boolean;
     error: string | null;
@@ -24,6 +25,7 @@ interface WorkOrderState {
 
 export const useWorkOrderStore = create<WorkOrderState>((set, get) => ({
     workOrders: [],
+    allOrders: [],
     loading: false,
     isInitialized: false, // Add flag
     error: null,
@@ -37,12 +39,20 @@ export const useWorkOrderStore = create<WorkOrderState>((set, get) => ({
         set({ loading: true, error: null });
         try {
             const result = await workOrderService.getAll(page, limit, formType);
-            set({
+            
+            // If fetching without formType, it's a global fetch (effectively "all orders" for indicators)
+            const updates: Partial<WorkOrderState> = {
                 workOrders: result.data,
                 pagination: { page, limit, total: result.total },
                 loading: false,
                 isInitialized: true
-            });
+            };
+
+            if (!formType) {
+                updates.allOrders = result.data;
+            }
+
+            set(updates);
         } catch (err: any) {
             set({ error: err.message || 'Failed to fetch orders', loading: false, isInitialized: true });
         }
@@ -59,6 +69,7 @@ export const useWorkOrderStore = create<WorkOrderState>((set, get) => ({
             const newOrder = await workOrderService.create(orderData);
             set((state) => ({
                 workOrders: [newOrder, ...state.workOrders],
+                allOrders: [newOrder, ...state.allOrders],
                 loading: false
             }));
             return newOrder;
@@ -75,6 +86,7 @@ export const useWorkOrderStore = create<WorkOrderState>((set, get) => ({
             await workOrderService.update(id, updates);
             set((state) => ({
                 workOrders: state.workOrders.map(o => o.id === id ? { ...o, ...updates } : o),
+                allOrders: state.allOrders.map(o => o.id === id ? { ...o, ...updates } : o),
                 loading: false
             }));
             // Optionally re-fetch to be sure?
@@ -90,6 +102,7 @@ export const useWorkOrderStore = create<WorkOrderState>((set, get) => ({
             await workOrderService.delete(id);
             set((state) => ({
                 workOrders: state.workOrders.filter(o => o.id !== id),
+                allOrders: state.allOrders.filter(o => o.id !== id),
                 loading: false
             }));
         } catch (err: any) {
