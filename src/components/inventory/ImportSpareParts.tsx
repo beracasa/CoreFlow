@@ -4,10 +4,45 @@ import { SparePart } from '../../types/inventory';
 import { inventoryService } from '../../services';
 import { Upload, FileSpreadsheet, AlertCircle, CheckCircle, X } from 'lucide-react';
 
-interface ImportSparePartsProps {
-    onClose: () => void;
-    onSuccess: () => void;
-}
+const parseExcelRow = (rawRow: any): Omit<SparePart, 'id'> | null => {
+    // Normalizamos las llaves de la fila (minúsculas, sin acentos, sin símbolos)
+    const normalizedRow: Record<string, any> = {};
+    for (const key in rawRow) {
+        if (Object.prototype.hasOwnProperty.call(rawRow, key)) {
+            const cleanKey = key
+                .toLowerCase()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "") // Quita acentos
+                .replace(/[^a-z0-9]/g, ""); // Quita espacios, °, º, /, $, etc.
+
+            normalizedRow[cleanKey] = rawRow[key];
+        }
+    }
+
+    // Extraer usando las llaves limpias
+    const partNumber = String(normalizedRow['codigonparte'] || normalizedRow['codigo'] || normalizedRow['sku'] || '').trim();
+    const name = String(normalizedRow['nombrerepuesto'] || normalizedRow['nombre'] || '').trim();
+
+    // Si no tiene los campos clave, ignoramos esta fila
+    if (!partNumber || !name) return null;
+
+    // Retornar el objeto SparePart mapeado corrigiendo el cruce de columnas
+    // Tramo (Excel) -> location (Modelo) -> Tramo (UI)
+    // Ubicación (Excel) -> subLocation (Modelo) -> Ubicación (UI)
+    return {
+        partNumber,
+        name,
+        category: normalizedRow['categoria'] || 'General',
+        location: String(normalizedRow['tramo'] || '').trim(),    // Mapeo correcto: Tramo -> location
+        subLocation: String(normalizedRow['ubicacion'] || '').trim(), // Mapeo correcto: Ubicación -> subLocation
+        minStock: Number(normalizedRow['stockminimo']) || 0,
+        maxStock: Number(normalizedRow['stockmaximo']) || 0,
+        currentStock: Number(normalizedRow['stockinicial']) || 0, // Stock Inicial va a currentStock
+        unitOfMeasure: normalizedRow['unidaddemedida'] || 'PCS',
+        cost: parseFloat(normalizedRow['costounitariord'] || normalizedRow['costo'] || '0') || 0,
+        description: normalizedRow['descripcion'] || ''
+    } as Omit<SparePart, 'id'>;
+};
 
 export const ImportSpareParts: React.FC<ImportSparePartsProps> = ({ onClose, onSuccess }) => {
     const [file, setFile] = useState<File | null>(null);
@@ -30,41 +65,36 @@ export const ImportSpareParts: React.FC<ImportSparePartsProps> = ({ onClose, onS
         reader.onload = (e) => {
             try {
                 const data = e.target?.result;
-                const workbook = XLSX.read(data, { type: 'binary' });
+                // Usamos type: 'array' para mejor detección de delimitadores en CSV (;)
+                const workbook = XLSX.read(data, { type: 'array' });
                 const sheetName = workbook.SheetNames[0];
                 const sheet = workbook.Sheets[sheetName];
-                const jsonData = XLSX.utils.sheet_to_json(sheet);
+                const jsonData = XLSX.utils.sheet_to_json(sheet) as any[];
 
-                // Basic validation and mapping
-                // Assuming columns: SKU, Name, Category, Stock, MinStock, Location, Cost
-                const mappedData: Omit<SparePart, 'id'>[] = jsonData.map((row: any) => ({
-                    partNumber: row['SKU'] || row['sku'] || row['Part Number'] || row['Numero Parte'] || '',
-                    name: row['Name'] || row['Nombre'] || row['name'] || '',
-                    category: row['Category'] || row['Categoria'] || row['category'] || 'General',
-                    currentStock: Number(row['Stock'] || row['Current Stock'] || row['currentStock'] || 0),
-                    minStock: Number(row['Min Stock'] || row['Minimo'] || row['minimumStock'] || 0),
-                    maxStock: Number(row['Max Stock'] || row['Maximo'] || row['maximumStock'] || 0),
-                    location: row['Location'] || row['Ubicacion'] || row['locationCode'] || '',
-                    cost: Number(row['Cost'] || row['Costo'] || row['unitCost'] || 0),
-                    // supplier: row['Supplier'] || row['Proveedor'] || row['supplier'] || '',
-                    // leadTimeDays: Number(row['Lead Time'] || row['Tiempo Entrega'] || row['leadTimeDays'] || 0),
-                    unitOfMeasure: row['Unit'] || row['Unidad'] || 'PCS',
-                    description: row['Description'] || row['Descripcion'] || '',
-                }));
-
-                const validData = mappedData.filter(d => d.partNumber && d.name);
-
-                if (validData.length === 0) {
-                    setError('No valid data found. Please ensure columns "SKU" and "Name" exist.');
+                if (jsonData.length > 0) {
+                    console.log("1. Fila Cruda de Excel/CSV:", jsonData[0]);
                 }
 
-                setPreviewData(validData);
+                const mappedData = jsonData
+                    .map(parseExcelRow)
+                    .filter((row): row is Omit<SparePart, 'id'> => row !== null);
+
+                if (mappedData.length > 0) {
+                    console.log("2. Fila Mapeada para BD:", mappedData[0]);
+                }
+
+                if (mappedData.length === 0) {
+                    setError("Error: No se encontraron datos válidos. Asegúrese de incluir 'Código / Nº Parte' y 'Nombre Repuesto'.");
+                }
+
+                setPreviewData(mappedData);
             } catch (err) {
-                console.error(err);
-                setError('Error parsing file. Please check the format.');
+                console.error("Error al parsear archivo:", err);
+                setError('Error al procesar el archivo. Por favor, verifique el formato.');
             }
         };
-        reader.readAsBinaryString(file);
+        // Leer como ArrayBuffer para soporte multi-delimitador robusto
+        reader.readAsArrayBuffer(file);
     };
 
     const handleImport = async () => {
@@ -77,7 +107,7 @@ export const ImportSpareParts: React.FC<ImportSparePartsProps> = ({ onClose, onS
             onClose();
         } catch (err) {
             console.error(err);
-            setError('Failed to import data. Please try again.');
+            setError('Error al importar los datos. Por favor, intente de nuevo.');
         } finally {
             setLoading(false);
         }
@@ -135,7 +165,7 @@ export const ImportSpareParts: React.FC<ImportSparePartsProps> = ({ onClose, onS
                                     onClick={() => { setFile(null); setPreviewData([]); setError(null); }}
                                     className="text-sm text-red-600 hover:text-red-700 font-medium"
                                 >
-                                    Change File
+                                    Cambiar Archivo
                                 </button>
                             </div>
 
@@ -176,7 +206,7 @@ export const ImportSpareParts: React.FC<ImportSparePartsProps> = ({ onClose, onS
                                     </table>
                                     {previewData.length > 5 && (
                                         <div className="p-3 text-center text-xs text-gray-500 bg-gray-50 border-t">
-                                            And {previewData.length - 5} more items...
+                                            Y {previewData.length - 5} elementos más...
                                         </div>
                                     )}
                                 </div>
@@ -191,14 +221,14 @@ export const ImportSpareParts: React.FC<ImportSparePartsProps> = ({ onClose, onS
                         onClick={onClose}
                         className="px-6 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors font-medium"
                     >
-                        Cancel
+                        Cancelar
                     </button>
                     <button
                         onClick={handleImport}
                         disabled={loading || previewData.length === 0}
                         className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                     >
-                        {loading ? 'Importing...' : 'Import Data'}
+                        {loading ? 'Importando...' : 'Importar Datos'}
                         {!loading && <CheckCircle className="w-4 h-4" />}
                     </button>
                 </div>

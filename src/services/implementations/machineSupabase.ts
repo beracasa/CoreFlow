@@ -154,7 +154,6 @@ export const MachineSupabaseService = {
 
   async updateMachine(machine: Machine): Promise<void> {
     console.log("==> updateMachine Payload:", machine);
-    console.log("==> updateMachine Category:", machine.category);
     
     // Build specifications object from individual fields
     const specifications: any = { ...(machine.specifications || {}) };
@@ -166,34 +165,50 @@ export const MachineSupabaseService = {
     if ((machine as any).capacity) specifications.capacity = (machine as any).capacity;
     if ((machine as any).currentRating) specifications.currentRating = (machine as any).currentRating;
 
+    const updatePayload: any = {
+      updated_at: new Date().toISOString()
+    };
+
+    if (machine.name !== undefined) updatePayload.name = machine.name;
+    if ((machine as any).alias !== undefined || (machine as any).code !== undefined) {
+      updatePayload.code = (machine as any).alias || (machine as any).code || null;
+    }
+    if ((machine as any).plate !== undefined || (machine as any).serialNumber !== undefined) {
+      updatePayload.serial_number = (machine as any).plate || (machine as any).serialNumber || null;
+    }
+    if (machine.type !== undefined) updatePayload.type = machine.type;
+    if (machine.status !== undefined) updatePayload.status = machine.status;
+    if (machine.location?.x !== undefined) updatePayload.location_x = machine.location.x;
+    if (machine.location?.y !== undefined) updatePayload.location_y = machine.location.y;
+    if (machine.branch !== undefined) updatePayload.branch = machine.branch;
+    if (machine.category !== undefined) updatePayload.category = machine.category;
+    if (machine.zone !== undefined) updatePayload.zone = machine.zone;
+    if (machine.brand !== undefined) updatePayload.brand = machine.brand;
+    if (machine.model !== undefined) updatePayload.model = machine.model;
+    if (machine.year !== undefined) updatePayload.year = machine.year;
+    if (machine.imageUrl !== undefined) updatePayload.image_url = machine.imageUrl;
+    if (machine.isIot !== undefined) updatePayload.is_iot = machine.isIot;
+    if ((machine as any).isActive !== undefined) updatePayload.is_active = (machine as any).isActive;
+    
+    // Only update running_hours if explicitly provided
+    if (machine.runningHours !== undefined && machine.runningHours !== null) {
+      updatePayload.running_hours = machine.runningHours;
+    }
+
+    if (machine.lastMaintenance !== undefined) updatePayload.last_maintenance = machine.lastMaintenance;
+    if (machine.nextMaintenance !== undefined) updatePayload.next_maintenance = machine.nextMaintenance;
+    if (machine.documents !== undefined) updatePayload.documents = machine.documents;
+    if (machine.maintenancePlans !== undefined) updatePayload.maintenance_plans = machine.maintenancePlans;
+    if (machine.criticalParts !== undefined) updatePayload.critical_parts = machine.criticalParts;
+    
+    // Specifications is special (JSONB)
+    if (Object.keys(specifications).length > 0) {
+      updatePayload.specifications = { ...(machine.specifications || {}), ...specifications };
+    }
+
     const { error } = await supabase
       .from('machines')
-      .update({
-        name: machine.name,
-        code: (machine as any).alias || machine.code || null,
-        serial_number: (machine as any).plate || machine.serialNumber || null,
-        type: machine.type || 'GENERIC', // ✅ FIX: Persist type field
-        status: machine.status || 'IDLE',
-        location_x: machine.location?.x || 0,
-        location_y: machine.location?.y || 0,
-        branch: machine.branch || null,
-        category: machine.category || null,
-        zone: machine.zone || null,
-        brand: machine.brand || null,
-        model: machine.model || null,
-        year: machine.year || null,
-        image_url: machine.imageUrl || null,
-        specifications: specifications,
-        is_iot: machine.isIot || false,
-        is_active: (machine as any).isActive !== false, // ✅ FIX: Persist isActive field
-        running_hours: machine.runningHours || 0,
-        last_maintenance: machine.lastMaintenance || null,
-        next_maintenance: machine.nextMaintenance || null,
-        updated_at: new Date().toISOString(),
-        documents: machine.documents || [], // ✅ FIX: Persist documents field
-        maintenance_plans: machine.maintenancePlans || [], // ✅ FIX: Persist maintenance plans
-        critical_parts: machine.criticalParts || [] // ✅ FIX: Persist Kardex
-      })
+      .update(updatePayload)
       .eq('id', machine.id);
 
     if (error) {

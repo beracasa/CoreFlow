@@ -154,7 +154,9 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
       consumedParts: [],
       executors: [{ name: '', lastName: '', position: '' }],
       tasks: [],
-      totalMaintenanceCost: 0
+      totalMaintenanceCost: 0,
+      machineWorkHours: 0,
+      nextMaintenanceHours: 0
    });
 
    const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
@@ -196,7 +198,9 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                formType: type,
                // Initialize assignedTo for new records if not present
                assignedTo: initialData.assignedTo || prev.assignedTo || user?.id,
-               startDate: (initialData.startDate || initialData.createdDate || prev.startDate || prev.createdDate || new Date().toISOString()).split('T')[0]
+               startDate: (initialData.startDate || initialData.createdDate || prev.startDate || prev.createdDate || new Date().toISOString()).split('T')[0],
+               machineWorkHours: initialData.machineWorkHours || prev.machineWorkHours || 0,
+               nextMaintenanceHours: initialData.nextMaintenanceHours || prev.nextMaintenanceHours || 0
             };
             // Deep check to prevent infinite React render loops if initialData reference keeps changing from parent
             if (JSON.stringify(prev) === JSON.stringify(nextData)) {
@@ -399,6 +403,9 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
          ...prev,
          machineId: machineId,
          machinePlate: machine?.plate || '',
+         machineWorkHours: machine?.runningHours || 0,
+         // Reset next maint hours if machine changes, it will be recalculated on interval change
+         nextMaintenanceHours: 0,
          interval: prev.interval || '',
          tasks: prev.tasks || []
       }));
@@ -409,10 +416,18 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
       if (!selectedMachine) return;
 
       const tasks = generateCumulativeTasks(selectedMachine.id, selectedMachine.type, interval);
+      
+      // Calculate Next Maintenance Hours
+      const currentHours = formData.machineWorkHours || selectedMachine.runningHours || 0;
+      const intervalMatch = interval.match(/(\d+)/);
+      const intervalHours = intervalMatch ? parseInt(intervalMatch[0]) : 0;
+      const nextMaintHours = currentHours + intervalHours;
+
       setFormData(prev => ({
          ...prev,
          interval: interval,
-         tasks: tasks
+         tasks: tasks,
+         nextMaintenanceHours: nextMaintHours
       }));
    };
 
@@ -978,7 +993,9 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                               type="text"
                               readOnly
                               className="w-full bg-industrial-900/50 border border-industrial-700 rounded p-2 text-industrial-300 text-sm font-mono text-right"
-                              value={selectedMachine?.runningHours ? selectedMachine.runningHours?.toLocaleString('en-US') : '0'}
+                              value={(formData.machineWorkHours !== undefined && formData.machineWorkHours !== null)
+                                 ? formData.machineWorkHours.toLocaleString('en-US') 
+                                 : (selectedMachine?.runningHours?.toLocaleString('en-US') || '0')}
                            />
                         </div>
 
@@ -989,7 +1006,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                               type="text"
                               readOnly
                               className="w-full bg-industrial-900/50 border border-industrial-700 rounded p-2 text-emerald-400 font-bold text-sm font-mono text-right"
-                              value={selectedMachine?.runningHours ? (selectedMachine.runningHours + 360)?.toLocaleString('en-US') : '0'}
+                              value={formData.nextMaintenanceHours ? formData.nextMaintenanceHours.toLocaleString('en-US') : '0'}
                            />
                         </div>
 
