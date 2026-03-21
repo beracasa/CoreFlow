@@ -6,7 +6,8 @@ import { UserManagement } from './user/UserManagement';
 import { RoleManagement } from './user/RoleManagement';
 import { ProtocolBuilder } from './ProtocolBuilder';
 import { useMasterStore } from '../src/stores/useMasterStore';
-import { X, UserPlus, Mail, Briefcase, Clock, Calendar, Server, Cpu, Wifi, Plus, MapPin, Layout, Box, Settings, Shield, Pencil, Camera, FileText, Trash2, CornerDownRight, Edit2, Check, Scale } from 'lucide-react';
+import { NotificationSettings } from './NotificationSettings';
+import { X, UserPlus, Mail, Briefcase, Clock, Calendar, Server, Cpu, Wifi, Plus, MapPin, Layout, Box, Settings, Shield, Pencil, Camera, FileText, Trash2, CornerDownRight, Edit2, Check, Scale, Bell } from 'lucide-react';
 
 interface ConfigurationProps {
   machines: Machine[];
@@ -28,7 +29,7 @@ interface ConfigurationProps {
   onRemoveZone: (id: string) => void;
 }
 
-type Tab = 'GENERAL' | 'ZONES' | 'EQUIPMENT' | 'INVENTORY' | 'PROTOCOLS' | 'WORKFORCE' | 'ROLES';
+type Tab = 'GENERAL' | 'ZONES' | 'EQUIPMENT' | 'INVENTORY' | 'PROTOCOLS' | 'WORKFORCE' | 'ROLES' | 'NOTIFICATIONS';
 
 export const Configuration: React.FC<ConfigurationProps> = ({
   machines: propMachines, // Renamed to avoid conflict with store
@@ -457,6 +458,16 @@ export const Configuration: React.FC<ConfigurationProps> = ({
         >
           {t('config.tab.roles')}
         </button>
+
+        <button
+          onClick={() => setActiveTab('NOTIFICATIONS')}
+          className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === 'NOTIFICATIONS'
+            ? 'text-white border-industrial-accent'
+            : 'text-industrial-500 border-transparent hover:text-industrial-300'
+            }`}
+        >
+          Notificaciones
+        </button>
       </div>
 
       {/* Content Area */}
@@ -738,6 +749,15 @@ export const Configuration: React.FC<ConfigurationProps> = ({
           activeTab === 'ROLES' && (
             <div className="h-full animate-fadeIn">
               <RoleManagement />
+            </div>
+          )
+        }
+
+        {/* NOTIFICATIONS TAB */}
+        {
+          activeTab === 'NOTIFICATIONS' && (
+            <div className="h-full animate-fadeIn">
+              <NotificationSettings />
             </div>
           )
         }

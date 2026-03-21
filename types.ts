@@ -62,6 +62,11 @@ export interface UserProfile {
   specialties?: string[]; // Array of tags e.g. ["SACMI", "Hydraulics"]
   status: 'ACTIVE' | 'INVITED' | 'INACTIVE';
   company_code?: string; // New field: Código de Empresa
+  notification_settings?: {
+    work_order_alerts: boolean;
+    low_stock_alerts: boolean;
+    pending_approvals: boolean;
+  };
 }
 
 export interface TelemetryData {
