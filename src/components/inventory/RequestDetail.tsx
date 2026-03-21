@@ -63,16 +63,48 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
     const selectedReceiverUser = systemUsers.find(u => u.id === selectedReceiver);
 
     const handleQuantityChange = (partId: string, value: number) => {
+        const part = activeParts.find(p => p.id === partId);
+        const item = localRequest.items.find(i => i.partId === partId);
+        
+        if (!item || !part) return;
+
+        // Ensure not negative
+        const qty = Math.max(0, value);
+        
         setDeliveryQuantities(prev => ({
             ...prev,
-            [partId]: value
+            [partId]: qty
         }));
     };
 
     const handleConfirmDelivery = async () => {
         if (!selectedReceiver) {
             setShowReceiverError(true);
-            // alert('Por favor seleccione a quién se le entrega el repuesto (Entregado a).'); // Replaced by visual error
+            return;
+        }
+
+        // Validation before processing
+        const errors: string[] = [];
+        Object.entries(deliveryQuantities).forEach(([partId, qty]) => {
+            if (qty <= 0) return;
+
+            const part = activeParts.find(p => p.id === partId);
+            const item = localRequest.items.find(i => i.partId === partId);
+
+            if (!part || !item) return;
+
+            const pending = item.quantityRequested - item.quantityDelivered;
+            
+            if (qty > part.currentStock) {
+                errors.push(`Stock insuficiente para ${part.name} (Disponible: ${part.currentStock})`);
+            }
+            if (qty > pending) {
+                errors.push(`La cantidad de ${part.name} excede lo pendiente (${pending})`);
+            }
+        });
+
+        if (errors.length > 0) {
+            alert(errors.join('\n'));
             return;
         }
 
@@ -83,6 +115,11 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
                     partId,
                     quantity: Number(qty)
                 }));
+
+            if (itemsList.length === 0) {
+                alert('Ingrese al menos una cantidad válida para entregar.');
+                return;
+            }
 
             const updatedRequest = await inventoryService.deliverParts(localRequest.id, itemsList, selectedReceiver);
 
@@ -441,17 +478,37 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
                                             </td>
                                             {isProcessing && (
                                                 <td className="px-6 py-4">
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        max={part ? part.currentStock : 0}
-                                                        className="w-full bg-industrial-900 border border-industrial-600 rounded px-2 py-1 text-white text-center font-mono outline-none focus:ring-1 focus:ring-industrial-accent"
-                                                        value={deliveryQuantities[item.partId] || 0}
-                                                        onChange={(e) => handleQuantityChange(item.partId, parseInt(e.target.value) || 0)}
-                                                    />
-                                                    {part && part.currentStock < (deliveryQuantities[item.partId] || 0) && (
-                                                        <p className="text-xs text-red-500 mt-1">Stock insuficiente ({part.currentStock})</p>
-                                                    )}
+                                                    {(() => {
+                                                        if (!part) return null;
+                                                        const pending = item.quantityRequested - item.quantityDelivered;
+                                                        const maxAllowed = Math.min(part.currentStock, pending);
+                                                        const currentInput = deliveryQuantities[item.partId] || 0;
+                                                        const hasStockError = currentInput > part.currentStock;
+                                                        const hasRequestError = currentInput > pending;
+
+                                                        return (
+                                                            <div className="space-y-1">
+                                                                <input
+                                                                    type="number"
+                                                                    min="0"
+                                                                    max={maxAllowed}
+                                                                    className={`w-full bg-industrial-900 border rounded px-2 py-1 text-white text-center font-mono outline-none focus:ring-1 ${hasStockError || hasRequestError ? 'border-red-500 focus:ring-red-500' : 'border-industrial-600 focus:ring-industrial-accent'}`}
+                                                                    value={currentInput || ''}
+                                                                    placeholder="0"
+                                                                    onChange={(e) => handleQuantityChange(item.partId, parseInt(e.target.value) || 0)}
+                                                                />
+                                                                <p className="text-[10px] text-industrial-500 text-center">
+                                                                    Límite: <span className="text-industrial-300 font-bold">{maxAllowed}</span>
+                                                                </p>
+                                                                {hasStockError && (
+                                                                    <p className="text-[10px] text-red-400 leading-tight text-center">Stock insuficiente</p>
+                                                                )}
+                                                                {!hasStockError && hasRequestError && (
+                                                                    <p className="text-[10px] text-orange-400 leading-tight text-center">Supera lo solicitado</p>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })()}
                                                 </td>
                                             )}
                                             <td className="px-6 py-4 text-right">

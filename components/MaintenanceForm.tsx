@@ -517,14 +517,21 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
       // RBAC: Tech or Admin
       if (!hasRole([UserRole.TECNICO_MANT, UserRole.ADMIN_SOLICITANTE])) return;
 
-      const updated = {
+      const now = new Date();
+      const updated: Partial<WorkOrder> = {
          ...formData,
          currentStage: WorkOrderStage.EXECUTION,
          status: WorkOrderStatus.IN_PROGRESS,
-         startTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+         startTime: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
       };
+
+      // R-MANT-05: Auto-initialize Report Received Date if empty
+      if (type === 'R-MANT-05' && !formData.requestReceivedDate) {
+         updated.requestReceivedDate = now.toISOString();
+      }
+
       setFormData(updated);
-      handleInternalSave({ ...updated, id: formData.id || `WO-${Date.now()}` } as WorkOrder, true);
+      handleInternalSave({ ...updated, id: formData.id || `WO-${now.getTime()}` } as WorkOrder, true);
    };
 
    const finishExecution = () => {
@@ -711,7 +718,10 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                     type="time"
                                     disabled
                                     className="w-32 bg-industrial-900/50 border border-industrial-700 rounded p-2 text-industrial-400 text-sm text-center [color-scheme:dark]"
-                                    value={new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
+                                    value={(() => {
+                                       const d = formData.createdDate ? new Date(formData.createdDate) : new Date();
+                                       return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+                                    })()}
                                  />
                               </div>
                            </div>
@@ -1137,7 +1147,10 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                        type="time"
                                        disabled
                                        className="w-32 bg-industrial-900/50 border border-industrial-700 rounded p-2 text-industrial-400 text-sm text-center"
-                                       value={new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
+                                       value={(() => {
+                                          const d = formData.requestReceivedDate ? new Date(formData.requestReceivedDate) : new Date();
+                                          return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+                                       })()}
                                     />
                                  </div>
                               </div>

@@ -454,8 +454,8 @@ export class InventorySupabaseService implements IInventoryService {
             .order('reception_date', { ascending: false });
 
         if (filters?.partId) {
-            // Filter by part_id inside the items JSONB array
-            query = query.contains('items', [{ partId: filters.partId }]);
+            // Filter by partId OR part_id inside the items JSONB array to handle regressions or different naming conventions
+            query = query.or(`items.cs.[{"partId":"${filters.partId}"}],items.cs.[{"part_id":"${filters.partId}"}]`);
         } else if (filters?.searchTerm) {
             query = query.or(`document_number.ilike.%${filters.searchTerm}%,notes.ilike.%${filters.searchTerm}%`);
         }
