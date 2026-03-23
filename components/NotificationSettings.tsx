@@ -4,16 +4,16 @@ import { supabase } from '../src/services/supabaseClient';
 import { Bell, AlertTriangle, Package, CheckSquare, Save, Loader2 } from 'lucide-react';
 
 interface NotificationPreferences {
-  work_order_alerts: boolean;
-  low_stock_alerts: boolean;
+  alerts_rmant05: boolean;
+  low_stock: boolean;
   pending_approvals: boolean;
 }
 
 export const NotificationSettings = () => {
   const { user } = useAuth();
   const [preferences, setPreferences] = useState<NotificationPreferences>({
-    work_order_alerts: false,
-    low_stock_alerts: false,
+    alerts_rmant05: false,
+    low_stock: false,
     pending_approvals: false,
   });
   const [isLoading, setIsLoading] = useState(true);
@@ -25,15 +25,15 @@ export const NotificationSettings = () => {
       try {
         const { data, error } = await supabase
           .from('profiles')
-          .select('notification_settings')
+          .select('notification_preferences')
           .eq('id', user.id)
           .single();
 
-        if (!error && data?.notification_settings) {
+        if (!error && data?.notification_preferences) {
           setPreferences({
-            work_order_alerts: !!data.notification_settings.work_order_alerts,
-            low_stock_alerts: !!data.notification_settings.low_stock_alerts,
-            pending_approvals: !!data.notification_settings.pending_approvals,
+            alerts_rmant05: !!data.notification_preferences.alerts_rmant05,
+            low_stock: !!data.notification_preferences.low_stock,
+            pending_approvals: !!data.notification_preferences.pending_approvals,
           });
         }
       } catch (err) {
@@ -59,7 +59,7 @@ export const NotificationSettings = () => {
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({ notification_settings: preferences })
+        .update({ notification_preferences: preferences })
         .eq('id', user.id);
 
       if (error) throw error;
@@ -107,8 +107,8 @@ export const NotificationSettings = () => {
               <input
                 type="checkbox"
                 className="sr-only peer"
-                checked={preferences.work_order_alerts}
-                onChange={() => handleToggle('work_order_alerts')}
+                checked={preferences.alerts_rmant05}
+                onChange={() => handleToggle('alerts_rmant05')}
               />
               <div className="w-11 h-6 bg-industrial-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-industrial-accent"></div>
             </label>
@@ -129,8 +129,8 @@ export const NotificationSettings = () => {
               <input
                 type="checkbox"
                 className="sr-only peer"
-                checked={preferences.low_stock_alerts}
-                onChange={() => handleToggle('low_stock_alerts')}
+                checked={preferences.low_stock}
+                onChange={() => handleToggle('low_stock')}
               />
               <div className="w-11 h-6 bg-industrial-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-industrial-accent"></div>
             </label>
