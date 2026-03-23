@@ -435,7 +435,8 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
       const orderToSave = {
          ...order,
          formType: type,
-         type: order.type || (type === 'R-MANT-02' ? 'PREVENTIVE' : 'CORRECTIVE')
+         type: order.type || (type === 'R-MANT-02' ? 'PREVENTIVE' : 'CORRECTIVE'),
+         totalMaintenanceCost: order.consumedParts?.reduce((sum, p) => sum + (p.totalCost || 0), 0) || 0
       };
       if (!orderToSave.title || orderToSave.title.trim() === '') {
          const machine = machines.find(m => m.id === orderToSave.machineId);
@@ -1303,11 +1304,12 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                                                         partId: sp.id,
                                                                         partName: `${sp.partNumber} - ${sp.name}`,
                                                                         sku: sp.partNumber,
-                                                                        unitCost: sp.cost,
-                                                                        totalCost: sp.cost * updated[idx].quantity,
+                                                                        unitCost: Math.max(0, sp.cost || 0),
+                                                                        totalCost: Math.max(0, (sp.cost || 0) * (updated[idx].quantity || 0)),
                                                                         unit: sp.unitOfMeasure || 'Unidad'
                                                                      };
-                                                                     setFormData({ ...formData, consumedParts: updated });
+                                                                     const totalCost = updated.reduce((sum, p) => sum + (p.totalCost || 0), 0);
+                                                                     setFormData({ ...formData, consumedParts: updated, totalMaintenanceCost: totalCost });
                                                                   }}
                                                                >
                                                                   <div className="flex flex-col flex-1 min-w-0">
@@ -1340,18 +1342,20 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                              <td className="p-2">
                                                 <input
                                                    type="number"
+                                                   min="0"
                                                    disabled={!isSection2Editable}
                                                    className="w-full bg-industrial-900 border border-industrial-600 rounded p-1 text-white text-xs focus:border-pink-500 outline-none text-right"
                                                    value={part.quantity}
                                                    onChange={(e) => {
-                                                      const qty = parseFloat(e.target.value) || 0;
+                                                      const qty = Math.max(0, parseFloat(e.target.value) || 0);
                                                       const updated = [...(formData.consumedParts || [])];
                                                       updated[idx] = {
                                                          ...updated[idx],
                                                          quantity: qty,
-                                                         totalCost: qty * updated[idx].unitCost
+                                                         totalCost: qty * (updated[idx].unitCost || 0)
                                                       };
-                                                      setFormData({ ...formData, consumedParts: updated });
+                                                      const totalCost = updated.reduce((sum, p) => sum + (p.totalCost || 0), 0);
+                                                      setFormData({ ...formData, consumedParts: updated, totalMaintenanceCost: totalCost });
                                                    }}
                                                 />
                                              </td>
@@ -1367,7 +1371,8 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                                       onClick={() => {
                                                          const updated = [...(formData.consumedParts || [])];
                                                          updated.splice(idx, 1);
-                                                         setFormData({ ...formData, consumedParts: updated });
+                                                         const totalCost = updated.reduce((sum, p) => sum + (p.totalCost || 0), 0);
+                                                         setFormData({ ...formData, consumedParts: updated, totalMaintenanceCost: totalCost });
                                                       }}
                                                       className="text-industrial-500 hover:text-red-400 p-1"
                                                    >
@@ -1382,10 +1387,11 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                  {isSection2Editable && (
                                     <div className="p-2 border-t border-industrial-700 bg-industrial-800/50">
                                        <button
-                                          onClick={() => setFormData(p => ({
-                                             ...p,
-                                             consumedParts: [...(p.consumedParts || []), { partId: '', partName: '', sku: '', quantity: 1, unit: 'Unidad', unitCost: 0, totalCost: 0 }]
-                                          }))}
+                                          onClick={() => setFormData(p => {
+                                             const updated = [...(p.consumedParts || []), { partId: '', partName: '', sku: '', quantity: 1, unit: 'Unidad', unitCost: 0, totalCost: 0 }];
+                                             const totalCost = updated.reduce((sum, p) => sum + (p.totalCost || 0), 0);
+                                             return { ...p, consumedParts: updated, totalMaintenanceCost: totalCost };
+                                          })}
                                           className="text-pink-400 hover:text-pink-300 text-xs font-bold flex items-center gap-1"
                                        >
                                           <Plus size={14} /> Add Part
