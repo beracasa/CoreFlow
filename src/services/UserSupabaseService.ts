@@ -3,6 +3,31 @@ import { supabase } from './supabaseClient';
 import { UserProfile, UserRole } from '../../types';
 
 export const UserSupabaseService = {
+  // Get all users (profiles) with notification preferences
+  async getUsersWithPreferences(): Promise<UserProfile[]> {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, email, full_name, job_title, role, tenant_id, status, notification_preferences')
+      .order('full_name');
+
+    if (error) throw error;
+
+    return data.map((p: any) => ({
+      id: p.id,
+      email: p.email,
+      full_name: p.full_name || '',
+      role: p.role,
+      job_title: p.job_title || '',
+      tenant_id: p.tenant_id,
+      status: p.status,
+      notification_preferences: p.notification_preferences || {
+        alerts_rmant05: false,
+        low_stock: false,
+        pending_approvals: false
+      }
+    }));
+  },
+
   // Get all users (profiles)
   async getUsers(): Promise<UserProfile[]> {
     const { data, error } = await supabase
@@ -117,5 +142,24 @@ export const UserSupabaseService = {
       console.error("[UserSupabaseService] Skill Request creation failed:", error);
       throw error;
     }
+  },
+
+  // Update a single user's notification preferences
+  async updateUserNotificationPreferences(userId: string, preferences: any): Promise<void> {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ notification_preferences: preferences })
+      .eq('id', userId);
+
+    if (error) throw error;
+  },
+
+  // Bulk update notification preferences
+  async bulkUpdateNotificationPreferences(updates: { userId: string, preferences: any }[]): Promise<void> {
+    const promises = updates.map(update => 
+      this.updateUserNotificationPreferences(update.userId, update.preferences)
+    );
+    
+    await Promise.all(promises);
   }
 };
