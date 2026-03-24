@@ -92,8 +92,9 @@ export const useUserStore = create<UserState>((set, get) => ({
   inviteUserWithPassword: async (email, fullName, role) => {
     set({ isLoading: true, error: null });
     try {
-      await UserSupabaseService.inviteUserWithPassword(email, fullName, role);
+      const data = await UserSupabaseService.inviteUserWithPassword(email, fullName, role);
       set({ isLoading: false });
+      return data;
     } catch (error: any) {
       set({ error: error.message, isLoading: false });
       throw error;

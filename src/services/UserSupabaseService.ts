@@ -89,17 +89,22 @@ export const UserSupabaseService = {
   },
 
   // Invite user with provisional password
-  async inviteUserWithPassword(email: string, fullName: string, role: string): Promise<any> {
+  async inviteUserWithPassword(email: string, fullName: string, roleId: string): Promise<any> {
     console.log(`[UserSupabaseService] Inviting user with password: ${email}`);
     
     // Call the NEW Edge Function
     const { data, error } = await supabase.functions.invoke('create-user-admin', {
-      body: { email, fullName, roleId: role }
+      body: { email, fullName, roleId }
     });
 
     if (error) {
-      console.error("[UserSupabaseService] Invitation error:", error);
-      throw error;
+      console.error("Error nativo de invoke:", error);
+      throw new Error("El servicio de invitación no está disponible. " + error.message);
+    }
+
+    // El backend ahora devuelve 200 con { error: '...' } si hubo un fallo interno
+    if (data && data.error) {
+      throw new Error(data.error);
     }
 
     return data;

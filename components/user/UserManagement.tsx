@@ -38,20 +38,26 @@ export const UserManagement: React.FC = () => {
         if (newUser.email && newUser.fullName) {
             try {
                 // Use the NEW invitation flow with provisional password
-                await inviteUserWithPassword(
+                const result = await inviteUserWithPassword(
                     newUser.email,
                     newUser.fullName,
                     newUser.role
                 );
 
-                alert(`✅ Invitación enviada existosamente a: ${newUser.email}`);
+                if (result && result.emailSent === false) {
+                    alert(`⚠️ Usuario creado exitosamente, pero NO se pudo enviar el correo de bienvenida.\n\nMotivo: ${result.warning || 'Restricción de dominio de Resend.'}\n\nDile al usuario que su clave provisional es: CF-XXXXXX (visible en consola edge) o restablece su contraseña.`);
+                } else {
+                    alert(`✅ Invitación enviada existosamente a: ${newUser.email}`);
+                }
+                
                 setShowInviteModal(false);
                 setNewUser({ email: '', role: '', fullName: '', title: '', companyCode: '' });
 
                 // Refrescamos lista
                 await fetchUsers();
             } catch (error: any) {
-                alert(`❌ Error al invitar usuario: ${error.message || 'Error de permisos o conexión.'}`);
+                console.error("Error en handleInvite:", error);
+                alert(`❌ Error al invitar usuario: ${error.message}`);
             }
         }
     };

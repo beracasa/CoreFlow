@@ -36,10 +36,13 @@ export const ChangePasswordView: React.FC = () => {
 
             if (authError) throw authError;
 
-            // 2. Actualizar perfil para quitar el flag
+            // 2. Actualizar perfil para quitar el flag y activar usuario
             const { error: profileError } = await supabase
                 .from('profiles')
-                .update({ requires_password_change: false })
+                .update({ 
+                    requires_password_change: false,
+                    status: 'ACTIVE' 
+                })
                 .eq('id', user?.id);
 
             if (profileError) throw profileError;
