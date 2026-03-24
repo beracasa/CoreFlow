@@ -23,6 +23,7 @@ import { UserProfileView } from './components/user/UserProfile';
 import { useLanguage } from './contexts/LanguageContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Login } from './components/Login';
+import { ChangePasswordView } from './components/auth/ChangePasswordView';
 import { Clock, LogOut, Shield, User, Hexagon, Server } from 'lucide-react';
 import { MachinesList } from './components/MachinesList';
 import { useWorkOrderStore } from './src/stores/useWorkOrderStore';
@@ -352,7 +353,7 @@ const ProfilePage = () => {
 
 // --- MAIN COMPONENT ---
 const AppRoutes = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   if (isLoading) {
     return (
@@ -370,6 +371,16 @@ const AppRoutes = () => {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    );
+  }
+
+  // FORCE CHANGE PASSWORD REDIRECTION
+  if (user?.requires_password_change && window.location.pathname !== '/change-password') {
+    return (
+      <Routes>
+        <Route path="/change-password" element={<ChangePasswordView />} />
+        <Route path="*" element={<Navigate to="/change-password" replace />} />
       </Routes>
     );
   }
@@ -392,6 +403,7 @@ const AppRoutes = () => {
         <Route path="settings" element={<ConfigurationPage />} />
 
         <Route path="profile" element={<ProfilePage />} />
+        <Route path="change-password" element={<ChangePasswordView />} />
       </Route>
     </Routes>
   );

@@ -7,7 +7,7 @@ import { useUserStore } from '../../src/stores/useUserStore';
 import { useAuth } from '../../contexts/AuthContext';
 
 export const UserManagement: React.FC = () => {
-    const { users, roles, fetchUsers, fetchRoles, addUser, updateUser, deleteUser, isLoading } = useUserStore();
+    const { users, roles, fetchUsers, fetchRoles, inviteUserWithPassword, updateUser, deleteUser, isLoading } = useUserStore();
 
     // Fetch on mount
     React.useEffect(() => {
@@ -37,14 +37,11 @@ export const UserManagement: React.FC = () => {
 
         if (newUser.email && newUser.fullName) {
             try {
-                // Pass current user's tenant_id to ensure the invited user is in the same tenant
-                await addUser(
+                // Use the NEW invitation flow with provisional password
+                await inviteUserWithPassword(
                     newUser.email,
                     newUser.fullName,
-                    newUser.role,
-                    newUser.title,
-                    newUser.companyCode,
-                    user?.tenant_id
+                    newUser.role
                 );
 
                 alert(`✅ Invitación enviada existosamente a: ${newUser.email}`);

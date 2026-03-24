@@ -67,6 +67,7 @@ export interface UserProfile {
     low_stock: boolean;
     pending_approvals: boolean;
   };
+  requires_password_change?: boolean;
 }
 
 export interface TelemetryData {

@@ -59,7 +59,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       status: data.status,
       specialties: data.specialties || [],
       tenant_id: data.tenant_id,
-      avatar_url: data.avatar_url
+      avatar_url: data.avatar_url,
+      requires_password_change: data.requires_password_change
     };
   };
 
