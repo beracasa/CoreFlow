@@ -29,6 +29,7 @@ import { MachinesList } from './components/MachinesList';
 import { useWorkOrderStore } from './src/stores/useWorkOrderStore';
 import { useMasterStore } from './src/stores/useMasterStore';
 import { useUserStore } from './src/stores/useUserStore';
+import { SERVICE_MODE, SERVICE_WARNINGS } from './src/services';
 
 // --- SIDEBAR ITEM ---
 const SidebarItem = ({ icon, label, active, onClick, restricted = false }: { icon: React.ReactNode, label: string, active: boolean, onClick: () => void, restricted?: boolean }) => {
@@ -221,6 +222,25 @@ const AppLayout = () => {
               </div>
             </div>
             <p className="text-xs text-industrial-500 mt-1">Secure Industrial Gateway</p>
+            <div className="mt-3 flex flex-col gap-1">
+              <div className="inline-flex items-center gap-2">
+                <span className="text-[10px] font-semibold tracking-wider uppercase text-industrial-500">DB</span>
+                <span
+                  className={`text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded border ${
+                    SERVICE_MODE === 'MOCK'
+                      ? 'text-amber-200 border-amber-500/40 bg-amber-500/10'
+                      : 'text-emerald-200 border-emerald-500/40 bg-emerald-500/10'
+                  }`}
+                >
+                  {SERVICE_MODE}
+                </span>
+              </div>
+              {SERVICE_WARNINGS.length > 0 && (
+                <div className="text-[10px] text-amber-300/90 bg-amber-900/10 border border-amber-500/20 rounded p-2 leading-snug">
+                  {SERVICE_WARNINGS[0]}
+                </div>
+              )}
+            </div>
           </div>
 
           <nav className="flex-1 space-y-1 mt-4">

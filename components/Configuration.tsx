@@ -17,7 +17,8 @@ interface ConfigurationProps {
   onUpdateMachine: (machine: Machine) => void;
   settings?: {
     plantName: string;
-    rnc: string;
+    taxId: string;
+    address: string;
     timezone: string;
     currency: string;
     logoUrl: string;
@@ -215,8 +216,7 @@ export const Configuration: React.FC<ConfigurationProps> = ({
     setIntervalToDelete(null); // Clear inline confirm state
   };
 
-  // State for Equipment Configuration
-  const { maintenanceSchedules } = useMasterStore();
+
 
   const handleAddToList = async (setter: (val: string) => Promise<void> | void, newItem: string, clearItem: (val: string) => void) => {
     if (newItem.trim()) {
