@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Settings, Cpu, AlertTriangle, Battery, Gauge, Move, Trash2 } from 'lucide-react';
 import { Machine, MachineStatus, WorkOrderStatus } from '../../types';
 import { useWorkOrderStore } from '../../src/stores/useWorkOrderStore';
+import { useMasterStore } from '../../src/stores/useMasterStore';
 
 export type MapLayer = 'OPERATIONAL' | 'MAINTENANCE' | 'INVENTORY' | 'EFFICIENCY';
 
@@ -47,10 +48,23 @@ export const AssetNode: React.FC<AssetNodeProps> = ({ machine, layer, onClick, i
         }
       }
 
-      case 'INVENTORY':
-        // Mock logic: Spare parts availability (Random for demo)
-        if (machine.status === MachineStatus.WARNING) return 'bg-orange-500 border-orange-400';
-        return 'bg-blue-600 border-blue-400';
+      case 'INVENTORY': {
+        const { parts } = useMasterStore.getState();
+        const criticalPartIds = machine.criticalParts || [];
+        
+        if (criticalPartIds.length === 0) {
+          return 'bg-blue-600 border-blue-400 shadow-[0_0_15px_rgba(37,99,235,0.4)]';
+        }
+
+        const criticalPartsData = parts.filter(p => criticalPartIds.includes(p.id));
+        const hasLowStock = criticalPartsData.some(p => p.currentStock <= p.minStock);
+
+        if (hasLowStock) {
+          return 'bg-industrial-danger border-red-500 animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.5)]';
+        }
+        
+        return 'bg-blue-600 border-blue-400 shadow-[0_0_15px_rgba(37,99,235,0.4)]';
+      }
 
       case 'EFFICIENCY':
         // Mock logic: OEE (Use powerConsumption as proxy for load)
