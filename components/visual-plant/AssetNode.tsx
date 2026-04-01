@@ -24,12 +24,28 @@ export const AssetNode: React.FC<AssetNodeProps> = ({ machine, layer, onClick, i
     const { allOrders } = useWorkOrderStore.getState(); // Get global state for indicators
 
     switch (layer) {
-      case 'MAINTENANCE':
-        // Mock logic: Maintenance urgency
-        const daysToMaint = Math.floor((new Date(machine.nextMaintenance).getTime() - new Date().getTime()) / (1000 * 3600 * 24));
-        if (daysToMaint < 3) return 'bg-red-500 border-red-400 shadow-[0_0_15px_rgba(239,68,68,0.6)]';
-        if (daysToMaint < 14) return 'bg-yellow-500 border-yellow-400';
-        return 'bg-emerald-600 border-emerald-400';
+      case 'MAINTENANCE': {
+        const nextMaintDate = new Date(machine.nextMaintenance);
+        const today = new Date();
+        
+        // Normalizar a medianoche para comparación por días
+        nextMaintDate.setHours(0, 0, 0, 0);
+        today.setHours(0, 0, 0, 0);
+
+        const diffTime = nextMaintDate.getTime() - today.getTime();
+        const daysToMaint = Math.ceil(diffTime / (1000 * 3600 * 24));
+
+        if (daysToMaint <= 0) {
+          // Hoy o vencido: Rojo y parpadeo
+          return 'bg-industrial-danger border-red-500 animate-pulse shadow-[0_0_15px_rgba(239,68,68,0.5)]';
+        } else if (daysToMaint <= 3) {
+          // 3 días o menos: Naranja
+          return 'bg-industrial-warning border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.4)]';
+        } else {
+          // Al día (más de 3 días): Verde
+          return 'bg-industrial-success border-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.4)]';
+        }
+      }
 
       case 'INVENTORY':
         // Mock logic: Spare parts availability (Random for demo)
