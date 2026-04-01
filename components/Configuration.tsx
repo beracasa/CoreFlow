@@ -157,7 +157,7 @@ export const Configuration: React.FC<ConfigurationProps> = ({
     }
   };
 
-  const handleSaveProtocol = (tasks: MaintenanceTask[]) => {
+  const handleSaveProtocol = async (tasks: MaintenanceTask[]) => {
     if (selectedProtocolMachineId && activeIntervalTab) {
       const existingPlan = maintenancePlans.find(p => p.machineId === selectedProtocolMachineId);
 
@@ -168,10 +168,16 @@ export const Configuration: React.FC<ConfigurationProps> = ({
             i.id === activeIntervalTab ? { ...i, tasks } : i
           )
         };
-        updateMaintenancePlan(updatedPlan);
-        alert('Protocol saved successfully!');
+        try {
+          await updateMaintenancePlan(updatedPlan);
+          return true;
+        } catch (error) {
+          console.error("Error saving protocol:", error);
+          throw error;
+        }
       }
     }
+    return false;
   };
 
   const handleConfirmAddInterval = (machineId: string) => {
