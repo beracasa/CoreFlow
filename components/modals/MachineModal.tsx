@@ -19,11 +19,11 @@ export const MachineModal: React.FC<MachineModalProps> = ({ isOpen, onClose, onS
     // Local state for form
     const [formData, setFormData] = useState<Partial<Machine>>({
         name: '',
-        branch: branches[0] || '',
-        category: categories[0] || '',
-        zone: initialData?.zone || (zones.length > 0 ? zones[0].name : ''), // Prefer passed zone or default
-        type: assetTypes[0] || 'GENERIC',
-        isActive: true,
+        branch: initialData?.branch || branches[0] || '',
+        category: initialData?.category || categories[0] || '',
+        zone: initialData?.zone || (zones.length > 0 ? `${zones[0].name}${zones[0].lines.length > 0 ? ' - ' + zones[0].lines[0] : ''}` : ''),
+        type: initialData?.type || assetTypes[0] || 'GENERIC',
+        isActive: initialData?.isActive !== false,
         plate: '',
         brand: '',
         model: '',
@@ -35,16 +35,16 @@ export const MachineModal: React.FC<MachineModalProps> = ({ isOpen, onClose, onS
     useEffect(() => {
         if (isOpen) {
             setFormData({
-                name: '',
-                branch: branches[0] || '',
-                category: categories[0] || '',
-                zone: (zones.length > 0 ? zones[0].name : ''),
-                type: assetTypes[0] || 'GENERIC',
-                isActive: true,
-                plate: '',
-                brand: '',
-                model: '',
-                status: MachineStatus.IDLE,
+                name: initialData?.name || '',
+                branch: initialData?.branch || branches[0] || '',
+                category: initialData?.category || categories[0] || '',
+                zone: initialData?.zone || (zones.length > 0 ? `${zones[0].name}${zones[0].lines.length > 0 ? ' - ' + zones[0].lines[0] : ''}` : ''),
+                type: initialData?.type || assetTypes[0] || 'GENERIC',
+                isActive: initialData?.isActive !== false,
+                plate: initialData?.plate || '',
+                brand: initialData?.brand || '',
+                model: initialData?.model || '',
+                status: initialData?.status || MachineStatus.IDLE,
                 ...initialData
             });
         }
@@ -137,7 +137,12 @@ export const MachineModal: React.FC<MachineModalProps> = ({ isOpen, onClose, onS
                                 value={formData.type}
                                 onChange={e => setFormData({ ...formData, type: e.target.value })}
                             >
+                                <option value="" disabled>Seleccionar Tipo</option>
                                 {assetTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                                {/* Show 'GENERIC' only if it's the current value but not in assetTypes */}
+                                {formData.type === 'GENERIC' && !assetTypes.includes('GENERIC') && (
+                                    <option value="GENERIC">GENERIC</option>
+                                )}
                             </select>
                         </div>
                     </div>

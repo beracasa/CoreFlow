@@ -65,7 +65,7 @@ export const MachineSupabaseService = {
         alias: record.code || '',
         serialNumber: record.serial_number || '',
         plate: record.serial_number || '', // Map serial_number to plate for component compatibility
-        type: record.type || 'GENERIC', // ✅ FIX: Map type field
+        type: record.type || '', // Use empty string if null, default to GENERIC in UI
         status: record.status || 'IDLE',
         location: { x: record.location_x || 0, y: record.location_y || 0 },
         branch: record.branch || '',
@@ -119,7 +119,7 @@ export const MachineSupabaseService = {
         name: machine.name,
         code: (machine as any).alias || machine.code || null,
         serial_number: (machine as any).plate || machine.serialNumber || null,
-        type: machine.type || 'GENERIC', // ✅ FIX: Persist type field
+        type: machine.type || null, // Persist exact type or null
         status: machine.status || 'IDLE',
         location_x: machine.location?.x || 0,
         location_y: machine.location?.y || 0,
@@ -176,7 +176,9 @@ export const MachineSupabaseService = {
     if ((machine as any).plate !== undefined || (machine as any).serialNumber !== undefined) {
       updatePayload.serial_number = (machine as any).plate || (machine as any).serialNumber || null;
     }
-    if (machine.type !== undefined) updatePayload.type = machine.type;
+    if (machine.type !== undefined) {
+      updatePayload.type = machine.type || null;
+    }
     if (machine.status !== undefined) updatePayload.status = machine.status;
     if (machine.location?.x !== undefined) updatePayload.location_x = machine.location.x;
     if (machine.location?.y !== undefined) updatePayload.location_y = machine.location.y;

@@ -231,8 +231,8 @@ export const MachinesList: React.FC = () => {
       setNewManualAsset({
         name: m.name,
         plate: m.plate || '',
-        type: m.type,
-        zone: m.zone || zones[0],
+        type: m.type || 'GENERIC',
+        zone: m.zone || (zones.length > 0 ? zones[0].name : ''),
         customIntervals: intervals,
         ...commonFields
       });
@@ -493,7 +493,7 @@ export const MachinesList: React.FC = () => {
                     <td className="px-6 py-4 text-industrial-300 text-xs">{m.zone || 'Unassigned'}</td>
                     <td className="px-6 py-4">
                       <span className="px-2 py-1 bg-industrial-900 rounded border border-industrial-600 text-xs font-mono">
-                        {m.type}
+                        {m.type || 'GENERIC'}
                       </span>
                     </td>
                     <td className="px-6 py-4">
@@ -1269,6 +1269,9 @@ export const MachinesList: React.FC = () => {
                     {assetTypes.map(type => (
                       <option key={type} value={type}>{type}</option>
                     ))}
+                    {newManualAsset.type === 'GENERIC' && !assetTypes.includes('GENERIC') && (
+                      <option value="GENERIC">GENERIC</option>
+                    )}
                   </select>
                 </div>
                 <div className="space-y-1">
