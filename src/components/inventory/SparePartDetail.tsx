@@ -155,7 +155,7 @@ export const SparePartDetail: React.FC<SparePartDetailProps> = ({ part, onClose 
                     <div className="flex flex-col md:flex-row gap-6 mb-6">
                         {currentPart.photoUrl && (
                             <div className="w-full md:w-1/3 shrink-0">
-                                <div className="rounded-lg border border-industrial-700 overflow-hidden bg-black/20 aspect-square flex items-center justify-center">
+                                <div className="rounded-lg border border-industrial-700 overflow-hidden bg-black/20 aspect-square flex items-center justify-center p-2">
                                     <img src={currentPart.photoUrl} alt={currentPart.name} className="w-full h-full object-contain" />
                                 </div>
                             </div>

@@ -385,8 +385,8 @@ export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData,
                                 cursor-pointer"
                             />
                             {formData.photoUrl && (
-                                <div className="h-16 w-16 rounded-lg border border-industrial-600 overflow-hidden bg-white/5 flex-shrink-0">
-                                    <img src={formData.photoUrl} alt="Preview" className="h-full w-full object-cover" />
+                                <div className="h-16 w-16 rounded-lg border border-industrial-600 overflow-hidden bg-white/5 flex-shrink-0 p-1 flex items-center justify-center">
+                                    <img src={formData.photoUrl} alt="Preview" className="h-full w-full object-contain" />
                                 </div>
                             )}
                         </div>

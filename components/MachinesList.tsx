@@ -553,9 +553,9 @@ export const MachinesList: React.FC = () => {
                 <div className="p-6 overflow-y-auto space-y-6 flex-1">
                   {/* Top Section: Image & Basic Info */}
                   <div className="flex gap-6">
-                    <div className="w-40 h-40 bg-industrial-900 rounded-lg border border-industrial-700 flex items-center justify-center overflow-hidden shrink-0">
-                      {viewingMachine.imageUrl ? (
-                        <img src={viewingMachine.imageUrl} alt={viewingMachine.name} className="w-full h-full object-cover" />
+                    <div className="w-40 h-40 bg-industrial-900 rounded-lg border border-industrial-700 flex items-center justify-center overflow-hidden shrink-0 p-2">
+                       {viewingMachine.imageUrl ? (
+                        <img src={viewingMachine.imageUrl} alt={viewingMachine.name} className="w-full h-full object-contain" />
                       ) : (
                         <Camera size={40} className="text-industrial-600" />
                       )}
@@ -1115,7 +1115,9 @@ export const MachinesList: React.FC = () => {
                   <label className="text-xs text-industrial-400 font-medium">{t('assets.image')}</label>
                   <div className="h-32 border-2 border-dashed border-industrial-600 rounded flex flex-col items-center justify-center relative hover:border-industrial-400 transition-colors">
                     {newMachine.imageUrl ? (
-                      <img src={newMachine.imageUrl} className="h-full w-full object-contain" alt="Asset" />
+                      <div className="h-full w-full p-1 flex items-center justify-center">
+                        <img src={newMachine.imageUrl} className="h-full w-full object-contain" alt="Asset" />
+                      </div>
                     ) : (
                       <div className="text-center p-2">
                         <Camera className="w-6 h-6 text-industrial-500 mx-auto mb-1" />
@@ -1479,7 +1481,9 @@ export const MachinesList: React.FC = () => {
                   <label className="text-xs text-industrial-400 font-medium">{t('assets.image')}</label>
                   <div className="h-32 border-2 border-dashed border-industrial-600 rounded flex flex-col items-center justify-center relative hover:border-industrial-400 transition-colors">
                     {newManualAsset.imageUrl ? (
-                      <img src={newManualAsset.imageUrl} className="h-full w-full object-contain" alt="Asset" />
+                      <div className="h-full w-full p-1 flex items-center justify-center">
+                        <img src={newManualAsset.imageUrl} className="h-full w-full object-contain" alt="Asset" />
+                      </div>
                     ) : (
                       <div className="text-center p-2">
                         <Camera className="w-6 h-6 text-industrial-500 mx-auto mb-1" />
