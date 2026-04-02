@@ -7,6 +7,7 @@ import { Machine, ZoneStructure } from '../../types';
 import { analyzeMachineHealth, PredictiveAnalysis } from '../../services/geminiService';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
+import { useWorkOrderStore } from '../../src/stores/useWorkOrderStore';
 
 interface PlantMapContainerProps {
   machines: Machine[];
@@ -42,6 +43,14 @@ export const PlantMapContainer: React.FC<PlantMapContainerProps> = ({ machines, 
   const [draftZonePos, setDraftZonePos] = useState<{ id: string, x: number, y: number, w?: number, h?: number } | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const { allOrders, isInitialized, fetchOrders } = useWorkOrderStore();
+
+  React.useEffect(() => {
+    if (!isInitialized || allOrders.length === 0) {
+      fetchOrders();
+    }
+  }, [isInitialized, allOrders.length, fetchOrders]);
 
   // Analysis State
   const [analysis, setAnalysis] = useState<PredictiveAnalysis | null>(null);

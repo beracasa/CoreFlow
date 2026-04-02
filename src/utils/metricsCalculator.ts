@@ -6,6 +6,7 @@ export const calculateMachineOEE = (machineId: string, workOrders: any[], period
   // 1. Filtrar TODAS las órdenes (Preventivas R-MANT-02 y Correctivas R-MANT-05)
   const machineOrders = workOrders.filter(wo => {
     const isSameMachine = String(wo.machine_id) === String(machineId) || 
+                          (wo.machine && String(wo.machine.id) === String(machineId)) ||
                           String(wo.machine) === String(machineId) || 
                           String(wo.machineId) === String(machineId);
     
