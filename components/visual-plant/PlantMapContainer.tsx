@@ -343,7 +343,7 @@ export const PlantMapContainer: React.FC<PlantMapContainerProps> = ({ machines, 
             {renderLayerButton('OPERATIONAL', <Activity size={14} />, t('map.layer.operational'), 'map.layer.operational.desc')}
             {renderLayerButton('MAINTENANCE', <Wrench size={14} />, t('map.layer.maintenance'), 'map.layer.maintenance.desc')}
             {renderLayerButton('INVENTORY', <Battery size={14} />, t('map.layer.inventory'), 'map.layer.inventory.desc')}
-            {renderLayerButton('EFFICIENCY', <Gauge size={14} />, t('map.layer.efficiency'), 'map.layer.efficiency.desc')}
+            {renderLayerButton('EFFICIENCY', <Gauge size={14} />, 'Mapa Calor OEE', 'map.layer.efficiency.desc')}
           </div>
         </div>
       </div>

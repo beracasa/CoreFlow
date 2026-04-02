@@ -4,6 +4,8 @@ import { X, Activity, Box, Calendar, Clock, AlertTriangle, Gauge } from 'lucide-
 import { Machine, MachineStatus } from '../../types';
 import { PredictiveAnalysis } from '../../services/geminiService';
 import { useMasterStore } from '../../src/stores/useMasterStore';
+import { useWorkOrderStore } from '../../src/stores/useWorkOrderStore';
+import { calculateMachineOEE } from '../../src/utils/metricsCalculator';
 
 interface AssetDrawerProps {
   machine: Machine | null;
@@ -16,8 +18,11 @@ interface AssetDrawerProps {
 
 export const AssetDrawer: React.FC<AssetDrawerProps> = ({ machine, onClose, analysis, onRunAnalysis, isAnalyzing, onCreateWorkOrder }) => {
   const { parts } = useMasterStore();
+  const { allOrders } = useWorkOrderStore();
   
   if (!machine) return null;
+
+  const oee = calculateMachineOEE(machine.id, allOrders || []);
 
   // Real Kardex Data mapped from machine's `criticalParts`
   const actualCriticalParts = (machine.criticalParts || [])
@@ -71,7 +76,7 @@ export const AssetDrawer: React.FC<AssetDrawerProps> = ({ machine, onClose, anal
               <div className="flex items-center gap-1 text-industrial-500 mb-1 text-xs">
                 <Gauge size={12} /> OEE
               </div>
-              <div className="text-lg font-mono text-industrial-accent">92%</div>
+              <div className="text-lg font-mono text-blue-500">{oee}%</div>
             </div>
           </div>
 

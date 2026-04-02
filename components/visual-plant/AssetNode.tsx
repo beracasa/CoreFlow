@@ -4,6 +4,7 @@ import { Settings, Cpu, AlertTriangle, Battery, Gauge, Move, Trash2 } from 'luci
 import { Machine, MachineStatus, WorkOrderStatus } from '../../types';
 import { useWorkOrderStore } from '../../src/stores/useWorkOrderStore';
 import { useMasterStore } from '../../src/stores/useMasterStore';
+import { calculateMachineOEE } from '../../src/utils/metricsCalculator';
 
 export type MapLayer = 'OPERATIONAL' | 'MAINTENANCE' | 'INVENTORY' | 'EFFICIENCY';
 
@@ -66,11 +67,12 @@ export const AssetNode: React.FC<AssetNodeProps> = ({ machine, layer, onClick, i
         return 'bg-blue-600 border-blue-400 shadow-[0_0_15px_rgba(37,99,235,0.4)]';
       }
 
-      case 'EFFICIENCY':
-        // Mock logic: OEE (Use powerConsumption as proxy for load)
-        if (machine.telemetry.powerConsumption > 40) return 'bg-emerald-500 border-emerald-400';
-        if (machine.telemetry.powerConsumption > 20) return 'bg-yellow-500 border-yellow-400';
-        return 'bg-slate-500 border-slate-400';
+      case 'EFFICIENCY': {
+        const oee = calculateMachineOEE(machine.id, allOrders || []);
+        if (oee > 90) return 'bg-industrial-800 border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]';
+        if (oee >= 75) return 'bg-industrial-800 border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.5)]';
+        return 'bg-industrial-800 border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.5)]';
+      }
 
       case 'OPERATIONAL':
       default: {
@@ -130,10 +132,9 @@ export const AssetNode: React.FC<AssetNodeProps> = ({ machine, layer, onClick, i
         )}
       </div>
 
-      {/* Telemetry Badge (Hidden in Edit Mode) */}
       {!isEditMode && (
-        <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-industrial-900 text-white text-[9px] px-2 py-0.5 rounded-full border border-industrial-700 shadow-lg font-mono">
-          {layer === 'EFFICIENCY' ? '88%' : `${machine.telemetry.temperature}°C`}
+        <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-industrial-900 text-white text-[9px] px-2 py-0.5 rounded-full border border-industrial-700 shadow-lg font-mono whitespace-nowrap">
+          {layer === 'EFFICIENCY' ? `${calculateMachineOEE(machine.id, useWorkOrderStore.getState().allOrders || [])}%` : `${machine.telemetry.temperature}°C`}
         </div>
       )}
       {/* Delete Button (Edit Mode) */}
