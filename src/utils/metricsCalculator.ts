@@ -18,7 +18,7 @@ export const calculateMachineOEE = (machineId: string, workOrders: any[], period
                           (maintenanceType && ['CORRECTIVO', 'PREVENTIVO'].includes(String(maintenanceType).toUpperCase()));
     
     // Filtrar solo los de los últimos 30 días
-    const dateToUse = wo.created_at || wo.created_date || wo.start_date || wo.createdAt;
+    const dateToUse = wo.created_at || wo.created_date || wo.start_date || wo.createdAt || wo.createdDate || wo.startDate;
     const isRecent = dateToUse ? new Date(dateToUse) >= new Date(Date.now() - periodDays * 24 * 60 * 60 * 1000) : false;
     
     return isSameMachine && isMaintenance && isRecent;
@@ -29,13 +29,13 @@ export const calculateMachineOEE = (machineId: string, workOrders: any[], period
   // 2. Cálculo de horas acumuladas de parada
   let downtimeHours = 0;
   machineOrders.forEach(wo => {
-    const startStr = wo.created_at || wo.created_date || wo.start_date || wo.createdAt;
+    const startStr = wo.created_at || wo.created_date || wo.start_date || wo.createdAt || wo.createdDate || wo.startDate;
     if (!startStr) return; 
     
     const start = new Date(startStr).getTime();
     
     // Si la orden está completada, usamos esa fecha. Si sigue en progreso, usamos la hora actual.
-    const endStr = wo.completed_date || wo.closing_date || wo.completedAt;
+    const endStr = wo.completed_date || wo.closing_date || wo.completedAt || wo.completedDate || wo.endDate || wo.closingDate;
     const end = endStr ? new Date(endStr).getTime() : Date.now();
 
     const hours = (end - start) / (1000 * 60 * 60);
