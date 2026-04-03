@@ -13,72 +13,7 @@ import { generateRMant02PDF, generateRMant05PDF } from '../src/utils/pdf/pdfGene
 
 // --- 1. CONFIGURATION & MASTER DATA ENGINE ---
 
-// Hierarchy: If I select '2160 Hours', I must perform '360' and '1080' tasks too.
-const INTERVAL_HIERARCHY = ['360 Hours', '1080 Hours', '2160 Hours', '4320 Hours', '8640 Hours'];
-
-// Master Task Database (Simulating a DB Table: maintenance_protocols)
-// Master Task Database (Simulating a DB Table: maintenance_protocols)
-// UPDATED: Now uses detailed MaintenanceTask structure
-const MOCK_FLAGS = { clean: false, inspect: false, lubricate: false, adjust: false, refill: false, replace: false, mount: false };
-const MAINTENANCE_PROTOCOLS: Record<string, Record<string, MaintenanceTask[]>> = {
-   'SACMI': {
-      '360 Hours': [
-         {
-            id: 't1', sequence: 1, group: 'Extrusor', component: 'Boquilla extrusor', activity: 'Limpieza',
-            referenceCode: '8.1.2.2.3.7', estimatedTime: 10,
-            actionFlags: { ...MOCK_FLAGS, clean: true }
-         },
-         {
-            id: 't2', sequence: 2, group: 'Extrusor', component: 'Tornillo de encastre', activity: 'Limpieza',
-            referenceCode: '8.1.2.2.3.7', estimatedTime: 10,
-            actionFlags: { ...MOCK_FLAGS, clean: true }
-         },
-         {
-            id: 't3', sequence: 3, group: 'Carrusel de Introducción', component: 'Cuchilla de corte', activity: 'Afilado / Regulado',
-            referenceCode: '8.1.2.3.1', estimatedTime: 45,
-            actionFlags: { ...MOCK_FLAGS, adjust: true, replace: true }
-         },
-         {
-            id: 't4_add', sequence: 4, group: 'Carrusel de Introducción', component: 'Rodillos guía', activity: 'Control de desgaste',
-            referenceCode: '8.1.2.3.2', estimatedTime: 15,
-            actionFlags: { ...MOCK_FLAGS, inspect: true }
-         },
-         {
-            id: 't5_add', sequence: 5, group: 'Sistema Neumático', component: 'Filtro regulador lubricador', activity: 'Drenaje y Llenado',
-            referenceCode: '8.1.2.4.1', estimatedTime: 20,
-            actionFlags: { ...MOCK_FLAGS, clean: true, refill: true }
-         },
-         {
-            id: 't6_add', sequence: 6, group: 'Sistema Neumático', component: 'Válvulas direccionales', activity: 'Prueba de funcionamiento',
-            referenceCode: '8.1.2.4.2', estimatedTime: 10,
-            actionFlags: { ...MOCK_FLAGS, inspect: true }
-         }
-      ],
-      '1080 Hours': [
-         {
-            id: 't4', sequence: 14, group: 'Motorizacion', component: 'Motorreductor Carrusel', activity: 'Control nivel aceite',
-            referenceCode: '8.1.2.1.6', estimatedTime: 15,
-            actionFlags: { ...MOCK_FLAGS, inspect: true, refill: true }
-         }
-      ],
-      '2160 Hours': []
-   },
-   'MOSS': {
-      '360 Hours': [],
-      '1080 Hours': [],
-      '2160 Hours': []
-   },
-   'GENERIC': {
-      '360 Hours': [
-         {
-            id: 'tg1', sequence: 1, group: 'General', component: 'Inspección Visual', activity: 'Control General',
-            estimatedTime: 30,
-            actionFlags: { ...MOCK_FLAGS, inspect: true }
-         }
-      ],
-      '1080 Hours': []
-   }
-};
+// Hierarchy and Master Task database removed as fallback to ensure only configured data is used.
 
 // Mock Spare Parts for Selection removed in favor of real `useMasterStore().spareParts`
 
@@ -310,39 +245,9 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
             return cumulativeTasks;
          }
       }
-      // Fallback to legacy hardcoded logic if no plan exists
-      const selectedIndex = INTERVAL_HIERARCHY.indexOf(selectedInterval);
-      if (selectedIndex === -1) return [];
-
-      let tasks: MaintenanceTask[] = [];
-
-      for (let i = 0; i <= selectedIndex; i++) {
-         const intervalLabel = INTERVAL_HIERARCHY[i];
-
-         // Resolve category name safely (handles both string[] and object[] in store)
-         const categoryMatch = categories.find(c => typeof c === 'string' ? c === machineType : c.id === machineType);
-         const actualMachineType = categoryMatch
-            ? (typeof categoryMatch === 'string' ? categoryMatch : categoryMatch.name)
-            : machineType;
-
-         // Find protocol set flexibly
-         const mtUpper = (actualMachineType || '').toUpperCase();
-         // Default to SACMI to show a rich example table instead of the single-row GENERIC
-         const matchingKey = Object.keys(MAINTENANCE_PROTOCOLS).find(k => mtUpper.includes(k) && k !== 'GENERIC') || 'SACMI';
-
-         const protocolSet = MAINTENANCE_PROTOCOLS[matchingKey];
-         const sourceTasks = protocolSet[intervalLabel] || [];
-
-         const newTasks = sourceTasks.map(t => ({
-            ...t,
-            id: `t-${intervalLabel.replace(/\s/g, '')}-${t.id}-${Math.random().toString(36).substr(2, 5)}`,
-            intervalOrigin: intervalLabel,
-            completed: false
-         }));
-
-         tasks = [...tasks, ...newTasks];
-      }
-      return tasks;
+      // Removed legacy hardcoded fallback. 
+      // If no plan exists, we return empty to avoid "fictitious" tasks.
+      return [];
    };
 
    const handleTaskToggle = (taskId: string, action: string) => {
@@ -983,18 +888,23 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                         <div className="space-y-1">
                            <label className="text-xs text-industrial-400 font-bold">{t('mant02.interval')}</label>
                            <select disabled={!isSection1Editable || !selectedMachine}
-                              className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm disabled:opacity-50"
+                              className={`w-full bg-industrial-900 border rounded p-2 text-white text-sm disabled:opacity-50 ${!selectedMachine?.maintenancePlans?.[0] && maintenancePlans.find(p => p.machineId === selectedMachine?.id) === undefined ? 'border-amber-500/50 bg-amber-500/5' : 'border-industrial-600'}`}
                               value={formData.interval || ''} onChange={handleIntervalChange}>
                               <option value="">- Seleccionar Programa -</option>
                               {(() => {
                                  const plan = selectedMachine?.maintenancePlans?.[0] || maintenancePlans.find(p => p.machineId === selectedMachine?.id);
                                  const intervals = (plan?.intervals && plan.intervals.length > 0)
                                     ? plan.intervals.slice().sort((a, b) => a.hours - b.hours).map(i => i.label)
-                                    : (selectedMachine?.intervals && selectedMachine.intervals.length > 0 ? selectedMachine.intervals : INTERVAL_HIERARCHY);
+                                    : (selectedMachine?.intervals && selectedMachine.intervals.length > 0 ? selectedMachine.intervals : []);
 
                                  return intervals.map(int => <option key={int} value={int}>{int}</option>);
                               })()}
                            </select>
+                           {selectedMachine && !selectedMachine.maintenancePlans?.[0] && !maintenancePlans.find(p => p.machineId === selectedMachine.id) && (
+                              <p className="text-[10px] text-amber-500 mt-1 flex items-center gap-1">
+                                 <AlertCircle size={10} /> Este equipo no tiene intervalos de mantenimiento configurados.
+                              </p>
+                           )}
                         </div>
 
                         {/* 7. Current Hours (Formatted) */}
