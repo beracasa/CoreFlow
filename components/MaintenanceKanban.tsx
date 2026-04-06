@@ -5,14 +5,9 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useWorkOrderStore } from '../src/stores/useWorkOrderStore';
 import { useMasterStore } from '../src/stores/useMasterStore';
+import { calculatePlantMTTR } from '../src/utils/metricsCalculator';
 
-// Simple calc helpers (moved back or imported if desired, keeping local)
-const calculateMTTR = (orders: any[]) => {
-  const completed = orders.filter(o => o.status === WorkOrderStatus.DONE && o.completedDate);
-  if (completed.length === 0) return 0;
-  return 4.2;
-};
-
+// MTBF remains placeholder for now as per instructions to keep other functionalities intact
 const calculateMTBF = () => 148.5;
 
 export const MaintenanceKanban: React.FC = () => {
@@ -43,7 +38,7 @@ export const MaintenanceKanban: React.FC = () => {
       <div className="flex gap-6 mb-8 overflow-x-auto pb-2">
         <div className="bg-industrial-800 p-4 rounded border border-industrial-700 shadow-sm flex-1 min-w-[200px] max-w-xs">
           <p className="text-industrial-500 text-xs font-bold uppercase tracking-wider">{t('kanban.mttr')}</p>
-          <p className="text-2xl font-mono text-white mt-1">{calculateMTTR(workOrders)} <span className="text-sm text-industrial-500">hrs</span></p>
+          <p className="text-2xl font-mono text-white mt-1">{calculatePlantMTTR(workOrders)} <span className="text-sm text-industrial-500">hrs</span></p>
         </div>
         <div className="bg-industrial-800 p-4 rounded border border-industrial-700 shadow-sm flex-1 min-w-[200px] max-w-xs">
           <p className="text-industrial-500 text-xs font-bold uppercase tracking-wider">{t('kanban.mtbf')}</p>
