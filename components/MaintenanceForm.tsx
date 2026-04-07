@@ -650,8 +650,8 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                  value={formData.assignedTo || ''}
                                  onChange={e => setFormData({ ...formData, assignedTo: e.target.value })}>
                                  <option value="">- Seleccionar -</option>
-                                 {/* Only show users with appropriate role (or all, depending on need, showing ADMIN_SOLICITANTE, OPERADOR, GERENCIA, etc. Usually anyone can request) */}
-                                 {users.map(u => (
+                                 {/* Only show users with appropriate role (Gerente or Supervisor de Mantenimiento) */}
+                                 {users.filter(u => u.roleName === 'Gerente de Mantenimiento' || u.roleName === 'Supervisor de Mantenimiento').map(u => (
                                     <option key={u.id} value={u.id}>{u.full_name}</option>
                                  ))}
                               </select>
