@@ -1617,8 +1617,8 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                     clearInvalidField('supervisorId');
                                  }}>
                                  <option value="">- Seleccionar Supervisor -</option>
-                                 {technicians.filter(t => t.role === UserRole.ADMIN_SOLICITANTE || t.role === UserRole.SUPERVISOR).map(t => (
-                                    <option key={t.id} value={t.id}>{t.name}</option>
+                                 {users.filter(u => u.roleName === 'Supervisor de Mantenimiento').map(u => (
+                                    <option key={u.id} value={u.id}>{u.full_name}</option>
                                  ))}
                               </select>
                            </div>
