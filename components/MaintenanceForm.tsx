@@ -1406,18 +1406,20 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                     <select
                                        disabled={!isSection2Editable}
                                        className="bg-industrial-900 border border-industrial-700 rounded p-2 text-xs text-white focus:border-pink-500 outline-none"
-                                       value={technicians.find(t => t.name === exec.name)?.id || ''}
+                                       value={users.find(u => u.full_name === exec.name)?.id || ''}
                                        onChange={(e) => {
-                                          const tech = technicians.find(t => t.id === e.target.value);
+                                          const tech = users.find(u => u.id === e.target.value);
                                           if (tech) {
                                              const updated = [...(formData.executors || [])];
-                                             updated[idx] = { name: tech.name, lastName: '', position: tech.role };
+                                             updated[idx] = { name: tech.full_name, lastName: '', position: tech.roleName || tech.job_title };
                                              setFormData({ ...formData, executors: updated });
                                           }
                                        }}
                                     >
-                                       <option value="">Select Technician...</option>
-                                       {technicians.map(t => <option key={t.id} value={t.id}>{t.name} ({t.role})</option>)}
+                                       <option value="">Seleccionar Técnico...</option>
+                                       {users.filter(u => u.roleName === 'Electromecánico Labels' || u.roleName === 'Electromecánico Ravi').map(u => (
+                                          <option key={u.id} value={u.id}>{u.full_name}</option>
+                                       ))}
                                     </select>
                                     <input type="text" readOnly disabled className="bg-industrial-900/50 border border-industrial-700 rounded p-2 text-xs text-industrial-400 cursor-not-allowed" value={exec.position} />
                                  </div>
