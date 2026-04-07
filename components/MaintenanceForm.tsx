@@ -1085,8 +1085,13 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                     value={formData.requestReceivedBy || ''}
                                     onChange={e => setFormData({ ...formData, requestReceivedBy: e.target.value })}>
                                     <option value="">- Seleccionar -</option>
-                                    {technicians.filter(t => t.role === UserRole.ADMIN_SOLICITANTE || t.role === UserRole.TECNICO_MANT).map(t => (
-                                       <option key={t.id} value={t.id}>{t.name}</option>
+                                    {users.filter(u => 
+                                       u.roleName === 'Supervisor de Mantenimiento' || 
+                                       u.roleName === 'Gerente de Mantenimiento' || 
+                                       u.roleName === 'Electromecánico Labels' || 
+                                       u.roleName === 'Electromecánico Ravi'
+                                    ).map(u => (
+                                       <option key={u.id} value={u.id}>{u.full_name}</option>
                                     ))}
                                  </select>
                               </div>
@@ -1122,8 +1127,11 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                     value={formData.assignedMechanic || ''}
                                     onChange={e => setFormData({ ...formData, assignedMechanic: e.target.value })}>
                                     <option value="">- Seleccionar Técnico -</option>
-                                    {technicians.filter(t => t.role === UserRole.TECNICO_MANT).map(t => (
-                                       <option key={t.id} value={t.id}>{t.name}</option>
+                                    {users.filter(u => 
+                                       u.roleName === 'Electromecánico Labels' || 
+                                       u.roleName === 'Electromecánico Ravi'
+                                    ).map(u => (
+                                       <option key={u.id} value={u.id}>{u.full_name}</option>
                                     ))}
                                  </select>
                               </div>
