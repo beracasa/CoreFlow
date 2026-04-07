@@ -98,6 +98,14 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
    const [machineSearchTerm, setMachineSearchTerm] = useState('');
    const [validationError, setValidationError] = useState<string | null>(null);
    const [invalidFields, setInvalidFields] = useState<Set<string>>(new Set());
+   const clearInvalidField = (field: string) => {
+      setInvalidFields(prev => {
+         if (!prev.has(field)) return prev;
+         const next = new Set(prev);
+         next.delete(field);
+         return next;
+      });
+   };
    const [duration, setDuration] = useState<string>('0h 0m');
    const [editingSection, setEditingSection] = useState<number | null>(null);
    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -465,6 +473,44 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
          return;
       }
 
+      // --- MANDATORY VALIDATION (R-MANT-02 & R-MANT-05) ---
+      const errors: string[] = [];
+      const fields = new Set<string>();
+
+      // 1. Checklist Validation
+      const checklistKeys = ['pointClean', 'areaClean', 'guardsComplete', 'toolsRemoved', 'greaseCleaned', 'safetyActivated'];
+      checklistKeys.forEach(key => {
+         if (formData.checklist?.[key as keyof typeof formData.checklist] === null || formData.checklist?.[key as keyof typeof formData.checklist] === undefined) {
+            fields.add(`checklist.${key}`);
+         }
+      });
+
+      // 2. Acceptance Fields Validation
+      if (!formData.supervisorId) {
+         fields.add('supervisorId');
+         errors.push("Debe seleccionar el supervisor que recibe.");
+      }
+      if (!formData.closingDate) {
+         fields.add('closingDate');
+         errors.push("Debe registrar la fecha y hora de recepción.");
+      }
+      if (!formData.signatureExecutor || formData.signatureExecutor === 'false') {
+         fields.add('signatureExecutor');
+         errors.push("Falta la firma del ejecutante.");
+      }
+      if (!formData.signatureSupervisor || formData.signatureSupervisor === 'false') {
+         fields.add('signatureSupervisor');
+         errors.push("Falta la firma del supervisor.");
+      }
+
+      if (fields.size > 0) {
+         setInvalidFields(fields);
+         setValidationError("Existen campos obligatorios pendientes en la sección de Supervisión.");
+         
+         // Scroll to first error? For now just show the banner.
+         return;
+      }
+
       const newOrder = {
          ...formData,
          id: formData.id || `WO-${Date.now()}`, // Preserve ID if exists
@@ -473,6 +519,8 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
          completedDate: new Date().toISOString()
       } as WorkOrder;
 
+      setValidationError(null);
+      setInvalidFields(new Set());
       handleInternalSave(newOrder);
    };
 
@@ -1434,24 +1482,30 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                               <div key={item.key} className="flex flex-col md:flex-row md:justify-between md:items-center gap-2 py-2 border-b border-industrial-700/30">
                                  <span className="text-sm text-industrial-300 flex-1">{item.label}</span>
                                  <div className="flex gap-4 min-w-[120px]">
-                                    <label className={`cursor-pointer flex items-center gap-2 px-3 py-1 rounded transition-colors ${formData.checklist?.[item.key as keyof typeof formData.checklist] === true ? 'bg-emerald-900/50 border border-emerald-500/50' : 'hover:bg-industrial-800'}`}>
+                                     <label className={`cursor-pointer flex items-center gap-2 px-3 py-1 rounded transition-colors ${formData.checklist?.[item.key as keyof typeof formData.checklist] === true ? 'bg-emerald-900/50 border border-emerald-500/50' : (invalidFields.has(`checklist.${item.key}`) ? 'bg-red-900/20 border border-red-500/50' : 'hover:bg-industrial-800')}`}>
                                        <input
                                           type="radio"
                                           disabled={!isSection3Editable}
                                           name={item.key}
                                           checked={formData.checklist?.[item.key as keyof typeof formData.checklist] === true}
-                                          onChange={() => setFormData(p => ({ ...p, checklist: { ...p.checklist, [item.key]: true } }))}
+                                           onChange={() => {
+                                              setFormData(p => ({ ...p, checklist: { ...p.checklist, [item.key]: true } }));
+                                              clearInvalidField(`checklist.${item.key}`);
+                                           }}
                                           className={`w-4 h-4 ${!isSection3Editable ? 'accent-emerald-500' : 'cursor-pointer'}`}
                                        />
                                        <span className={`${formData.checklist?.[item.key as keyof typeof formData.checklist] === true ? 'text-emerald-400 font-bold' : 'text-industrial-400'}`}>Si</span>
                                     </label>
-                                    <label className={`cursor-pointer flex items-center gap-2 px-3 py-1 rounded transition-colors ${formData.checklist?.[item.key as keyof typeof formData.checklist] === false ? 'bg-red-900/50 border border-red-500/50' : 'hover:bg-industrial-800'}`}>
+                                     <label className={`cursor-pointer flex items-center gap-2 px-3 py-1 rounded transition-colors ${formData.checklist?.[item.key as keyof typeof formData.checklist] === false ? 'bg-red-900/50 border border-red-500/50' : (invalidFields.has(`checklist.${item.key}`) ? 'bg-red-900/20 border border-red-500/50' : 'hover:bg-industrial-800')}`}>
                                        <input
                                           type="radio"
                                           disabled={!isSection3Editable}
                                           name={item.key}
                                           checked={formData.checklist?.[item.key as keyof typeof formData.checklist] === false}
-                                          onChange={() => setFormData(p => ({ ...p, checklist: { ...p.checklist, [item.key]: false } }))}
+                                           onChange={() => {
+                                              setFormData(p => ({ ...p, checklist: { ...p.checklist, [item.key]: false } }));
+                                              clearInvalidField(`checklist.${item.key}`);
+                                           }}
                                           className={`w-4 h-4 ${!isSection3Editable ? 'accent-red-500' : 'cursor-pointer'}`}
                                        />
                                        <span className={`${formData.checklist?.[item.key as keyof typeof formData.checklist] === false ? 'text-red-400 font-bold' : 'text-industrial-400'}`}>No</span>
@@ -1547,10 +1601,8 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                               )}
                            </div>
                         </div>
-                     </div>
-
-                     {/* 3. Acceptance & Signatures */}
-                     <div className="border-t border-industrial-700 pt-6">
+                      </div>
+                      <div className="border-t border-industrial-700 pt-6">
                         <h4 className="text-sm font-bold text-white mb-4">Aceptación del Trabajo</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 
@@ -1558,9 +1610,12 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                            <div className="space-y-1">
                               <label className="text-xs text-industrial-400 font-bold">Recibido Por (Supervisor)</label>
                               <select disabled={!isSection3Editable}
-                                 className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm focus:border-emerald-500 outline-none"
+                                 className={`w-full bg-industrial-900 border rounded p-2 text-white text-sm focus:border-emerald-500 outline-none ${invalidFields.has('supervisorId') ? 'border-red-500 bg-red-900/10 shadow-[0_0_10px_rgba(239,68,68,0.1)]' : 'border-industrial-600'}`}
                                  value={formData.supervisorId || ''}
-                                 onChange={e => setFormData({ ...formData, supervisorId: e.target.value })}>
+                                 onChange={e => {
+                                    setFormData({ ...formData, supervisorId: e.target.value });
+                                    clearInvalidField('supervisorId');
+                                 }}>
                                  <option value="">- Seleccionar Supervisor -</option>
                                  {technicians.filter(t => t.role === UserRole.ADMIN_SOLICITANTE || t.role === UserRole.SUPERVISOR).map(t => (
                                     <option key={t.id} value={t.id}>{t.name}</option>
@@ -1575,23 +1630,27 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                  <input
                                     type="date"
                                     disabled={!isSection3Editable}
-                                    className="flex-1 bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm focus:border-emerald-500 outline-none"
+                                    className={`flex-1 bg-industrial-900 border rounded p-2 text-white text-sm focus:border-emerald-500 outline-none ${invalidFields.has('closingDate') ? 'border-red-500 bg-red-900/10 shadow-[0_0_10px_rgba(239,68,68,0.1)]' : 'border-industrial-600'}`}
                                     value={formData.closingDate?.split('T')[0] || new Date().toISOString().split('T')[0]}
                                     onChange={(e) => {
                                        const originalTime = formData.closingDate?.split('T')[1] || new Date().toISOString().split('T')[1];
                                        setFormData({ ...formData, closingDate: `${e.target.value}T${originalTime}` });
+                                       clearInvalidField('closingDate');
                                     }}
                                  />
                                  <input
                                     type="time"
                                     disabled
                                     readOnly
-                                    className="w-32 bg-industrial-900/50 border border-industrial-700 rounded p-2 text-industrial-400 text-sm text-center"
+                                    className={`w-32 bg-industrial-900/50 border rounded p-2 text-industrial-400 text-sm text-center ${invalidFields.has('closingDate') ? 'border-red-500' : 'border-industrial-700'}`}
                                     value={formData.closingDate ? new Date(formData.closingDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : '--:--'}
                                  />
                                  {isSection3Editable && (
                                     <button
-                                       onClick={() => setFormData({ ...formData, closingDate: new Date().toISOString() })}
+                                       onClick={() => {
+                                          setFormData({ ...formData, closingDate: new Date().toISOString() });
+                                          clearInvalidField('closingDate');
+                                       }}
                                        className="bg-industrial-800 hover:bg-emerald-900/50 text-emerald-400 border border-industrial-600 hover:border-emerald-500/50 rounded px-3 py-2 text-xs font-bold transition-all flex items-center gap-1 whitespace-nowrap"
                                        title="Registrar Hora Actual"
                                     >
@@ -1615,9 +1674,10 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                           signatureExecutor: user?.full_name || user?.name || 'Executor Name',
                                           signatureExecutorDate: new Date().toISOString()
                                        });
+                                       clearInvalidField('signatureExecutor');
                                     }
                                  }}
-                                 className={`h-24 bg-white/5 rounded border-2 border-dashed ${isSection3Editable && (!formData.signatureExecutor || formData.signatureExecutor === 'false') ? 'border-pink-500/50 cursor-pointer hover:bg-white/10' : 'border-industrial-600'} flex items-center justify-center flex-col gap-1 transition-colors`}
+                                 className={`h-24 bg-white/5 rounded border-2 border-dashed ${isSection3Editable && (!formData.signatureExecutor || formData.signatureExecutor === 'false') ? (invalidFields.has('signatureExecutor') ? 'border-red-500 bg-red-900/10' : 'border-pink-500/50 cursor-pointer hover:bg-white/10') : 'border-industrial-600'} flex items-center justify-center flex-col gap-1 transition-colors`}
                               >
                                  {formData.signatureExecutor && formData.signatureExecutor !== 'false' ? (
                                     <>
@@ -1625,7 +1685,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                        <span className="text-xs text-industrial-500">{formData.signatureExecutorDate ? new Date(formData.signatureExecutorDate).toLocaleDateString() : ''}</span>
                                     </>
                                  ) : (
-                                    <span className="text-xs text-industrial-500">
+                                    <span className={`text-xs ${invalidFields.has('signatureExecutor') ? 'text-red-400 font-bold' : 'text-industrial-500'}`}>
                                        {isSection3Editable ? 'Click to Sign (Executor)' : 'Pending Signature'}
                                     </span>
                                  )}
@@ -1636,8 +1696,13 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                            <div>
                               <label className="text-xs text-industrial-400 font-bold mb-2 block">Firma Supervisor (Conformidad)</label>
                               <div
-                                 onClick={signSupervisor}
-                                 className={`h-24 bg-white/5 rounded border-2 border-dashed ${isSection3Editable && (!formData.signatureSupervisor || formData.signatureSupervisor === 'false') ? 'border-emerald-500/50 cursor-pointer hover:bg-white/10' : 'border-industrial-600'} flex items-center justify-center flex-col gap-1 transition-colors`}
+                                 onClick={() => {
+                                    signSupervisor();
+                                    if (isSection3Editable) {
+                                       clearInvalidField('signatureSupervisor');
+                                    }
+                                 }}
+                                 className={`h-24 bg-white/5 rounded border-2 border-dashed ${isSection3Editable && (!formData.signatureSupervisor || formData.signatureSupervisor === 'false') ? (invalidFields.has('signatureSupervisor') ? 'border-red-500 bg-red-900/10' : 'border-emerald-500/50 cursor-pointer hover:bg-white/10') : 'border-industrial-600'} flex items-center justify-center flex-col gap-1 transition-colors`}
                               >
                                  {formData.signatureSupervisor && formData.signatureSupervisor !== 'false' ? (
                                     <>
@@ -1645,7 +1710,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                        <span className="text-xs text-industrial-500">{formData.signatureSupervisorDate ? new Date(formData.signatureSupervisorDate).toLocaleDateString() : ''}</span>
                                     </>
                                  ) : (
-                                    <span className="text-xs text-industrial-500">
+                                    <span className={`text-xs ${invalidFields.has('signatureSupervisor') ? 'text-red-400 font-bold' : 'text-industrial-500'}`}>
                                        {isSection3Editable ? 'Click to Sign (Supervisor)' : 'Pending Signature'}
                                     </span>
                                  )}
