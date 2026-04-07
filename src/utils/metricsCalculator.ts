@@ -152,3 +152,99 @@ export const calculatePlantMTTR = (workOrders: any[]) => {
 
   return Number((totalRepairHours / correctiveOrders.length).toFixed(1));
 };
+
+/**
+ * 2.1 MTBF Individual por Máquina
+ * Calcula el Tiempo Medio Entre Fallas basándose en las órdenes correctivas (R-MANT-05).
+ */
+export const calculateMachineMTBF = (machineId: string, workOrders: any[], periodDays = 30) => {
+  const totalHours = periodDays * 24;
+  if (!workOrders || workOrders.length === 0) return totalHours;
+
+  // Filtrar solo R-MANT-05 de la máquina en los últimos 30 días
+  const correctiveOrders = workOrders.filter(wo => {
+    const isSameMachine = String(wo.machine_id) === String(machineId) || 
+                         (wo.machine && String(wo.machine.id) === String(machineId)) ||
+                         String(wo.machine) === String(machineId) || 
+                         String(wo.machineId) === String(machineId);
+                         
+    const isCorrective = wo.form_type === 'R-MANT-05' || 
+                         wo.formType === 'R-MANT-05' ||
+                         (wo.maintenance_type && String(wo.maintenance_type).toUpperCase() === 'CORRECTIVO') ||
+                         (wo.maintenanceType && String(wo.maintenanceType).toUpperCase() === 'CORRECTIVO');
+    
+    const dateToUse = wo.created_at || wo.created_date || wo.start_date || wo.createdAt || wo.createdDate || wo.startDate;
+    const isRecent = dateToUse ? new Date(dateToUse) >= new Date(Date.now() - periodDays * 24 * 60 * 60 * 1000) : false;
+    
+    return isSameMachine && isCorrective && isRecent;
+  });
+
+  // Si no hay fallas, el tiempo medio entre fallas es el total del periodo (100% confiabilidad)
+  if (correctiveOrders.length === 0) return totalHours;
+
+  // Sumar tiempos de reparación (Downtime)
+  let downtimeHours = 0;
+  correctiveOrders.forEach(wo => {
+    const startStr = wo.created_at || wo.start_date || wo.created_date || wo.createdAt || wo.startDate || wo.createdDate;
+    const endStr = wo.completed_date || wo.closing_date || wo.updated_at || wo.completedAt || wo.closingDate || wo.updatedAt;
+    
+    if (!startStr) return;
+    
+    const start = new Date(startStr).getTime();
+    const end = endStr ? new Date(endStr).getTime() : Date.now();
+    
+    const hours = (end - start) / (1000 * 60 * 60);
+    if (!isNaN(hours) && hours > 0) downtimeHours += hours;
+  });
+
+  // Fórmula MTBF = Tiempo Operativo (Uptime) / Cantidad de Fallas
+  const uptimeHours = Math.max(0, totalHours - downtimeHours);
+  const mtbf = uptimeHours / correctiveOrders.length;
+
+  return Number(mtbf.toFixed(1));
+};
+
+/**
+ * 2.2 MTBF Global de Planta (Promedio de equipos con fallas en R-MANT-05)
+ * Calcula el MTBF promedio de todas las máquinas que han tenido fallas en el periodo.
+ */
+export const calculatePlantMTBF = (workOrders: any[], periodDays = 30) => {
+  const totalHours = periodDays * 24;
+  if (!workOrders || workOrders.length === 0) return totalHours;
+
+  // 1. Filtrar solo R-MANT-05 de los últimos 30 días
+  const correctiveOrders = workOrders.filter(wo => {
+    const isCorrective = wo.form_type === 'R-MANT-05' || 
+                         wo.formType === 'R-MANT-05' ||
+                         (wo.maintenance_type && String(wo.maintenance_type).toUpperCase() === 'CORRECTIVO') ||
+                         (wo.maintenanceType && String(wo.maintenanceType).toUpperCase() === 'CORRECTIVO');
+                         
+    const dateToUse = wo.created_at || wo.created_date || wo.start_date || wo.createdAt || wo.createdDate || wo.startDate;
+    const isRecent = dateToUse ? new Date(dateToUse) >= new Date(Date.now() - periodDays * 24 * 60 * 60 * 1000) : false;
+    
+    return isCorrective && isRecent;
+  });
+
+  if (correctiveOrders.length === 0) return totalHours;
+
+  // 2. Agrupar las órdenes por máquina
+  const machineFailures: Record<string, any[]> = {};
+  correctiveOrders.forEach(wo => {
+    const mId = String(wo.machine_id || (wo.machine ? (wo.machine.id || wo.machine) : 'unknown') || wo.machineId);
+    if (!machineFailures[mId]) machineFailures[mId] = [];
+    machineFailures[mId].push(wo);
+  });
+
+  // 3. Calcular el MTBF individual de las máquinas que fallaron y sacar el promedio general
+  let totalMTBF = 0;
+  let machineCount = 0;
+
+  Object.keys(machineFailures).forEach(mId => {
+    // Reutilizamos la función individual
+    const mtbf = calculateMachineMTBF(mId, workOrders, periodDays);
+    totalMTBF += mtbf;
+    machineCount++;
+  });
+
+  return machineCount > 0 ? Number((totalMTBF / machineCount).toFixed(1)) : totalHours;
+};

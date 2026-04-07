@@ -5,7 +5,7 @@ import { Machine, MachineStatus } from '../../types';
 import { PredictiveAnalysis } from '../../services/geminiService';
 import { useMasterStore } from '../../src/stores/useMasterStore';
 import { useWorkOrderStore } from '../../src/stores/useWorkOrderStore';
-import { calculateMachineOEE, calculateMachineMTTR } from '../../src/utils/metricsCalculator';
+import { calculateMachineOEE, calculateMachineMTTR, calculateMachineMTBF } from '../../src/utils/metricsCalculator';
 
 interface AssetDrawerProps {
   machine: Machine | null;
@@ -18,12 +18,19 @@ interface AssetDrawerProps {
 
 export const AssetDrawer: React.FC<AssetDrawerProps> = ({ machine, onClose, analysis, onRunAnalysis, isAnalyzing, onCreateWorkOrder }) => {
   const { parts } = useMasterStore();
-  const { allOrders } = useWorkOrderStore();
+  const { allOrders, fetchOrders, isInitialized } = useWorkOrderStore();
+  
+  React.useEffect(() => {
+    if (!isInitialized || (allOrders && allOrders.length === 0)) {
+      fetchOrders();
+    }
+  }, [allOrders, fetchOrders, isInitialized]);
   
   if (!machine) return null;
 
   const oee = calculateMachineOEE(machine.id, allOrders || []);
   const mttr = calculateMachineMTTR(machine.id, allOrders || []);
+  const mtbf = calculateMachineMTBF(machine.id, allOrders || []);
 
   // Real Kardex Data mapped from machine's `criticalParts`
   const actualCriticalParts = (machine.criticalParts || [])
@@ -71,7 +78,7 @@ export const AssetDrawer: React.FC<AssetDrawerProps> = ({ machine, onClose, anal
               <div className="flex items-center gap-1 text-industrial-500 mb-1 text-xs">
                 <Activity size={12} /> MTBF
               </div>
-              <div className="text-lg font-mono text-white">148h</div>
+              <div className="text-lg font-mono text-white">{mtbf}h</div>
             </div>
             <div className="bg-industrial-900 p-3 rounded border border-industrial-700">
               <div className="flex items-center gap-1 text-industrial-500 mb-1 text-xs">

@@ -5,10 +5,8 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useWorkOrderStore } from '../src/stores/useWorkOrderStore';
 import { useMasterStore } from '../src/stores/useMasterStore';
-import { calculatePlantMTTR } from '../src/utils/metricsCalculator';
+import { calculatePlantMTTR, calculatePlantMTBF } from '../src/utils/metricsCalculator';
 
-// MTBF remains placeholder for now as per instructions to keep other functionalities intact
-const calculateMTBF = () => 148.5;
 
 export const MaintenanceKanban: React.FC = () => {
   const { t } = useLanguage();
@@ -42,7 +40,7 @@ export const MaintenanceKanban: React.FC = () => {
         </div>
         <div className="bg-industrial-800 p-4 rounded border border-industrial-700 shadow-sm flex-1 min-w-[200px] max-w-xs">
           <p className="text-industrial-500 text-xs font-bold uppercase tracking-wider">{t('kanban.mtbf')}</p>
-          <p className="text-2xl font-mono text-white mt-1">{calculateMTBF()} <span className="text-sm text-industrial-500">hrs</span></p>
+          <p className="text-2xl font-mono text-white mt-1">{calculatePlantMTBF(workOrders)} <span className="text-sm text-industrial-500">hrs</span></p>
         </div>
 
         {/* R-MANT-02 Filter Card */}
