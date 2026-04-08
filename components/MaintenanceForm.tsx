@@ -38,6 +38,9 @@ const SchemaStage1_RMANT05 = z.object({
    condition: z.string().min(1, "required"),
    failureType: z.string().min(1, "required"),
    requestDescription: z.string().min(1, "required"),
+   frequency: z.string().min(1, "required"),
+   consequence: z.string().min(1, "required"),
+   actionTaken: z.string().min(1, "required"),
 });
 
 const SchemaStage2 = z.object({
@@ -823,7 +826,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                               <div className="space-y-1">
                                  <label className="text-xs text-industrial-400 font-bold">Frecuencia</label>
                                  <select disabled={!isSection1Editable}
-                                    className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm focus:border-emerald-500 outline-none"
+                                    className={`w-full bg-industrial-900 border rounded p-2 text-white text-sm focus:border-emerald-500 outline-none ${invalidFields.has('frequency') ? 'border-red-500 bg-red-900/10' : 'border-industrial-600'}`}
                                     value={formData.frequency || ''}
                                     onChange={e => setFormData({ ...formData, frequency: e.target.value as any })}>
                                     <option value="">- Seleccionar -</option>
@@ -838,9 +841,10 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                               <div className="space-y-1">
                                  <label className="text-xs text-industrial-400 font-bold">Consecuencia</label>
                                  <select disabled={!isSection1Editable}
-                                    className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm focus:border-emerald-500 outline-none"
+                                    className={`w-full bg-industrial-900 border rounded p-2 text-white text-sm focus:border-emerald-500 outline-none ${invalidFields.has('consequence') ? 'border-red-500 bg-red-900/10' : 'border-industrial-600'}`}
                                     value={formData.consequence || ''}
                                     onChange={e => setFormData({ ...formData, consequence: e.target.value as any })}>
+                                    <option value="">- Seleccionar -</option>
                                     <option value="Ninguna">Ninguna</option>
                                     <option value="Bajo Rendimiento">Bajo Rendimiento</option>
                                     <option value="Parada">Parada</option>
@@ -852,7 +856,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                  <label className="text-xs text-industrial-400 font-bold">Acción de contención tomada por el solicitante</label>
                                  <textarea
                                     disabled={!isSection1Editable}
-                                    className="w-full bg-industrial-900 border border-industrial-600 rounded p-3 text-white text-sm focus:border-emerald-500 outline-none min-h-[80px]"
+                                    className={`w-full bg-industrial-900 border rounded p-3 text-white text-sm focus:border-emerald-500 outline-none min-h-[80px] ${invalidFields.has('actionTaken') ? 'border-red-500 bg-red-900/10' : 'border-industrial-600'}`}
                                     placeholder="¿Qué medidas se tomaron provisionalmente?"
                                     value={formData.actionTaken || ''}
                                     onChange={e => setFormData({ ...formData, actionTaken: e.target.value })}
