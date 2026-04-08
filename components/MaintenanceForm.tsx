@@ -22,7 +22,11 @@ import { generateRMant02PDF, generateRMant05PDF } from '../src/utils/pdf/pdfGene
 // R-MANT-02 Stage 1
 const SchemaStage1 = z.object({
    machineId: z.string().min(1, "Machine is required"),
-   interval: z.string().min(1, "Interval is required"),
+   maintenanceType: z.string().min(1, "Type is required"),
+   startDate: z.string().min(1, "Start date is required"),
+   assignedMechanic: z.string().min(1, "Technician is required"),
+   supervisor: z.string().min(1, "Supervisor is required"),
+   interval: z.string().optional(),
    priority: z.nativeEnum(Priority)
 });
 
@@ -880,9 +884,12 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                         <div className="space-y-1">
                            <label className="text-xs text-industrial-400 font-bold">Tipo de Mantenimiento</label>
                            <select disabled={!isSection1Editable}
-                              className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm focus:border-emerald-500 outline-none"
+                              className={`w-full bg-industrial-900 border rounded p-2 text-white text-sm focus:border-emerald-500 outline-none ${invalidFields.has('maintenanceType') ? 'border-red-500 bg-red-900/10' : 'border-industrial-600'}`}
                               value={formData.maintenanceType || 'Preventive'}
-                              onChange={e => setFormData({ ...formData, maintenanceType: e.target.value as any })}>
+                              onChange={e => {
+                                 setFormData({ ...formData, maintenanceType: e.target.value as any });
+                                 clearInvalidField('maintenanceType');
+                              }}>
                               <option value="Preventive">Preventivo</option>
                               <option value="Programmed">Programado</option>
                            </select>
@@ -895,7 +902,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                               <input
                                  list="machine-list"
                                  disabled={!isSection1Editable}
-                                 className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm focus:border-emerald-500 outline-none placeholder-industrial-600"
+                                 className={`w-full bg-industrial-900 border rounded p-2 text-white text-sm focus:border-emerald-500 outline-none placeholder-industrial-600 ${invalidFields.has('machineId') ? 'border-red-500 bg-red-900/10' : 'border-industrial-600'}`}
                                  placeholder="Buscar equipo..."
                                  value={machineSearchTerm}
                                  onChange={(e) => {
@@ -905,7 +912,10 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                        handleMachineChange('');
                                     } else {
                                        const match = machines.find(m => m.isActive && (`${m.name} (Alias: ${m.alias || 'N/A'})` === val || m.plate === val));
-                                       if (match) handleMachineChange(match.id);
+                                       if (match) {
+                                          handleMachineChange(match.id);
+                                          clearInvalidField('machineId');
+                                       }
                                     }
                                  }}
                               />
@@ -987,9 +997,12 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                         <div className="space-y-1">
                            <label className="text-xs text-industrial-400 font-bold">Ejecutante (Técnico)</label>
                            <select disabled={!isSection1Editable}
-                              className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm focus:border-emerald-500 outline-none"
+                              className={`w-full bg-industrial-900 border rounded p-2 text-white text-sm focus:border-emerald-500 outline-none ${invalidFields.has('assignedMechanic') ? 'border-red-500 bg-red-900/10' : 'border-industrial-600'}`}
                               value={formData.assignedMechanic || ''}
-                              onChange={e => setFormData({ ...formData, assignedMechanic: e.target.value })}>
+                              onChange={e => {
+                                 setFormData({ ...formData, assignedMechanic: e.target.value });
+                                 clearInvalidField('assignedMechanic');
+                              }}>
                               <option value="">- Seleccionar Técnico -</option>
                               {users.filter(u => u.roleName === 'Electromecánico Labels' || u.roleName === 'Electromecánico Ravi').map(u => (
                                  <option key={u.id} value={u.id}>{u.full_name}</option>
@@ -1001,9 +1014,12 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                         <div className="space-y-1">
                            <label className="text-xs text-industrial-400 font-bold">Supervisor</label>
                            <select disabled={!isSection1Editable}
-                              className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm focus:border-emerald-500 outline-none"
+                              className={`w-full bg-industrial-900 border rounded p-2 text-white text-sm focus:border-emerald-500 outline-none ${invalidFields.has('supervisor') ? 'border-red-500 bg-red-900/10' : 'border-industrial-600'}`}
                               value={formData.supervisor || ''}
-                              onChange={e => setFormData({ ...formData, supervisor: e.target.value })}>
+                              onChange={e => {
+                                 setFormData({ ...formData, supervisor: e.target.value });
+                                 clearInvalidField('supervisor');
+                              }}>
                               <option value="">- Seleccionar Supervisor -</option>
                               {users.filter(u => u.roleName === 'Supervisor de Mantenimiento').map(u => (
                                  <option key={u.id} value={u.id}>{u.full_name}</option>
