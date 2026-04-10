@@ -88,31 +88,27 @@ export const UserSupabaseService = {
     };
   },
 
-  // Invite user with provisional password
-  async inviteUserWithPassword(email: string, fullName: string, roleId: string): Promise<any> {
+  async inviteUserWithPassword(email: string, fullName: string, roleId: string, jobTitle?: string, companyCode?: string, tenantId?: string): Promise<any> {
     console.log(`[UserSupabaseService] Inviting user with password: ${email}`);
     
     // Call the NEW Edge Function
     const { data, error } = await supabase.functions.invoke('create-user-admin', {
-      body: { email, fullName, roleId }
+      body: { email, fullName, roleId, jobTitle, companyCode, tenantId }
     });
 
     if (error) {
       console.error("Error nativo de invoke:", error);
-      throw new Error("El servicio de invitación no está disponible. " + error.message);
+      throw error;
     }
 
-    // El backend ahora devuelve 200 con { error: '...' } si hubo un fallo interno
     if (data && data.error) {
       throw new Error(data.error);
     }
 
     return data;
   },
-
   // Update User Profile
   async updateUser(user: UserProfile): Promise<void> {
-    console.log("[UserSupabaseService] Updating user:", user);
     const { data, error } = await supabase
       .from('profiles')
       .update({
@@ -121,24 +117,16 @@ export const UserSupabaseService = {
         job_title: user.job_title,
         status: user.status,
         specialties: user.specialties,
-        company_code: user.company_code
+        company_code: user.company_code // Added company_code to update
       })
       .eq('id', user.id)
       .select();
 
     if (error) {
-      console.error("[UserSupabaseService] Update failed:", error);
-      throw error;
+       console.error("Error updating profile:", error);
+       throw error;
     }
-
-    if (!data || data.length === 0) {
-      console.error("[UserSupabaseService] Update returned no data. Possible RLS blocking.");
-      throw new Error("Update failed: No permission to modify this user.");
-    }
-
-    console.log("[UserSupabaseService] Update successful. New data:", data);
   },
-
   // Delete User (Profile)
   async deleteUser(id: string): Promise<void> {
     const { error } = await supabase
