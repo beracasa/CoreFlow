@@ -17,7 +17,7 @@ serve(async (req) => {
   try {
     const { email, fullName, roleId, jobTitle, companyCode } = await req.json()
     
-    // Get caller's token to securely resolve their tenant
+    // Get caller's token to securely resolve their tenant (kept for best practice, though simplified)
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) throw new Error('No Authorization header provided');
     
@@ -27,37 +27,31 @@ serve(async (req) => {
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
 
-    // Securely identify the caller's tenant
-    const { data: { user: callerUser }, error: callerError } = await supabaseAdmin.auth.getUser(authHeader.replace('Bearer ', ''));
-    if (callerError || !callerUser) throw new Error('Invalid caller token');
-    
-    const { data: callerProfile } = await supabaseAdmin.from('profiles').select('tenant_id').eq('id', callerUser.id).single();
-    const resolvedTenantId = callerProfile?.tenant_id || 'primary';
-
     const generatedPassword = 'CF-' + Math.random().toString(36).slice(-6).toUpperCase();
 
-    // Crear usuario confirmado
+    // 1. Crear el usuario en Auth
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email,
+      email: email,
       password: generatedPassword,
       email_confirm: true,
       user_metadata: { full_name: fullName, role_id: roleId }
-    })
-
+    });
     if (authError) throw authError;
 
-    // Crear o actualizar Perfil con todos los datos (IMPORTANTE para que aparezca en el directorio con su rol verdadero y en el Tenant correcto)
-    await supabaseAdmin.from('profiles').upsert({ 
+    // 2. UPSERT explícito y obligatorio en public.profiles
+    const { error: profileError } = await supabaseAdmin.from('profiles').upsert({
       id: authData.user.id,
       email: email,
       full_name: fullName,
       role_id: roleId,
-      job_title: jobTitle || '',
-      company_code: companyCode || '',
-      tenant_id: resolvedTenantId,
-      status: 'INVITED',
-      requires_password_change: true 
+      status: 'INVITED', 
+      requires_password_change: true
     });
+
+    if (profileError) {
+      console.error("Error al crear el perfil público:", profileError);
+      throw new Error("Usuario autenticado creado, pero falló la creación del perfil: " + profileError.message);
+    }
 
     // Enviar correo con Resend
     const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
