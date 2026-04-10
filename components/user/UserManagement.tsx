@@ -43,7 +43,8 @@ export const UserManagement: React.FC = () => {
                     newUser.fullName,
                     newUser.role,
                     newUser.title,
-                    newUser.companyCode
+                    newUser.companyCode,
+                    user?.tenant_id
                 );
 
                 if (result && result.emailSent === false) {

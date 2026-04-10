@@ -15,7 +15,7 @@ serve(async (req) => {
   }
 
   try {
-    const { email, fullName, roleId, jobTitle, companyCode } = await req.json()
+    const { email, fullName, roleId, jobTitle, companyCode, tenantId } = await req.json()
     
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -35,7 +35,7 @@ serve(async (req) => {
 
     if (authError) throw authError;
 
-    // Crear o actualizar Perfil con todos los datos (IMPORTANTE para que aparezca en el directorio con su rol verdadero)
+    // Crear o actualizar Perfil con todos los datos (IMPORTANTE para que aparezca en el directorio con su rol verdadero y en el Tenant correcto)
     await supabaseAdmin.from('profiles').upsert({ 
       id: authData.user.id,
       email: email,
@@ -43,6 +43,7 @@ serve(async (req) => {
       role_id: roleId,
       job_title: jobTitle || '',
       company_code: companyCode || '',
+      tenant_id: tenantId || 'primary',
       status: 'INVITED',
       requires_password_change: true 
     });
