@@ -15,13 +15,24 @@ serve(async (req) => {
   }
 
   try {
-    const { email, fullName, roleId, jobTitle, companyCode, tenantId } = await req.json()
+    const { email, fullName, roleId, jobTitle, companyCode } = await req.json()
+    
+    // Get caller's token to securely resolve their tenant
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader) throw new Error('No Authorization header provided');
     
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
+
+    // Securely identify the caller's tenant
+    const { data: { user: callerUser }, error: callerError } = await supabaseAdmin.auth.getUser(authHeader.replace('Bearer ', ''));
+    if (callerError || !callerUser) throw new Error('Invalid caller token');
+    
+    const { data: callerProfile } = await supabaseAdmin.from('profiles').select('tenant_id').eq('id', callerUser.id).single();
+    const resolvedTenantId = callerProfile?.tenant_id || 'primary';
 
     const generatedPassword = 'CF-' + Math.random().toString(36).slice(-6).toUpperCase();
 
@@ -43,7 +54,7 @@ serve(async (req) => {
       role_id: roleId,
       job_title: jobTitle || '',
       company_code: companyCode || '',
-      tenant_id: tenantId || 'primary',
+      tenant_id: resolvedTenantId,
       status: 'INVITED',
       requires_password_change: true 
     });
