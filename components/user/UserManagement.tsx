@@ -17,7 +17,7 @@ export const UserManagement: React.FC = () => {
 
     // Invite Modal State
     const [showInviteModal, setShowInviteModal] = useState(false);
-    const [newUser, setNewUser] = useState({ email: '', role: '', fullName: '', title: '', companyCode: '' });
+    const [newUser, setNewUser] = useState({ email: '', role: '', fullName: '', title: '', companyCode: '', specialties: [] as string[] });
 
     // Edit Modal State
     const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
@@ -44,7 +44,8 @@ export const UserManagement: React.FC = () => {
                     newUser.role,
                     newUser.title,
                     newUser.companyCode,
-                    user?.tenant_id
+                    user?.tenant_id,
+                    newUser.specialties || []
                 );
 
                 if (result && result.emailSent === false) {

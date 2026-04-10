@@ -15,7 +15,7 @@ serve(async (req) => {
   }
 
   try {
-    const { email, fullName, roleId, jobTitle, companyCode } = await req.json()
+    const { email, fullName, roleId, jobTitle, companyCode, specialties } = await req.json()
     
     // Get caller's token to securely resolve their tenant (kept for best practice, though simplified)
     const authHeader = req.headers.get('Authorization')
@@ -44,6 +44,9 @@ serve(async (req) => {
       email: email,
       full_name: fullName,
       role_id: roleId,
+      job_title: jobTitle || '',
+      company_code: companyCode || '',
+      specialties: specialties || [],
       status: 'INVITED', 
       requires_password_change: true
     });

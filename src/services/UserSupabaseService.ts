@@ -88,12 +88,12 @@ export const UserSupabaseService = {
     };
   },
 
-  async inviteUserWithPassword(email: string, fullName: string, roleId: string, jobTitle?: string, companyCode?: string, tenantId?: string): Promise<any> {
+  async inviteUserWithPassword(email: string, fullName: string, roleId: string, jobTitle?: string, companyCode?: string, tenantId?: string, specialties?: string[]): Promise<any> {
     console.log(`[UserSupabaseService] Inviting user with password: ${email}`);
     
     // Call the NEW Edge Function
     const { data, error } = await supabase.functions.invoke('create-user-admin', {
-      body: { email, fullName, roleId, jobTitle, companyCode, tenantId }
+      body: { email, fullName, roleId, jobTitle, companyCode, tenantId, specialties }
     });
 
     if (error) {
