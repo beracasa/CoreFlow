@@ -41,7 +41,9 @@ export const UserManagement: React.FC = () => {
                 const result = await inviteUserWithPassword(
                     newUser.email,
                     newUser.fullName,
-                    newUser.role
+                    newUser.role,
+                    newUser.title,
+                    newUser.companyCode
                 );
 
                 if (result && result.emailSent === false) {
