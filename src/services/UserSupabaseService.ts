@@ -99,10 +99,9 @@ export const UserSupabaseService = {
 
     if (error) {
       console.error("Error nativo de invoke:", error);
-      throw new Error("El servicio de invitación no está disponible. " + error.message);
+      throw error;
     }
 
-    // El backend ahora devuelve 200 con { error: '...' } si hubo un fallo interno
     if (data && data.error) {
       throw new Error(data.error);
     }
