@@ -16,7 +16,8 @@ import { MaintenanceList } from './components/MaintenanceList';
 import { MaintenanceForm } from './components/MaintenanceForm';
 import { MachineHoursLog } from './components/MachineHoursLog';
 import { Inventory } from './components/Inventory';
-import { Analytics } from './components/Analytics';
+import { Analytics as AnalyticsPage } from './components/Analytics';
+import { Analytics } from '@vercel/analytics/react';
 import { Configuration } from './components/Configuration';
 import { UserProfileView } from './components/user/UserProfile';
 // Remove OnboardingWizard if not used or add route
@@ -119,12 +120,12 @@ const ConfigurationPage = () => {
   );
 };
 
-const AnalyticsPage = () => {
+const AnalyticsPageWrapper = () => {
   const { hasRole } = useAuth();
   if (!hasRole([UserRole.ADMIN_SOLICITANTE])) {
     return <div className="h-full flex items-center justify-center bg-industrial-900 text-industrial-500 flex-col gap-4"><Shield className="w-12 h-12 text-red-900" /><span>Access Restricted: Analytics requires Admin privileges.</span></div>;
   }
-  return <Analytics />;
+  return <AnalyticsPage />;
 };
 
 const MaintenanceFormPage = () => {
@@ -419,7 +420,7 @@ const AppRoutes = () => {
         <Route path="logs" element={<MachineHoursPage />} />
         <Route path="machines" element={<MachinesPage />} />
         <Route path="inventory" element={<InventoryPage />} />
-        <Route path="stats" element={<AnalyticsPage />} />
+        <Route path="stats" element={<AnalyticsPageWrapper />} />
         <Route path="settings" element={<ConfigurationPage />} />
 
         <Route path="profile" element={<ProfilePage />} />
@@ -435,6 +436,7 @@ export default function App() {
       <ErrorBoundary>
         <AuthProvider>
           <AppRoutes />
+          <Analytics />
         </AuthProvider>
       </ErrorBoundary>
     </BrowserRouter>
