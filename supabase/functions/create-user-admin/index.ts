@@ -15,9 +15,9 @@ serve(async (req) => {
   }
 
   try {
-    const { email, fullName, roleId, jobTitle, companyCode, specialties, tenantId } = await req.json()
+    const { email, fullName, roleId, jobTitle, companyCode, specialties } = await req.json()
     
-    // Get caller's token to securely resolve their tenant (kept for best practice, though simplified)
+    // Get caller's token to securely resolve their tenant
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) throw new Error('No Authorization header provided');
     
@@ -26,6 +26,13 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
+
+    // Securely identify the caller's tenant_id directly from the database
+    const { data: { user: callerUser }, error: callerError } = await supabaseAdmin.auth.getUser(authHeader.replace('Bearer ', ''));
+    if (callerError || !callerUser) throw new Error('Invalid caller token');
+
+    const { data: callerProfile } = await supabaseAdmin.from('profiles').select('tenant_id').eq('id', callerUser.id).single();
+    const finalTenantId = callerProfile?.tenant_id || 'primary';
 
     const generatedPassword = 'CF-' + Math.random().toString(36).slice(-6).toUpperCase();
 
@@ -38,7 +45,7 @@ serve(async (req) => {
     });
     if (authError) throw authError;
 
-    // 2. UPSERT explícito y obligatorio en public.profiles
+    // 2. UPSERT explícito y obligatorio en public.profiles usando el tenant id validado
     const { error: profileError } = await supabaseAdmin.from('profiles').upsert({
       id: authData.user.id,
       email: email,
@@ -47,7 +54,7 @@ serve(async (req) => {
       job_title: jobTitle || '',
       company_code: companyCode || '',
       specialties: specialties || [],
-      tenant_id: tenantId || 'primary',
+      tenant_id: finalTenantId,
       status: 'ACTIVE', 
       requires_password_change: true
     });
