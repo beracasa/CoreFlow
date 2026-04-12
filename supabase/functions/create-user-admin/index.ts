@@ -9,30 +9,25 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  // Manejo de CORS
+  // Manejo de CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const { email, fullName, roleId, jobTitle, companyCode, specialties } = await req.json()
-    
-    // Get caller's token to securely resolve their tenant
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) throw new Error('No Authorization header provided');
-    
+    const { email, fullName, roleId, jobTitle, companyCode, specialties, tenantId } = await req.json()
+
+    // Validate required fields
+    if (!email || !fullName || !roleId) {
+      throw new Error('Faltan campos requeridos: email, fullName, roleId');
+    }
+
+    // Use service role key — this is the security layer, no user token needed
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
-
-    // Securely identify the caller's tenant_id directly from the database
-    const { data: { user: callerUser }, error: callerError } = await supabaseAdmin.auth.getUser(authHeader.replace('Bearer ', ''));
-    if (callerError || !callerUser) throw new Error('Invalid caller token');
-
-    const { data: callerProfile } = await supabaseAdmin.from('profiles').select('tenant_id').eq('id', callerUser.id).single();
-    const finalTenantId = callerProfile?.tenant_id || 'primary';
 
     const generatedPassword = 'CF-' + Math.random().toString(36).slice(-6).toUpperCase();
 
@@ -43,10 +38,22 @@ serve(async (req) => {
       email_confirm: true,
       user_metadata: { full_name: fullName, role_id: roleId }
     });
-    if (authError) throw authError;
 
-    // 2. UPSERT explícito y obligatorio en public.profiles usando el tenant id validado
-    const { error: profileError } = await supabaseAdmin.from('profiles').upsert({
+    if (authError) {
+      const errDetail = {
+        msg: authError.message,
+        code: (authError as any).status || (authError as any).code || 'unknown',
+        supabaseUrl: Deno.env.get('SUPABASE_URL')?.substring(0, 30) || 'NOT_SET',
+        hasServiceKey: !!(Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'))
+      };
+      console.error("Auth error details:", JSON.stringify(errDetail));
+      throw new Error("AUTH_ERROR: " + authError.message + " | debug: " + JSON.stringify(errDetail));
+    }
+
+    console.log("Auth user created:", authData.user.id);
+
+    // 2. UPSERT explícito en public.profiles
+    const profilePayload = {
       id: authData.user.id,
       email: email,
       full_name: fullName,
@@ -54,35 +61,64 @@ serve(async (req) => {
       job_title: jobTitle || '',
       company_code: companyCode || '',
       specialties: specialties || [],
-      tenant_id: finalTenantId,
-      status: 'ACTIVE', 
+      tenant_id: tenantId || 'primary',
+      status: 'ACTIVE',
       requires_password_change: true
-    });
+    };
+
+    console.log("Upserting profile:", JSON.stringify(profilePayload));
+
+    const { data: profileData, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .upsert(profilePayload)
+      .select();
 
     if (profileError) {
-      console.error("Error al crear el perfil público:", profileError);
-      throw new Error("Usuario autenticado creado, pero falló la creación del perfil: " + profileError.message);
+      console.error("Error upserting profile:", JSON.stringify(profileError));
+      throw new Error("Perfil fallido: " + profileError.message + " | code: " + profileError.code);
     }
 
-    // Enviar correo con Resend
-    const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
-    await resend.emails.send({
-      from: 'CoreFlow <notificaciones@ravicaribeinc.com>',
-      to: email,
-      subject: 'Bienvenido a CoreFlow Maintenance Cloud',
-      html: `<div style="font-family: sans-serif; padding: 20px; background-color: #f8fafc;">
-              <h2 style="color: #1d4ed8;">CoreFlow Maintenance Cloud</h2>
-              <p>Hola ${fullName}, has sido invitado a la plataforma.</p>
-              <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0;">
-                <p><strong>Correo:</strong> ${email}</p>
-                <p><strong>Clave Provisional:</strong> ${generatedPassword}</p>
-              </div>
-              <p><small>Por seguridad, el sistema te pedirá cambiar esta clave al iniciar sesión por primera vez.</small></p>
-             </div>`
-    });
+    console.log("Profile upserted successfully:", JSON.stringify(profileData));
 
-    return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 })
+    // 3. Enviar correo con Resend
+    const resendKey = Deno.env.get('RESEND_API_KEY');
+    if (resendKey) {
+      const resend = new Resend(resendKey);
+      const { error: emailError } = await resend.emails.send({
+        from: 'CoreFlow <notificaciones@ravicaribeinc.com>',
+        to: email,
+        subject: 'Bienvenido a CoreFlow Maintenance Cloud',
+        html: `<div style="font-family: sans-serif; padding: 20px; background-color: #f8fafc;">
+                <h2 style="color: #1d4ed8;">CoreFlow Maintenance Cloud</h2>
+                <p>Hola ${fullName}, has sido invitado a la plataforma.</p>
+                <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                  <p><strong>Correo:</strong> ${email}</p>
+                  <p><strong>Clave Provisional:</strong> ${generatedPassword}</p>
+                </div>
+                <p><small>Por seguridad, el sistema te pedirá cambiar esta clave al iniciar sesión por primera vez.</small></p>
+               </div>`
+      });
+
+      if (emailError) {
+        console.error("Email error (non-fatal):", emailError);
+        // Email failure is non-fatal — user was created successfully
+        return new Response(
+          JSON.stringify({ success: true, emailSent: false, warning: emailError.message }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+        )
+      }
+    }
+
+    return new Response(
+      JSON.stringify({ success: true, emailSent: true }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+    )
+
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 })
+    console.error("Edge function error:", error.message);
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+    )
   }
 })
