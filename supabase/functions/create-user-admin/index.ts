@@ -9,7 +9,6 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  // Manejo de CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -17,12 +16,13 @@ serve(async (req) => {
   try {
     const { email, fullName, roleId, jobTitle, companyCode, specialties, tenantId } = await req.json()
 
-    // Validate required fields
+    console.log("=== CREATE USER START ===");
+    console.log("Payload:", JSON.stringify({ email, fullName, roleId, jobTitle, companyCode, tenantId }));
+
     if (!email || !fullName || !roleId) {
       throw new Error('Faltan campos requeridos: email, fullName, roleId');
     }
 
-    // Use service role key — this is the security layer, no user token needed
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
@@ -32,7 +32,7 @@ serve(async (req) => {
     const generatedPassword = 'CF-' + Math.random().toString(36).slice(-6).toUpperCase();
 
     // 1. Crear el usuario en Auth
-    // Pasamos TODOS los campos en user_metadata para que el trigger los pueda usar
+    // El trigger on_auth_user_created crea un perfil básico automáticamente
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: email,
       password: generatedPassword,
@@ -48,47 +48,62 @@ serve(async (req) => {
     });
 
     if (authError) {
-      const errDetail = {
-        msg: authError.message,
-        code: (authError as any).status || (authError as any).code || 'unknown',
-        supabaseUrl: Deno.env.get('SUPABASE_URL')?.substring(0, 30) || 'NOT_SET',
-        hasServiceKey: !!(Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'))
-      };
-      console.error("Auth error details:", JSON.stringify(errDetail));
-      throw new Error("AUTH_ERROR: " + authError.message + " | debug: " + JSON.stringify(errDetail));
+      console.error("Auth error:", authError.message);
+      throw new Error("AUTH_ERROR: " + authError.message);
     }
 
-    console.log("Auth user created:", authData.user.id);
+    const userId = authData.user.id;
+    console.log("Auth user created:", userId);
 
-    // 2. UPSERT explícito en public.profiles
-    const profilePayload = {
-      id: authData.user.id,
-      email: email,
-      full_name: fullName,
-      role_id: roleId,
-      job_title: jobTitle || '',
-      company_code: companyCode || '',
-      specialties: specialties || [],
-      tenant_id: tenantId || 'primary',
-      status: 'ACTIVE',
-      requires_password_change: true
-    };
+    // 2. Esperar 500ms para que el trigger DB complete el INSERT inicial
+    await new Promise(resolve => setTimeout(resolve, 500));
 
-    console.log("Upserting profile:", JSON.stringify(profilePayload));
+    // 3. Usar RPC update_user_profile para actualizar el perfil sin conflictos de constraints
+    // Esta función hace un UPDATE directo por id, evitando problemas con UNIQUE en email
+    console.log("Calling RPC update_user_profile...");
+    const { data: rpcData, error: rpcError } = await supabaseAdmin
+      .rpc('update_user_profile', {
+        p_user_id:                userId,
+        p_full_name:              fullName,
+        p_role_id:                roleId,
+        p_job_title:              jobTitle || '',
+        p_company_code:           companyCode || '',
+        p_specialties:            specialties || [],
+        p_tenant_id:              tenantId || 'primary',
+        p_status:                 'ACTIVE',
+        p_requires_password_change: true
+      });
 
-    const { data: profileData, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .upsert(profilePayload)
-      .select();
+    if (rpcError) {
+      console.error("RPC error:", JSON.stringify(rpcError));
+      // Fallback: intentar upsert directo con onConflict explícito
+      console.log("Trying direct upsert fallback...");
+      const { data: upsertData, error: upsertError } = await supabaseAdmin
+        .from('profiles')
+        .upsert({
+          id:                     userId,
+          email:                  email,
+          full_name:              fullName,
+          role_id:                roleId,
+          job_title:              jobTitle || '',
+          company_code:           companyCode || '',
+          specialties:            specialties || [],
+          tenant_id:              tenantId || 'primary',
+          status:                 'ACTIVE',
+          requires_password_change: true
+        }, { onConflict: 'id' })
+        .select();
 
-    if (profileError) {
-      console.error("Error upserting profile:", JSON.stringify(profileError));
-      throw new Error("Perfil fallido: " + profileError.message + " | code: " + profileError.code);
+      if (upsertError) {
+        console.error("Upsert fallback failed:", JSON.stringify(upsertError));
+        throw new Error("PROFILE_ERROR: " + upsertError.message + " | code: " + upsertError.code);
+      }
+      console.log("Profile saved via upsert fallback:", JSON.stringify(upsertData));
+    } else {
+      console.log("Profile updated via RPC:", JSON.stringify(rpcData));
     }
 
-    console.log("Profile upserted successfully:", JSON.stringify(profileData));
-
-    // 3. Enviar correo con Resend
+    // 4. Enviar correo con Resend
     const resendKey = Deno.env.get('RESEND_API_KEY');
     if (resendKey) {
       const resend = new Resend(resendKey);
@@ -109,7 +124,6 @@ serve(async (req) => {
 
       if (emailError) {
         console.error("Email error (non-fatal):", emailError);
-        // Email failure is non-fatal — user was created successfully
         return new Response(
           JSON.stringify({ success: true, emailSent: false, warning: emailError.message }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
@@ -117,13 +131,14 @@ serve(async (req) => {
       }
     }
 
+    console.log("=== CREATE USER SUCCESS ===");
     return new Response(
       JSON.stringify({ success: true, emailSent: true }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     )
 
   } catch (error) {
-    console.error("Edge function error:", error.message);
+    console.error("=== CREATE USER ERROR ===", error.message);
     return new Response(
       JSON.stringify({ error: error.message }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
