@@ -32,11 +32,19 @@ serve(async (req) => {
     const generatedPassword = 'CF-' + Math.random().toString(36).slice(-6).toUpperCase();
 
     // 1. Crear el usuario en Auth
+    // Pasamos TODOS los campos en user_metadata para que el trigger los pueda usar
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: email,
       password: generatedPassword,
       email_confirm: true,
-      user_metadata: { full_name: fullName, role_id: roleId }
+      user_metadata: {
+        full_name: fullName,
+        role_id: roleId,
+        job_title: jobTitle || '',
+        company_code: companyCode || '',
+        specialties: specialties || [],
+        tenant_id: tenantId || 'primary'
+      }
     });
 
     if (authError) {

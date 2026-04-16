@@ -55,7 +55,7 @@ export const UserManagement: React.FC = () => {
                 }
                 
                 setShowInviteModal(false);
-                setNewUser({ email: '', role: '', fullName: '', title: '', companyCode: '' });
+                setNewUser({ email: '', role: '', fullName: '', title: '', companyCode: '', specialties: [] });
 
                 // Refrescamos lista
                 await fetchUsers();
@@ -298,9 +298,10 @@ export const UserManagement: React.FC = () => {
                                     <label className="text-xs text-industrial-400 font-bold uppercase">Rol</label>
                                     <select
                                         className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm focus:border-industrial-accent outline-none"
-                                        value={editingUser.role}
+                                        value={editingUser.role || ''}
                                         onChange={e => setEditingUser({ ...editingUser, role: e.target.value })}
                                     >
+                                        <option value="">-- Sin Rol Asignado --</option>
                                         {roles.map(role => (
                                             <option key={role.id} value={role.id}>{role.name}</option>
                                         ))}
