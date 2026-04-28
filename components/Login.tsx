@@ -7,10 +7,9 @@ import { UserRole } from '../types';
 
 export const Login: React.FC = () => {
   const { login, isAuthenticated } = useAuth();
-  const [isSignUp, setIsSignUp] = useState(false); // Toggle state
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState(''); // New field
   const [error, setError] = useState('');
   const [message, setMessage] = useState(''); // Success message
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -33,30 +32,12 @@ export const Login: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      if (isSignUp) {
-        // Handle Sign Up
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              full_name: fullName,
-              // role: UserRole.ADMIN_SOLICITANTE, // Let trigger handle default role ('Nuevo Usuario')
-              job_title: 'Manager' // Default
-            }
-          }
+      if (isForgotPassword) {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/change-password`,
         });
-
         if (error) throw error;
-
-        if (data.user && data.session) {
-          // Auto logged in
-          navigate(from, { replace: true });
-        } else {
-          setMessage('Account created! Please check your email to confirm.');
-          setIsSignUp(false);
-        }
-
+        setMessage('Password recovery link sent to your email.');
       } else {
         // Handle Login
         await login(email, password);
@@ -101,22 +82,7 @@ export const Login: React.FC = () => {
         <div className="p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
 
-            {isSignUp && (
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-industrial-400 uppercase tracking-wider ml-1">Full Name</label>
-                <div className="relative group">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 text-industrial-500 group-focus-within:text-industrial-accent transition-colors w-5 h-5" />
-                  <input
-                    type="text"
-                    required
-                    className="w-full bg-industrial-900 border border-industrial-600 rounded-lg py-3 pl-10 pr-4 text-white placeholder-industrial-600 focus:border-industrial-accent focus:ring-1 focus:ring-industrial-accent outline-none transition-all"
-                    placeholder="John Doe"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                  />
-                </div>
-              </div>
-            )}
+
 
             <div className="space-y-2">
               <label className="text-xs font-bold text-industrial-400 uppercase tracking-wider ml-1">Corporate ID / Email</label>
@@ -133,20 +99,22 @@ export const Login: React.FC = () => {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-industrial-400 uppercase tracking-wider ml-1">Password</label>
-              <div className="relative group">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-industrial-500 group-focus-within:text-industrial-accent transition-colors w-5 h-5" />
-                <input
-                  type="password"
-                  required
-                  className="w-full bg-industrial-900 border border-industrial-600 rounded-lg py-3 pl-10 pr-4 text-white placeholder-industrial-600 focus:border-industrial-accent focus:ring-1 focus:ring-industrial-accent outline-none transition-all"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
+            {!isForgotPassword && (
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-industrial-400 uppercase tracking-wider ml-1">Password</label>
+                <div className="relative group">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-industrial-500 group-focus-within:text-industrial-accent transition-colors w-5 h-5" />
+                  <input
+                    type="password"
+                    required
+                    className="w-full bg-industrial-900 border border-industrial-600 rounded-lg py-3 pl-10 pr-4 text-white placeholder-industrial-600 focus:border-industrial-accent focus:ring-1 focus:ring-industrial-accent outline-none transition-all"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
             {error && (
               <div className="bg-red-900/20 border border-red-500/50 rounded-lg p-3 flex items-start gap-3">
@@ -167,30 +135,20 @@ export const Login: React.FC = () => {
               disabled={isSubmitting}
               className={`w-full bg-industrial-accent hover:bg-blue-600 text-white font-bold py-3.5 rounded-lg shadow-lg shadow-blue-900/20 transition-all flex items-center justify-center gap-2 ${isSubmitting ? 'opacity-70 cursor-wait' : 'hover:translate-y-[-1px]'}`}
             >
-              {isSubmitting ? (isSignUp ? 'Creating Account...' : 'Authenticating...') : (isSignUp ? 'Create Account' : 'Sign In')}
+              {isSubmitting ? (isForgotPassword ? 'Sending...' : 'Authenticating...') : (isForgotPassword ? 'Send Reset Link' : 'Sign In')}
               {!isSubmitting && <ArrowRight className="w-5 h-5" />}
             </button>
           </form>
 
           <div className="mt-4 text-center">
             <button
-              onClick={() => { setIsSignUp(!isSignUp); setError(''); setMessage(''); }}
+              type="button"
+              onClick={() => { setIsForgotPassword(!isForgotPassword); setError(''); setMessage(''); }}
               className="text-sm text-industrial-400 hover:text-industrial-accent transition-colors"
             >
-              {isSignUp ? 'Already have an account? Sign In' : 'Need an account? Sign Up'}
+              {isForgotPassword ? 'Back to Sign In' : 'Forgot Password?'}
             </button>
           </div>
-
-          {/* Demo Hint (Only show on Sign In) */}
-          {!isSignUp && (
-            <div className="mt-8 pt-6 border-t border-industrial-700/50">
-              <p className="text-xs text-center text-industrial-500 mb-3">Demo Credentials (Will fail if not in Supabase)</p>
-              <div className="flex gap-2 justify-center flex-wrap">
-                <button onClick={() => { setEmail('admin@coreflow.io'); setPassword('1234'); }} className="px-2 py-1 bg-industrial-900 border border-industrial-700 rounded text-[10px] text-industrial-400 hover:text-white hover:border-industrial-500 transition-colors">Admin</button>
-                <button onClick={() => { setEmail('tech@coreflow.io'); setPassword('1234'); }} className="px-2 py-1 bg-industrial-900 border border-industrial-700 rounded text-[10px] text-industrial-400 hover:text-white hover:border-industrial-500 transition-colors">Tech</button>
-              </div>
-            </div>
-          )}
         </div>
       </div>
 
