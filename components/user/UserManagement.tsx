@@ -138,7 +138,7 @@ export const UserManagement: React.FC = () => {
                                 <td className="px-6 py-4">
                                     <div className="flex items-center gap-3">
                                         <div className="w-8 h-8 rounded-full bg-industrial-700 border border-industrial-600 flex items-center justify-center text-xs text-white font-bold shadow-sm">
-                                            {user.full_name.substring(0, 2).toUpperCase()}
+                                            {(user.full_name || user.email || 'US').substring(0, 2).toUpperCase()}
                                         </div>
                                         <div>
                                             <p className="text-white font-medium">{user.full_name}</p>
@@ -281,7 +281,7 @@ export const UserManagement: React.FC = () => {
                             {/* Avatar & Basic Info Header */}
                             <div className="flex items-center gap-4 pb-4 border-b border-industrial-700">
                                 <div className="w-16 h-16 rounded-full bg-industrial-700 border-2 border-industrial-600 flex items-center justify-center text-2xl font-bold text-white">
-                                    {editingUser.full_name.substring(0, 2).toUpperCase()}
+                                    {(editingUser.full_name || editingUser.email || 'US').substring(0, 2).toUpperCase()}
                                 </div>
                                 <div className="flex-1">
                                     <label className="text-[10px] text-industrial-500 font-bold uppercase">Nombre Completo</label>

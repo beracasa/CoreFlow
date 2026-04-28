@@ -280,7 +280,7 @@ const AppLayout = () => {
           <div className="p-4 border-t border-industrial-800 bg-industrial-900/50">
             <div className="flex items-center gap-3 mb-3 cursor-pointer hover:bg-industrial-800 rounded p-1 transition-colors" onClick={() => navigate('/profile')}>
               <div className="w-8 h-8 rounded-full bg-industrial-700 flex items-center justify-center font-bold text-xs text-white border border-industrial-600">
-                {user?.full_name.substring(0, 2).toUpperCase()}
+                {(user?.full_name || user?.email || 'U').substring(0, 2).toUpperCase()}
               </div>
               <div className="overflow-hidden">
                 <p className="text-sm font-medium text-white truncate w-32">{user?.full_name}</p>
