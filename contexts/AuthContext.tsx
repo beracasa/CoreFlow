@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { UserProfile, UserRole } from '../types';
 import { supabase } from '../src/services/supabaseClient';
 import { useUserStore } from '../src/stores/useUserStore';
@@ -16,6 +17,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const navigate = useNavigate();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -125,6 +127,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // SILENT REFRESH: Do NOT set isLoading(true) for TOKEN_REFRESHED
       // Only set loading for SIGNED_IN if we don't already have a current session (initial login)
       // or for SIGNED_OUT to ensure a clean transition.
+      if (event === 'PASSWORD_RECOVERY') {
+        navigate('/change-password');
+      }
+
       if (event === 'SIGNED_IN' && !session?.user) {
         if (mounted) setIsLoading(true);
       } else if (event === 'SIGNED_OUT') {

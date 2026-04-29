@@ -408,6 +408,7 @@ const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/login" element={<Navigate to="/" replace />} />
+      <Route path="/change-password" element={<ChangePasswordView />} />
       <Route path="/" element={<AppLayout />}>
         <Route index element={<Dashboard />} />
         <Route path="kanban" element={<MaintenanceKanban />} />
@@ -423,7 +424,6 @@ const AppRoutes = () => {
         <Route path="settings" element={<ConfigurationPage />} />
 
         <Route path="profile" element={<ProfilePage />} />
-        <Route path="change-password" element={<ChangePasswordView />} />
       </Route>
     </Routes>
   );
