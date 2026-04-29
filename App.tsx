@@ -387,6 +387,17 @@ const AppRoutes = () => {
   }
 
   if (!isAuthenticated) {
+    // Prevent wiping the hash if Supabase is still processing a magic link or recovery link
+    if (window.location.hash.includes('access_token')) {
+      return (
+        <div className="h-screen w-screen bg-industrial-900 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+            <p className="text-industrial-400 text-sm animate-pulse">Processing secure link...</p>
+          </div>
+        </div>
+      );
+    }
     return (
       <Routes>
         <Route path="/login" element={<Login />} />
