@@ -128,6 +128,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Only set loading for SIGNED_IN if we don't already have a current session (initial login)
       // or for SIGNED_OUT to ensure a clean transition.
       if (event === 'PASSWORD_RECOVERY') {
+        if (mounted && session?.user) {
+          // Set fallback user immediately to avoid unauthenticated redirect
+          setUser(mapSupabaseUser(session.user));
+          setIsLoading(true);
+        }
         navigate('/change-password');
       }
 
