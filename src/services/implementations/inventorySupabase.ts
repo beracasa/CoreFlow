@@ -250,6 +250,20 @@ export class InventorySupabaseService implements IInventoryService {
     }
 
     async deliverParts(requestId: string, itemsToDeliver: { partId: string; quantity: number }[], receiverId?: string): Promise<PartsRequest> {
+        // 0. Pre-validate stock for all items
+        for (const item of itemsToDeliver) {
+            const { data: part, error: partError } = await supabase
+                .from('spare_parts')
+                .select('current_stock, name')
+                .eq('id', item.partId)
+                .single();
+                
+            if (partError || !part) throw new Error('Repuesto no encontrado');
+            if ((part.current_stock || 0) < item.quantity) {
+                throw new Error(`Stock insuficiente para ${part.name}. Disponible: ${part.current_stock || 0}, Solicitado: ${item.quantity}`);
+            }
+        }
+
         // 1. Process each item delivery
         for (const item of itemsToDeliver) {
             // Update quantity_delivered in request_items
@@ -298,10 +312,20 @@ export class InventorySupabaseService implements IInventoryService {
 
                     if (!getError && part) {
                         const newStock = (part.current_stock || 0) - item.quantity;
-                        await supabase
+                        if (newStock < 0) {
+                            throw new Error(`Stock insuficiente durante el procesamiento para el ID ${item.partId}`);
+                        }
+                        const { error: updateError } = await supabase
                             .from('spare_parts')
                             .update({ current_stock: newStock })
                             .eq('id', item.partId);
+                            
+                        if (updateError) {
+                            console.error('Error in fallback update:', updateError);
+                            throw updateError;
+                        }
+                    } else if (getError) {
+                        throw getError;
                     }
                 }
 
