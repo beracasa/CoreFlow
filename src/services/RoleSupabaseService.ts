@@ -5,14 +5,33 @@ import { RoleDefinition } from '../../types';
 export const RoleSupabaseService = {
   // Get all roles (flat list with parent_role_id)
   async getRoles(): Promise<RoleDefinition[]> {
-    const { data, error } = await supabase
+    // 1. Obtener todos los roles
+    const { data: rolesData, error: rolesError } = await supabase
       .from('app_roles')
       .select('*')
       .order('name');
 
-    if (error) throw error;
+    if (rolesError) throw rolesError;
     
-    return data.map((r: any) => ({
+    // 2. Obtener todos los perfiles para contar usuarios por rol
+    const { data: profilesData, error: profilesError } = await supabase
+      .from('profiles')
+      .select('role_id, role');
+      
+    if (profilesError) throw profilesError;
+
+    // 3. Calcular la cantidad de usuarios por rol
+    const userCounts: Record<string, number> = {};
+    if (profilesData) {
+      profilesData.forEach((p: any) => {
+        const roleId = p.role_id || p.role; // Soporte para esquema actual o legacy
+        if (roleId) {
+          userCounts[roleId] = (userCounts[roleId] || 0) + 1;
+        }
+      });
+    }
+
+    return rolesData.map((r: any) => ({
       id: r.id,
       name: r.name,
       description: r.description || '',
@@ -20,7 +39,7 @@ export const RoleSupabaseService = {
       isSystem: r.is_system || false,
       permissions: r.permissions || {},
       shareDataWithPeers: r.share_data_with_peers || false,
-      usersCount: 0 // TODO: Implementar query para contar usuarios
+      usersCount: userCounts[r.id] || 0
     }));
   },
 
