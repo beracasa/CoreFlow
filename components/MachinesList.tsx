@@ -646,7 +646,7 @@ export const MachinesList: React.FC = () => {
                   {viewingMachine.criticalParts && viewingMachine.criticalParts.length > 0 && (
                     <div className="mb-6">
                       <h4 className="text-xs font-bold text-industrial-400 uppercase border-b border-industrial-700 pb-2 mb-3">
-                        Repuestos Críticos (Kardex)
+                        Repuestos Asociados (Kardex)
                       </h4>
                       <div className="bg-industrial-900/50 rounded border border-industrial-700/50 overflow-hidden">
                         <table className="w-full text-left text-sm text-white">
@@ -1008,7 +1008,7 @@ export const MachinesList: React.FC = () => {
 
               {/* Critical Spare Parts Section (Kardex) */}
               <div className="pt-4 mt-4 border-t border-industrial-700">
-                <h4 className="text-sm font-bold text-white mb-3">Repuestos Críticos (Kardex)</h4>
+                <h4 className="text-sm font-bold text-white mb-3">Repuestos Asociados (Kardex)</h4>
                 
                 <div className="bg-industrial-900/50 p-4 rounded border border-industrial-700/50 space-y-4">
                   <div className="flex gap-2 items-end relative">
@@ -1377,7 +1377,7 @@ export const MachinesList: React.FC = () => {
 
               {/* Critical Spare Parts Section (Kardex) */}
               <div className="pt-4 mt-4 border-t border-industrial-700">
-                <h4 className="text-sm font-bold text-white mb-3">Repuestos Críticos (Kardex)</h4>
+                <h4 className="text-sm font-bold text-white mb-3">Repuestos Asociados (Kardex)</h4>
                 
                 <div className="bg-industrial-900/50 p-4 rounded border border-industrial-700/50 space-y-4">
                   <div className="flex gap-2 items-end relative">
