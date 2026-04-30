@@ -77,7 +77,7 @@ const RoleTreeItem: React.FC<RoleTreeItemProps> = ({ role, selectedId, onSelect,
         </span>
         
         {/* System Lock Icon */}
-        {role.isSystem && <Lock size={12} className="text-industrial-500" />}
+        {(role.isSystem || role.name.includes('Admin')) && <Lock size={12} className="text-industrial-500" />}
         
         {/* Users Count */}
         <span className="text-[10px] bg-industrial-900 text-industrial-400 px-1.5 py-0.5 rounded flex items-center gap-1">
@@ -194,8 +194,10 @@ export const RoleManagement: React.FC = () => {
     const handleDelete = async () => {
         if (!selectedRole) return;
         
-        if (selectedRole.isSystem) {
-            alert("No se pueden eliminar roles del sistema.");
+        const isProtected = selectedRole.isSystem || selectedRole.name.includes('Admin');
+        
+        if (isProtected) {
+            alert("No se pueden eliminar roles del sistema o de administración.");
             return;
         }
         
@@ -346,7 +348,7 @@ export const RoleManagement: React.FC = () => {
                                             <Save size={14} /> Guardar Cambios
                                         </button>
                                     )}
-                                    {selectedRole && !selectedRole.isSystem && (
+                                    {selectedRole && !(selectedRole.isSystem || selectedRole.name.includes('Admin')) && (
                                         <button 
                                             onClick={handleDelete}
                                             className="px-4 py-2 bg-red-900/30 hover:bg-red-900/50 text-red-400 border border-red-900/50 text-sm font-bold rounded flex items-center gap-2"
