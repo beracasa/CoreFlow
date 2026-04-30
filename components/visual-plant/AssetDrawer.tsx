@@ -139,7 +139,7 @@ export const AssetDrawer: React.FC<AssetDrawerProps> = ({ machine, onClose, anal
           {actualCriticalParts.length > 0 && (
             <div>
               <h3 className="text-sm font-bold text-industrial-400 uppercase mb-3 flex items-center gap-2">
-                <Box size={14} /> Repuestos Críticos (Kardex)
+                <Box size={14} /> Repuestos Asociados (Kardex)
               </h3>
               <div className="space-y-2">
                 {actualCriticalParts.map((part) => {
