@@ -6,8 +6,8 @@ import { Shield, Lock, CheckSquare, Square, Save, Plus, Trash2, ChevronDown, Che
 // --- DEFINICIÓN DE PERMISOS DEL SISTEMA ---
 const SYSTEM_PERMISSIONS: Permission[] = [
     // Operativos
-    { id: 'view_dashboard', category: 'OPERATIONAL', label: 'Ver Dashboard y Mapa', description: 'Acceso a Planta Visual y monitoreo.' },
-    { id: 'edit_dashboard_map', category: 'OPERATIONAL', label: 'Editar Dashboard y Mapa', description: 'Permiso de Edición a Planta Visual y Monitoreo.' },
+    { id: 'view_dashboard', category: 'OPERATIONAL', label: 'Ver Planta Visual y Mapa', description: 'Ver información en la planta visual. No puede editar el diseño del mapa.' },
+    { id: 'edit_dashboard_map', category: 'OPERATIONAL', label: 'Editar Planta Visual y Mapa', description: 'Editar información en la planta visual. Puede editar el diseño del mapa.' },
     { id: 'view_kanban', category: 'OPERATIONAL', label: 'Ver Tablero Kanban', description: 'Ver estado de tickets de mantenimiento.' },
     { id: 'edit_kanban', category: 'OPERATIONAL', label: 'Editar Tablero Kanban', description: 'Permiso de Edición de la Tabla Kanban.' },
     { id: 'create_wo', category: 'OPERATIONAL', label: 'Crear Órdenes de Trabajo', description: 'Generar nuevos tickets R-MANT-02/05.' },
