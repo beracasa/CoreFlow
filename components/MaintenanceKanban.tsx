@@ -45,10 +45,10 @@ export const MaintenanceKanban: React.FC = () => {
 
         {/* R-MANT-02 Filter Card */}
         <div
-          onClick={() => setTypeFilter(typeFilter === 'R-MANT-02' ? null : 'R-MANT-02')}
-          className={`p-4 rounded border shadow-sm flex-1 min-w-[240px] max-w-xs cursor-pointer transition-all duration-200 ${typeFilter === 'R-MANT-02'
+          onClick={() => hasPermission('edit_kanban') && setTypeFilter(typeFilter === 'R-MANT-02' ? null : 'R-MANT-02')}
+          className={`p-4 rounded border shadow-sm flex-1 min-w-[240px] max-w-xs transition-all duration-200 ${hasPermission('edit_kanban') ? 'cursor-pointer' : 'cursor-default'} ${typeFilter === 'R-MANT-02'
             ? 'bg-blue-600/20 border-blue-500 ring-2 ring-blue-500/50'
-            : 'bg-industrial-800 border-industrial-700 hover:border-industrial-500'
+            : `bg-industrial-800 border-industrial-700 ${hasPermission('edit_kanban') ? 'hover:border-industrial-500' : ''}`
             }`}
         >
           <p className={`text-[10px] font-bold uppercase tracking-wider ${typeFilter === 'R-MANT-02' ? 'text-blue-400' : 'text-industrial-500'}`}>
@@ -61,10 +61,10 @@ export const MaintenanceKanban: React.FC = () => {
 
         {/* R-MANT-05 Filter Card */}
         <div
-          onClick={() => setTypeFilter(typeFilter === 'R-MANT-05' ? null : 'R-MANT-05')}
-          className={`p-4 rounded border shadow-sm flex-1 min-w-[240px] max-w-xs cursor-pointer transition-all duration-200 ${typeFilter === 'R-MANT-05'
+          onClick={() => hasPermission('edit_kanban') && setTypeFilter(typeFilter === 'R-MANT-05' ? null : 'R-MANT-05')}
+          className={`p-4 rounded border shadow-sm flex-1 min-w-[240px] max-w-xs transition-all duration-200 ${hasPermission('edit_kanban') ? 'cursor-pointer' : 'cursor-default'} ${typeFilter === 'R-MANT-05'
             ? 'bg-orange-600/20 border-orange-500 ring-2 ring-orange-500/50'
-            : 'bg-industrial-800 border-industrial-700 hover:border-industrial-500'
+            : `bg-industrial-800 border-industrial-700 ${hasPermission('edit_kanban') ? 'hover:border-industrial-500' : ''}`
             }`}
         >
           <p className={`text-[10px] font-bold uppercase tracking-wider ${typeFilter === 'R-MANT-05' ? 'text-orange-400' : 'text-industrial-500'}`}>
@@ -105,8 +105,8 @@ export const MaintenanceKanban: React.FC = () => {
                   return (
                     <div
                       key={order.id}
-                      onClick={() => navigate(`/orders/${order.id}`, { state: { type: order.formType } })}
-                      className="bg-industrial-700 p-4 rounded-xl border border-industrial-600 shadow-xl transition-all hover:border-industrial-400 cursor-pointer hover:shadow-2xl"
+                      onClick={() => hasPermission('edit_kanban') && navigate(`/orders/${order.id}`, { state: { type: order.formType } })}
+                      className={`bg-industrial-700 p-4 rounded-xl border border-industrial-600 shadow-xl transition-all ${hasPermission('edit_kanban') ? 'hover:border-industrial-400 cursor-pointer hover:shadow-2xl' : 'cursor-default'}`}
                     >
                       <div className="flex justify-between items-start mb-3">
                         <span className={`text-[10px] px-2 py-0.5 rounded font-bold tracking-wider ${isMant02
