@@ -20,9 +20,8 @@ const SYSTEM_PERMISSIONS: Permission[] = [
     { id: 'manage_inventory', category: 'ADMINISTRATIVE', label: 'Gestionar Inventario', description: 'Agregar/Editar repuestos y stock.' },
     { id: 'manage_assets', category: 'ADMINISTRATIVE', label: 'Gestionar Activos', description: 'Agregar/Editar máquinas y gateways.' },
     
-    // Financieros
-    { id: 'view_costs', category: 'FINANCIAL', label: 'Ver Datos Financieros', description: 'Ver costos de repuestos y mantenimiento.' },
-    { id: 'view_analytics', category: 'FINANCIAL', label: 'Ver Analíticas BI', description: 'Acceso completo a dashboard de reportes.' },
+    // Analíticas
+    { id: 'view_analytics', category: 'FINANCIAL', label: 'Ver Analíticas y BI', description: 'Acceso completo a dashboard de reportes.' },
     
     // Sistema
     { id: 'manage_users', category: 'SYSTEM', label: 'Gestionar Usuarios', description: 'Invitar usuarios y asignar roles.' },
@@ -241,7 +240,7 @@ export const RoleManagement: React.FC = () => {
     const categoryLabels: Record<string, string> = {
         'OPERATIONAL': 'Acceso Operativo',
         'ADMINISTRATIVE': 'Acceso Administrativo',
-        'FINANCIAL': 'Acceso Financiero',
+        'FINANCIAL': 'Acceso Analíticas',
         'SYSTEM': 'Acceso al Sistema'
     };
 
