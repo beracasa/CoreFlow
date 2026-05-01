@@ -322,7 +322,7 @@ export const PlantMapContainer: React.FC<PlantMapContainerProps> = ({ machines, 
                     onClick={() => handleOpenAssetModal('ZONE')}
                     className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold bg-industrial-700 text-industrial-300 hover:bg-industrial-600 hover:text-white transition-colors border-r border-industrial-600/50"
                   >
-                    <Plus size={14} /> Agregar Zona
+                    <Plus size={14} /> <span>Agregar Zona</span>
                   </button>
                 )}
                 {isEditMode && (
@@ -330,7 +330,7 @@ export const PlantMapContainer: React.FC<PlantMapContainerProps> = ({ machines, 
                     onClick={() => handleOpenAssetModal('MACHINE')}
                     className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold bg-industrial-700 text-industrial-300 hover:bg-industrial-600 hover:text-white transition-colors border-r border-industrial-600/50"
                   >
-                    <Plus size={14} /> Agregar Equipo
+                    <Plus size={14} /> <span>Agregar Equipo</span>
                   </button>
                 )}
                 <button
@@ -341,7 +341,7 @@ export const PlantMapContainer: React.FC<PlantMapContainerProps> = ({ machines, 
                   className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${isEditMode ? 'bg-yellow-500 text-black shadow-[0_0_15px_rgba(234,179,8,0.4)]' : 'bg-industrial-700 text-white hover:bg-industrial-600'}`}
                 >
                   {isEditMode ? <Save size={14} /> : <Edit3 size={14} />}
-                  {isEditMode ? 'Guardar Diseño' : 'Editar Diseño'}
+                  <span>{isEditMode ? 'Guardar Diseño' : 'Editar Diseño'}</span>
                 </button>
               </div>
             )}

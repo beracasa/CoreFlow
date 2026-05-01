@@ -281,7 +281,7 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
                             <div className="bg-industrial-900/50 p-3 rounded border border-industrial-600 mb-4">
                                 <span className="text-xs text-industrial-500 block">{t('hours.last')}</span>
                                 <span className="text-xl font-mono text-white">
-                                    {new Intl.NumberFormat('en-US').format(selectedMachine.runningHours)} {history.length > 0 && history[0].machineId === selectedMachine.id ? history[0].unit : selectedUnit}
+                                    <span>{new Intl.NumberFormat('en-US').format(selectedMachine.runningHours)}</span> <span>{history.length > 0 && history[0].machineId === selectedMachine.id ? history[0].unit : selectedUnit}</span>
                                 </span>
                             </div>
                         )}
@@ -316,7 +316,7 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
                             disabled={isLoading}
                             className="w-full bg-industrial-accent hover:bg-blue-600 text-white py-2 rounded font-bold transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                         >
-                            {isLoading ? 'Saving...' : <><Save size={16} /> {t('form.save')}</>}
+                            {isLoading ? <span>Saving...</span> : <><Save size={16} /> <span>{t('form.save')}</span></>}
                         </button>
                     </form>
                 </div>
@@ -332,7 +332,7 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
                                 onClick={generatePDF}
                                 className="bg-industrial-700 hover:bg-industrial-600 text-white px-3 py-1.5 rounded text-xs flex items-center gap-2 transition-colors border border-industrial-600"
                             >
-                                <FileDown size={14} /> Reporte PDF
+                                <FileDown size={14} /> <span>Reporte PDF</span>
                             </button>
                         </div>
                     </div>
