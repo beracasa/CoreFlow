@@ -201,7 +201,7 @@ const MaintenanceFormPage = () => {
 
 // --- LAYOUT ---
 const AppLayout = () => {
-  const { user, logout, hasRole } = useAuth();
+  const { user, logout, hasRole, hasPermission } = useAuth();
   const { plantSettings } = useMasterStore();
   const { roles } = useUserStore(); // Get roles for lookup
   const { language, setLanguage, t } = useLanguage();
