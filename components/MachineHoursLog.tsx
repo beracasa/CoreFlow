@@ -3,7 +3,7 @@ import { Machine, MachineHourLog } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from "../contexts/AuthContext";
 import { MachineSupabaseService } from "../src/services/implementations/machineSupabase";
-import { Clock, History, Save, FileDown, Filter, X } from 'lucide-react';
+import { Clock, History, Save, FileDown, Filter, X, Lock, AlertCircle } from 'lucide-react';
 import { TablePagination } from './shared/TablePagination';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -15,7 +15,8 @@ interface MachineHoursLogProps {
 
 export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) => {
     const { t } = useLanguage();
-    const { user } = useAuth();
+    const { user, hasPermission } = useAuth();
+    const canRegister = hasPermission('log_hours');
     const [selectedMachineId, setSelectedMachineId] = useState<string>('');
     const [currentReading, setCurrentReading] = useState<number>(0);
     const [displayReading, setDisplayReading] = useState<string>('');
@@ -219,14 +220,15 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
                                 <input
                                     type="text"
                                     placeholder="Buscar por Nombre, Alias o Matrícula..."
-                                    className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white outline-none focus:border-emerald-500 transition-colors"
+                                    className={`w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white outline-none focus:border-emerald-500 transition-colors ${!canRegister ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     value={searchTerm}
+                                    disabled={!canRegister}
                                     onChange={e => {
                                         setSearchTerm(e.target.value);
                                         setSelectedMachineId('');
                                         setShowDropdown(true);
                                     }}
-                                    onFocus={() => setShowDropdown(true)}
+                                    onFocus={() => canRegister && setShowDropdown(true)}
                                     // Delay blur to allow click on dropdown items
                                     onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
                                 />
@@ -292,8 +294,9 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
                                 <input
                                     type="text"
                                     required
-                                    className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white font-mono"
-                                    placeholder="e.g. 12,500"
+                                    disabled={!canRegister}
+                                    className={`w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white font-mono ${!canRegister ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    placeholder={canRegister ? "e.g. 12,500" : "Sin permiso"}
                                     value={displayReading}
                                     onChange={handleReadingChange}
                                 />
@@ -301,8 +304,9 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
                             <div className="space-y-1">
                                 <label className="text-xs text-industrial-400 font-bold uppercase">Unidad</label>
                                 <select
-                                    className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white outline-none focus:border-emerald-500 transition-colors"
+                                    className={`w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white outline-none focus:border-emerald-500 transition-colors ${!canRegister ? 'opacity-50 cursor-not-allowed' : ''}`}
                                     value={selectedUnit}
+                                    disabled={!canRegister}
                                     onChange={(e) => setSelectedUnit(e.target.value as 'h' | 'km')}
                                 >
                                     <option value="h">Horas (h)</option>
@@ -313,11 +317,16 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
 
                         <button
                             type="submit"
-                            disabled={isLoading}
-                            className="w-full bg-industrial-accent hover:bg-blue-600 text-white py-2 rounded font-bold transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                            disabled={isLoading || !canRegister}
+                            className={`w-full ${canRegister ? 'bg-industrial-accent hover:bg-blue-600' : 'bg-industrial-700 cursor-not-allowed'} text-white py-2 rounded font-bold transition-colors flex items-center justify-center gap-2 disabled:opacity-50`}
                         >
-                            {isLoading ? <span>Saving...</span> : <><Save size={16} /> <span>{t('form.save')}</span></>}
+                            {isLoading ? <span>Saving...</span> : <>{canRegister ? <Save size={16} /> : <Lock size={16} />} <span>{canRegister ? t('form.save') : 'Acceso Restringido'}</span></>}
                         </button>
+                        {!canRegister && (
+                            <p className="text-[10px] text-red-400 mt-2 text-center flex items-center justify-center gap-1">
+                                <AlertCircle size={10} /> No tiene permisos para registrar uso del equipo.
+                            </p>
+                        )}
                     </form>
                 </div>
 
