@@ -5,6 +5,7 @@ import { Machine, MachineStatus } from '../../types';
 import { PredictiveAnalysis } from '../../services/geminiService';
 import { useMasterStore } from '../../src/stores/useMasterStore';
 import { useWorkOrderStore } from '../../src/stores/useWorkOrderStore';
+import { useAuth } from '../../contexts/AuthContext';
 import { calculateMachineOEE, calculateMachineMTTR, calculateMachineMTBF } from '../../src/utils/metricsCalculator';
 
 interface AssetDrawerProps {
@@ -19,6 +20,7 @@ interface AssetDrawerProps {
 export const AssetDrawer: React.FC<AssetDrawerProps> = ({ machine, onClose, analysis, onRunAnalysis, isAnalyzing, onCreateWorkOrder }) => {
   const { parts } = useMasterStore();
   const { allOrders, fetchOrders, isInitialized } = useWorkOrderStore();
+  const { hasPermission } = useAuth();
   
   React.useEffect(() => {
     if (!isInitialized || (allOrders && allOrders.length === 0)) {
@@ -190,8 +192,13 @@ export const AssetDrawer: React.FC<AssetDrawerProps> = ({ machine, onClose, anal
             Ver Historial
           </button>
           <button
-            onClick={onCreateWorkOrder}
-            className="flex-1 bg-industrial-accent hover:bg-blue-600 text-white py-2 rounded text-sm font-medium shadow-lg shadow-blue-900/20 transition-colors"
+            onClick={() => hasPermission('create_wo') && onCreateWorkOrder()}
+            disabled={!hasPermission('create_wo')}
+            className={`flex-1 py-2 rounded text-sm font-medium shadow-lg transition-colors ${
+              hasPermission('create_wo') 
+              ? 'bg-industrial-accent hover:bg-blue-600 text-white shadow-blue-900/20' 
+              : 'bg-industrial-700 text-industrial-400 cursor-not-allowed opacity-50'
+            }`}
           >
             Crear Orden de Trabajo
           </button>
