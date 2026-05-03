@@ -10,11 +10,11 @@ const SYSTEM_PERMISSIONS: Permission[] = [
     { id: 'edit_dashboard_map', category: 'OPERATIONAL', label: 'Editar Planta Visual y Mapa', description: 'Editar información en la planta visual. Puede editar el diseño del mapa.' },
     { id: 'view_kanban', category: 'OPERATIONAL', label: 'Ver Tablero Kanban', description: 'Ver estado de tickets de mantenimiento.' },
     { id: 'edit_kanban', category: 'OPERATIONAL', label: 'Editar Tablero Kanban', description: 'Permiso de Edición de la Tabla Kanban.' },
-    { id: 'create_wo', category: 'OPERATIONAL', label: 'Crear Órdenes de Trabajo', description: 'Generar nuevos tickets R-MANT-02/05.' },
-    { id: 'edit_wo', category: 'OPERATIONAL', label: 'Editar Orden de Mantenimiento', description: 'Editar información de la orden.' },
-    { id: 'execute_wo', category: 'OPERATIONAL', label: 'Ejecutar Órdenes', description: 'Llenar checklists y consumir repuestos.' },
-    { id: 'supervise_order', category: 'OPERATIONAL', label: 'Supervisar y Recibir Ordenes', description: 'Llenar checklists y recepción de una orden.' },
-    { id: 'log_hours', category: 'OPERATIONAL', label: 'Registrar Horas', description: 'Actualizar contadores de horas de máquinas.' },
+    { id: 'create_wo', category: 'OPERATIONAL', label: 'Crear Órdenes de Mantenimiento', description: 'Generar nuevos tickets R-MANT-02/05.' },
+    { id: 'execute_wo', category: 'OPERATIONAL', label: 'Ejecutar Órdenes de Mantenimiento', description: 'Llenar checklists y consumir repuestos.' },
+    { id: 'supervise_order', category: 'OPERATIONAL', label: 'Supervisar y Recibir Órdenes', description: 'Llenar checklists y recepción de una orden.' },
+    { id: 'edit_wo', category: 'OPERATIONAL', label: 'Editar Órdenes de Mantenimiento', description: 'Editar información de la orden.' },
+    { id: 'log_hours', category: 'OPERATIONAL', label: 'Registrar Uso del Equipo', description: 'Actualizar contadores de horas de máquinas.' },
     
     // Administrativos
     { id: 'approve_wo', category: 'ADMINISTRATIVE', label: 'Aprobar/Cerrar Tickets', description: 'Firma final y cierre de órdenes.' },
