@@ -4,6 +4,8 @@ import { X, Package, MapPin, AlertTriangle, Activity, Edit } from 'lucide-react'
 import { PartCreationForm } from './PartCreationForm';
 import { inventoryService } from '../../services';
 
+import { useAuth } from '../../../contexts/AuthContext';
+
 // Service initialized in index.ts
 
 interface SparePartDetailProps {
@@ -12,6 +14,8 @@ interface SparePartDetailProps {
 }
 
 export const SparePartDetail: React.FC<SparePartDetailProps> = ({ part, onClose }) => {
+    const { hasPermission } = useAuth();
+    const canManage = hasPermission('manage_inventory');
     const [isEditing, setIsEditing] = useState(false);
     const [currentPart, setCurrentPart] = useState(part);
     const [showPurchaseModal, setShowPurchaseModal] = useState(false);
@@ -83,13 +87,15 @@ export const SparePartDetail: React.FC<SparePartDetailProps> = ({ part, onClose 
                         <p className="text-industrial-400 font-mono text-sm ml-11">{currentPart.partNumber}</p>
                     </div>
                     <div className="flex gap-2">
-                        <button
-                            onClick={() => setIsEditing(true)}
-                            className="text-industrial-400 hover:text-white hover:bg-industrial-700 p-2 rounded-lg transition-colors flex items-center gap-2"
-                        >
-                            <Edit className="w-5 h-5" />
-                            <span className="text-sm font-bold">Editar</span>
-                        </button>
+                        {canManage && (
+                            <button
+                                onClick={() => setIsEditing(true)}
+                                className="text-industrial-400 hover:text-white hover:bg-industrial-700 p-2 rounded-lg transition-colors flex items-center gap-2"
+                            >
+                                <Edit className="w-5 h-5" />
+                                <span className="text-sm font-bold">Editar</span>
+                            </button>
+                        )}
                         <button
                             onClick={onClose}
                             className="text-industrial-400 hover:text-white hover:bg-industrial-700 p-2 rounded-lg transition-colors"
@@ -199,12 +205,14 @@ export const SparePartDetail: React.FC<SparePartDetailProps> = ({ part, onClose 
                                                         El stock actual está por debajo del nivel mínimo. Se recomienda reabastecer.
                                                     </p>
                                                 </div>
-                                                <button
-                                                    onClick={() => setShowPurchaseModal(true)}
-                                                    className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded shadow-lg transition-colors flex items-center gap-1.5"
-                                                >
-                                                    Solicitar Compra
-                                                </button>
+                                                {canManage && (
+                                                    <button
+                                                        onClick={() => setShowPurchaseModal(true)}
+                                                        className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded shadow-lg transition-colors flex items-center gap-1.5"
+                                                    >
+                                                        Solicitar Compra
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
                                     )}

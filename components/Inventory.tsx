@@ -8,9 +8,12 @@ import { PurchaseRequestList } from '../src/components/inventory/PurchaseRequest
 import { RequestDetail } from '../src/components/inventory/RequestDetail';
 import { inventoryService } from '../src/services';
 import { PartsRequest, SparePart } from '../src/types/inventory';
+import { useAuth } from '../contexts/AuthContext';
 import { Layers, FileText, ArrowDownCircle, PlusCircle, List } from 'lucide-react';
 
 export const Inventory: React.FC<any> = () => {
+  const { hasPermission } = useAuth();
+  const canManage = hasPermission('manage_inventory');
   const [activeTab, setActiveTab] = useState<'list' | 'request' | 'requests_list' | 'receive' | 'create' | 'purchase_requests'>('list');
   const [selectedRequest, setSelectedRequest] = useState<PartsRequest | null>(null);
   const [parts, setParts] = useState<SparePart[]>([]);
@@ -51,56 +54,60 @@ export const Inventory: React.FC<any> = () => {
           <Layers className="w-4 h-4 mr-2" />
           Stock Actual
         </button>
-        <button
-          onClick={() => { setActiveTab('requests_list'); setSelectedRequest(null); }}
-          className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${activeTab === 'requests_list'
-            ? 'bg-industrial-800 text-white border-industrial-600 shadow-md'
-            : 'bg-transparent text-industrial-500 border-transparent hover:text-industrial-300 hover:bg-industrial-800/50'
-            }`}
-        >
-          <List className="w-4 h-4 mr-2" />
-          Lista Solicitudes
-        </button>
-        <button
-          onClick={() => setActiveTab('request')}
-          className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${activeTab === 'request'
-            ? 'bg-industrial-800 text-white border-industrial-600 shadow-md'
-            : 'bg-transparent text-industrial-500 border-transparent hover:text-industrial-300 hover:bg-industrial-800/50'
-            }`}
-        >
-          <FileText className="w-4 h-4 mr-2" />
-          Nueva Solicitud
-        </button>
-        <button
-          onClick={() => setActiveTab('receive')}
-          className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${activeTab === 'receive'
-            ? 'bg-industrial-800 text-white border-industrial-600 shadow-md'
-            : 'bg-transparent text-industrial-500 border-transparent hover:text-industrial-300 hover:bg-industrial-800/50'
-            }`}
-        >
-          <ArrowDownCircle className="w-4 h-4 mr-2" />
-          Recepción
-        </button>
-        <button
-          onClick={() => setActiveTab('create')}
-          className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${activeTab === 'create'
-            ? 'bg-industrial-800 text-white border-industrial-600 shadow-md'
-            : 'bg-transparent text-industrial-500 border-transparent hover:text-industrial-300 hover:bg-industrial-800/50'
-            }`}
-        >
-          <PlusCircle className="w-4 h-4 mr-2" />
-          Nuevo Repuesto
-        </button>
-        <button
-          onClick={() => { setActiveTab('purchase_requests'); setSelectedRequest(null); }}
-          className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${activeTab === 'purchase_requests'
-            ? 'bg-industrial-800 text-white border-industrial-600 shadow-md'
-            : 'bg-transparent text-industrial-500 border-transparent hover:text-industrial-300 hover:bg-industrial-800/50'
-            }`}
-        >
-          <FileText className="w-4 h-4 mr-2" />
-          Solicitudes Compras
-        </button>
+        {canManage && (
+          <>
+            <button
+              onClick={() => { setActiveTab('requests_list'); setSelectedRequest(null); }}
+              className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${activeTab === 'requests_list'
+                ? 'bg-industrial-800 text-white border-industrial-600 shadow-md'
+                : 'bg-transparent text-industrial-500 border-transparent hover:text-industrial-300 hover:bg-industrial-800/50'
+                }`}
+            >
+              <List className="w-4 h-4 mr-2" />
+              Lista Solicitudes
+            </button>
+            <button
+              onClick={() => setActiveTab('request')}
+              className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${activeTab === 'request'
+                ? 'bg-industrial-800 text-white border-industrial-600 shadow-md'
+                : 'bg-transparent text-industrial-500 border-transparent hover:text-industrial-300 hover:bg-industrial-800/50'
+                }`}
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              Nueva Solicitud
+            </button>
+            <button
+              onClick={() => setActiveTab('receive')}
+              className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${activeTab === 'receive'
+                ? 'bg-industrial-800 text-white border-industrial-600 shadow-md'
+                : 'bg-transparent text-industrial-500 border-transparent hover:text-industrial-300 hover:bg-industrial-800/50'
+                }`}
+            >
+              <ArrowDownCircle className="w-4 h-4 mr-2" />
+              Recepción
+            </button>
+            <button
+              onClick={() => setActiveTab('create')}
+              className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${activeTab === 'create'
+                ? 'bg-industrial-800 text-white border-industrial-600 shadow-md'
+                : 'bg-transparent text-industrial-500 border-transparent hover:text-industrial-300 hover:bg-industrial-800/50'
+                }`}
+            >
+              <PlusCircle className="w-4 h-4 mr-2" />
+              Nuevo Repuesto
+            </button>
+            <button
+              onClick={() => { setActiveTab('purchase_requests'); setSelectedRequest(null); }}
+              className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${activeTab === 'purchase_requests'
+                ? 'bg-industrial-800 text-white border-industrial-600 shadow-md'
+                : 'bg-transparent text-industrial-500 border-transparent hover:text-industrial-300 hover:bg-industrial-800/50'
+                }`}
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              Solicitudes Compras
+            </button>
+          </>
+        )}
       </div>
 
       <div className="bg-industrial-900 rounded-xl min-h-[500px]">
