@@ -5,7 +5,11 @@ import { Search, FileText, Clock, ChevronDown, ChevronRight, Plus, Download, Eye
 import { exportPurchaseRequestPDF } from '../../utils/pdfExport';
 import { TablePagination } from '../shared/TablePagination';
 
+import { useAuth } from '../../../contexts/AuthContext';
+
 export const PurchaseRequestList: React.FC = () => {
+    const { hasPermission } = useAuth();
+    const canManage = hasPermission('manage_inventory');
     const [requests, setRequests] = useState<ExtendedPurchaseRequest[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -135,13 +139,15 @@ export const PurchaseRequestList: React.FC = () => {
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
-                <button
-                    onClick={() => { setShowDirectModal(true); setSelectedItems([{ partId: '', quantity: 1, partName: '' }]); }}
-                    className="px-4 py-2 bg-industrial-accent hover:bg-industrial-accent/90 text-white text-sm font-bold rounded-lg shadow-lg flex items-center gap-2 transition-all"
-                >
-                    <Plus className="w-4 h-4" />
-                    Nueva Solicitud Directa
-                </button>
+                {canManage && (
+                    <button
+                        onClick={() => { setShowDirectModal(true); setSelectedItems([{ partId: '', quantity: 1, partName: '' }]); }}
+                        className="px-4 py-2 bg-industrial-accent hover:bg-industrial-accent/90 text-white text-sm font-bold rounded-lg shadow-lg flex items-center gap-2 transition-all"
+                    >
+                        <Plus className="w-4 h-4" />
+                        Nueva Solicitud Directa
+                    </button>
+                )}
             </div>
 
             {isLoading ? (
@@ -223,13 +229,15 @@ export const PurchaseRequestList: React.FC = () => {
                                                             >
                                                                 <Eye className="w-4 h-4" />
                                                             </button>
-                                                            <button
-                                                                onClick={() => exportPurchaseRequestPDF(req)}
-                                                                className="p-1.5 bg-industrial-700 hover:bg-blue-600 rounded-lg text-industrial-300 hover:text-white transition-all"
-                                                                title="Exportar PDF"
-                                                            >
-                                                                <Download className="w-4 h-4" />
-                                                            </button>
+                                                            {canManage && (
+                                                                <button
+                                                                    onClick={() => exportPurchaseRequestPDF(req)}
+                                                                    className="p-1.5 bg-industrial-700 hover:bg-blue-600 rounded-lg text-industrial-300 hover:text-white transition-all"
+                                                                    title="Exportar PDF"
+                                                                >
+                                                                    <Download className="w-4 h-4" />
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -425,9 +433,9 @@ export const PurchaseRequestList: React.FC = () => {
                                     <span className="text-[10px] text-industrial-500 uppercase font-black tracking-widest">Resumen General</span>
                                     <div>
                                         <button
-                                            onClick={() => setShowStatusDropdown(!showStatusDropdown)}
-                                            disabled={isUpdatingStatus}
-                                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${isUpdatingStatus ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 active:scale-95'
+                                            onClick={() => canManage && setShowStatusDropdown(!showStatusDropdown)}
+                                            disabled={isUpdatingStatus || !canManage}
+                                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${isUpdatingStatus || !canManage ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 active:scale-95'
                                                 } ${selectedRequest.status === 'Recibido'
                                                     ? 'bg-emerald-900/30 text-emerald-400 border-emerald-800'
                                                     : selectedRequest.status === 'Cancelado'
@@ -438,7 +446,7 @@ export const PurchaseRequestList: React.FC = () => {
                                                 }`}
                                         >
                                             <span className="text-xs font-black uppercase tracking-wider">{selectedRequest.status || 'Pendiente'}</span>
-                                            <ChevronDown className="w-3 h-3" />
+                                            {canManage && <ChevronDown className="w-3 h-3" />}
                                         </button>
 
                                         {showStatusDropdown && (
@@ -484,20 +492,22 @@ export const PurchaseRequestList: React.FC = () => {
                             </div>
                         </div>
                         <div className="p-6 bg-industrial-900/80 border-t border-industrial-700 flex gap-4">
-                            <button
-                                onClick={() => setSelectedRequest(null)}
-                                className="px-6 py-3 text-industrial-400 font-bold hover:text-white transition-colors"
-                            >
-                                Cerrar
-                            </button>
-                            <button
-                                onClick={() => exportPurchaseRequestPDF(selectedRequest)}
-                                className="flex-1 py-3 bg-white text-industrial-900 font-black hover:bg-industrial-100 rounded-lg transition-all flex items-center justify-center gap-3 shadow-xl"
-                            >
-                                <Download className="w-5 h-5" />
-                                EXPORTAR REQUISICIÓN (PDF)
-                            </button>
-                        </div>
+                                <button
+                                    onClick={() => setSelectedRequest(null)}
+                                    className={`px-6 py-3 text-industrial-400 font-bold hover:text-white transition-colors ${!canManage ? 'flex-1 border border-industrial-700 rounded-lg bg-industrial-900/50' : ''}`}
+                                >
+                                    Cerrar
+                                </button>
+                                {canManage && (
+                                    <button
+                                        onClick={() => exportPurchaseRequestPDF(selectedRequest)}
+                                        className="flex-1 py-3 bg-white text-industrial-900 font-black hover:bg-industrial-100 rounded-lg transition-all flex items-center justify-center gap-3 shadow-xl"
+                                    >
+                                        <Download className="w-5 h-5" />
+                                        EXPORTAR REQUISICIÓN (PDF)
+                                    </button>
+                                )}
+                            </div>
                     </div>
                 </div>
             )}
