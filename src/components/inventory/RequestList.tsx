@@ -11,6 +11,8 @@ import { useMasterStore } from '../../stores/useMasterStore';
 
 import { TablePagination } from '../shared/TablePagination';
 
+import { useAuth } from '../../../contexts/AuthContext';
+
 // Service initialized in index.ts
 
 interface RequestListProps {
@@ -18,6 +20,8 @@ interface RequestListProps {
 }
 
 export const RequestList: React.FC<RequestListProps> = ({ onSelectRequest }) => {
+    const { hasPermission } = useAuth();
+    const canManage = hasPermission('manage_inventory');
     const [requests, setRequests] = useState<PartsRequest[]>([]);
     const [parts, setParts] = useState<SparePart[]>([]); // Need parts to show names in report
     const { plantSettings } = useMasterStore();
@@ -216,14 +220,16 @@ export const RequestList: React.FC<RequestListProps> = ({ onSelectRequest }) => 
                         <FileText className="w-5 h-5 text-industrial-400" />
                         Solicitudes de Repuestos
                     </h2>
-                    <button
-                        onClick={generatePDF}
-                        disabled={filteredRequests.length === 0}
-                        className="flex items-center px-4 py-2 bg-industrial-accent hover:bg-blue-600 text-white rounded-lg font-bold text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        <Download className="w-4 h-4 mr-2" />
-                        Generar Reporte
-                    </button>
+                    {canManage && (
+                        <button
+                            onClick={generatePDF}
+                            disabled={filteredRequests.length === 0}
+                            className="flex items-center px-4 py-2 bg-industrial-accent hover:bg-blue-600 text-white rounded-lg font-bold text-xs transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <Download className="w-4 h-4 mr-2" />
+                            Generar Reporte
+                        </button>
+                    )}
                 </div>
 
                 {/* Filters */}

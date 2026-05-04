@@ -17,6 +17,7 @@ const SYSTEM_PERMISSIONS: Permission[] = [
     // Administrativos
     { id: 'manage_assets', category: 'ADMINISTRATIVE', label: 'Gestionar Activos', description: 'Agregar/Editar Equipos y Máquinas' },
     { id: 'manage_inventory', category: 'ADMINISTRATIVE', label: 'Gestionar Inventario', description: 'Agregar/Editar repuestos y stock.' },
+    { id: 'view_part_requests', category: 'ADMINISTRATIVE', label: 'Ver Solicitudes de Repuestos', description: 'Visualizar listado y detalle de solicitudes de repuestos.' },
     
     // Analíticas
     { id: 'view_kanban', category: 'FINANCIAL', label: 'Ver Tablero Kanban', description: 'Ver estado de tickets de mantenimiento.' },

@@ -54,18 +54,20 @@ export const Inventory: React.FC<any> = () => {
           <Layers className="w-4 h-4 mr-2" />
           Stock Actual
         </button>
+        {(canManage || hasPermission('view_part_requests')) && (
+          <button
+            onClick={() => { setActiveTab('requests_list'); setSelectedRequest(null); }}
+            className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${activeTab === 'requests_list'
+              ? 'bg-industrial-800 text-white border-industrial-600 shadow-md'
+              : 'bg-transparent text-industrial-500 border-transparent hover:text-industrial-300 hover:bg-industrial-800/50'
+              }`}
+          >
+            <List className="w-4 h-4 mr-2" />
+            Lista Solicitudes
+          </button>
+        )}
         {canManage && (
           <>
-            <button
-              onClick={() => { setActiveTab('requests_list'); setSelectedRequest(null); }}
-              className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${activeTab === 'requests_list'
-                ? 'bg-industrial-800 text-white border-industrial-600 shadow-md'
-                : 'bg-transparent text-industrial-500 border-transparent hover:text-industrial-300 hover:bg-industrial-800/50'
-                }`}
-            >
-              <List className="w-4 h-4 mr-2" />
-              Lista Solicitudes
-            </button>
             <button
               onClick={() => setActiveTab('request')}
               className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${activeTab === 'request'

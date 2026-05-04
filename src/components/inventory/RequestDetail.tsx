@@ -18,9 +18,13 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useMasterStore } from '../../stores/useMasterStore';
 
+import { useAuth } from '../../../contexts/AuthContext';
+
 // ... (existing imports)
 
 export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, onBack }) => {
+    const { hasPermission } = useAuth();
+    const canManage = hasPermission('manage_inventory');
     const { technicians, plantSettings, parts: storeParts } = useMasterStore();
     const activeParts = storeParts.length > 0 ? storeParts : parts;
 
@@ -299,7 +303,7 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
 
                 {/* Actions */}
                 <div className="flex gap-3">
-                    {!isProcessing && !isEditing && localRequest.status !== 'CLOSED' && (
+                    {canManage && !isProcessing && !isEditing && localRequest.status !== 'CLOSED' && (
                         <>
                             {(localRequest.status === 'OPEN' || localRequest.status === 'PENDING_STOCK' || localRequest.status === 'PARTIAL') && (
                                 <button
@@ -310,7 +314,6 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
                                     Editar
                                 </button>
                             )}
-
                             <button
                                 onClick={handleStartProcessing}
                                 className="flex items-center px-4 py-2 bg-industrial-accent hover:bg-blue-600 text-white rounded-lg font-bold text-sm transition-colors shadow-lg"
@@ -328,7 +331,7 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
                         </>
                     )}
 
-                    {!isProcessing && !isEditing && (localRequest.status === 'PENDING_STOCK' || localRequest.status === 'PARTIAL' || localRequest.items.some(i => i.quantityDelivered < i.quantityRequested)) && (
+                    {canManage && !isProcessing && !isEditing && (localRequest.status === 'PENDING_STOCK' || localRequest.status === 'PARTIAL' || localRequest.items.some(i => i.quantityDelivered < i.quantityRequested)) && (
                         <button
                             onClick={() => setIsPurchaseModalOpen(true)}
                             className={`flex items-center px-4 py-2 rounded-lg font-bold text-sm transition-colors shadow-lg ${(localRequest.purchaseHistory && localRequest.purchaseHistory.length > 0)
@@ -340,7 +343,7 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
                             {(localRequest.purchaseHistory && localRequest.purchaseHistory.length > 0) ? 'Repuestos Solicitados' : 'Solicitar Repuestos'}
                         </button>
                     )}
-                    {!isProcessing && !isEditing && (
+                    {canManage && !isProcessing && !isEditing && (
                         localRequest.status === 'CLOSED' ? (
                             <button
                                 onClick={handleGenerateDetailsPDF}
@@ -360,7 +363,7 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
                         )
                     )}
 
-                    {isProcessing && (
+                    {canManage && isProcessing && (
                         <>
                             <button
                                 onClick={handleConfirmDelivery}
