@@ -15,9 +15,8 @@ const SYSTEM_PERMISSIONS: Permission[] = [
     { id: 'log_hours', category: 'OPERATIONAL', label: 'Registrar Uso del Equipo', description: 'Actualizar contadores de horas de máquinas.' },
     
     // Administrativos
-    { id: 'approve_wo', category: 'ADMINISTRATIVE', label: 'Aprobar/Cerrar Tickets', description: 'Firma final y cierre de órdenes.' },
+    { id: 'manage_assets', category: 'ADMINISTRATIVE', label: 'Gestionar Activos', description: 'Agregar/Editar Equipos y Máquinas' },
     { id: 'manage_inventory', category: 'ADMINISTRATIVE', label: 'Gestionar Inventario', description: 'Agregar/Editar repuestos y stock.' },
-    { id: 'manage_assets', category: 'ADMINISTRATIVE', label: 'Gestionar Activos', description: 'Agregar/Editar máquinas y gateways.' },
     
     // Analíticas
     { id: 'view_kanban', category: 'FINANCIAL', label: 'Ver Tablero Kanban', description: 'Ver estado de tickets de mantenimiento.' },

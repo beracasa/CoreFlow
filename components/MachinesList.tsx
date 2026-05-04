@@ -4,10 +4,9 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useMasterStore } from '../src/stores/useMasterStore';
 import { DocumentService } from '../src/services/documentService';
 import { supabase } from '../src/services/supabaseClient';
-import {
-  Box, Wifi, Plus, X, Camera, FileText, Server, Clock, Calendar, Pencil, Eye, Download, Trash2
-} from 'lucide-react';
+import { Box, Wifi, Plus, X, Camera, FileText, Server, Clock, Calendar, Pencil, Eye, Download, Trash2, Lock, AlertCircle } from 'lucide-react';
 import { TablePagination } from './shared/TablePagination';
+import { useAuth } from '../contexts/AuthContext';
 
 export const MachinesList: React.FC = () => {
   const {
@@ -19,6 +18,8 @@ export const MachinesList: React.FC = () => {
   } = useMasterStore();
 
   const { t } = useLanguage();
+  const { hasPermission } = useAuth();
+  const canManage = hasPermission('manage_assets');
 
   // Flatten Zones for Selection
   const zones = zoneStructures.flatMap(z =>
@@ -166,6 +167,7 @@ export const MachinesList: React.FC = () => {
   });
 
   const openAddGateway = () => {
+    if (!canManage) return;
     setEditingId(null);
     setNewMachine({
       name: '', plate: '', type: 'GENERIC', runningHours: 0, customIntervals: '',
@@ -176,6 +178,7 @@ export const MachinesList: React.FC = () => {
   };
 
   const openAddManual = () => {
+    if (!canManage) return;
     setEditingId(null);
     setNewManualAsset({
       name: '', plate: '', type: 'GENERIC', zone: zones[0] || '', customIntervals: '',
@@ -186,11 +189,13 @@ export const MachinesList: React.FC = () => {
   };
 
   const handleEditFromDetail = (m: Machine) => {
+    if (!canManage) return;
     setViewingMachine(null);
     handleEditMachine(m);
   };
 
   const handleEditMachine = (m: Machine) => {
+    if (!canManage) return;
     setEditingId(m.id);
     const intervals = m.intervals ? m.intervals.join(', ') : '';
 
@@ -379,16 +384,21 @@ export const MachinesList: React.FC = () => {
           <div className="flex gap-3">
             <button
               onClick={openAddManual}
-              className="bg-industrial-800 hover:bg-industrial-700 text-white border border-industrial-600 px-3 py-1.5 rounded text-xs transition-colors flex items-center gap-2"
+              disabled={!canManage}
+              className={`${canManage ? 'bg-industrial-800 hover:bg-industrial-700' : 'bg-industrial-800/50 opacity-50 cursor-not-allowed'} text-white border border-industrial-600 px-3 py-1.5 rounded text-xs transition-colors flex items-center gap-2`}
+              title={!canManage ? "No tiene permisos para agregar equipos" : ""}
             >
-              <Box className="w-3 h-3" />
+              {canManage ? <Box className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
               Agregar Equipo
             </button>
             <button
               onClick={openAddGateway}
-              className="bg-industrial-accent hover:bg-blue-600 text-white px-3 py-1.5 rounded text-xs font-medium shadow-lg transition-colors flex items-center gap-2"
+              disabled={!canManage}
+              className={`${canManage ? 'bg-industrial-accent hover:bg-blue-600 shadow-lg' : 'bg-industrial-accent/50 opacity-50 cursor-not-allowed'} text-white px-3 py-1.5 rounded text-xs font-medium transition-colors flex items-center gap-2`}
+              title={!canManage ? "No tiene permisos para agregar equipos" : ""}
             >
-              <Wifi className="w-3 h-3" /> {t('assets.provision')}
+              {canManage ? <Wifi className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
+              {t('assets.provision')}
             </button>
           </div>
         </div>
@@ -813,9 +823,11 @@ export const MachinesList: React.FC = () => {
                   </button>
                   <button
                     onClick={() => handleEditFromDetail(viewingMachine)}
-                    className="px-4 py-2 bg-industrial-600 hover:bg-industrial-500 text-white rounded text-sm font-bold shadow flex items-center gap-2"
+                    disabled={!canManage}
+                    className={`px-4 py-2 ${canManage ? 'bg-industrial-600 hover:bg-industrial-500' : 'bg-industrial-700/50 opacity-50 cursor-not-allowed'} text-white rounded text-sm font-bold shadow flex items-center gap-2`}
+                    title={!canManage ? "No tiene permisos para editar equipos" : ""}
                   >
-                    <Pencil size={14} /> Editar Equipo
+                    {canManage ? <Pencil size={14} /> : <Lock size={14} />} Editar Equipo
                   </button>
                 </div>
               </div>

@@ -115,7 +115,6 @@ VALUES
       "create_wo": true,
       "execute_wo": true,
       "log_hours": true,
-      "approve_wo": true,
       "manage_inventory": true,
       "manage_assets": true,
       "view_costs": true,
