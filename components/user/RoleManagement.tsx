@@ -8,8 +8,6 @@ const SYSTEM_PERMISSIONS: Permission[] = [
     // Operativos
     { id: 'view_dashboard', category: 'OPERATIONAL', label: 'Ver Planta Visual y Mapa', description: 'Ver información en la planta visual. No puede editar el diseño del mapa.' },
     { id: 'edit_dashboard_map', category: 'OPERATIONAL', label: 'Editar Planta Visual y Mapa', description: 'Editar información en la planta visual. Puede editar el diseño del mapa.' },
-    { id: 'view_kanban', category: 'OPERATIONAL', label: 'Ver Tablero Kanban', description: 'Ver estado de tickets de mantenimiento.' },
-    { id: 'edit_kanban', category: 'OPERATIONAL', label: 'Editar Tablero Kanban', description: 'Permiso de Edición de la Tabla Kanban.' },
     { id: 'create_wo', category: 'OPERATIONAL', label: 'Crear Órdenes de Mantenimiento', description: 'Generar nuevos tickets R-MANT-02/05.' },
     { id: 'execute_wo', category: 'OPERATIONAL', label: 'Ejecutar Órdenes de Mantenimiento', description: 'Llenar checklists y consumir repuestos.' },
     { id: 'supervise_order', category: 'OPERATIONAL', label: 'Supervisar y Recibir Órdenes', description: 'Llenar checklists y recepción de una orden.' },
@@ -22,6 +20,8 @@ const SYSTEM_PERMISSIONS: Permission[] = [
     { id: 'manage_assets', category: 'ADMINISTRATIVE', label: 'Gestionar Activos', description: 'Agregar/Editar máquinas y gateways.' },
     
     // Analíticas
+    { id: 'view_kanban', category: 'FINANCIAL', label: 'Ver Tablero Kanban', description: 'Ver estado de tickets de mantenimiento.' },
+    { id: 'edit_kanban', category: 'FINANCIAL', label: 'Editar Tablero Kanban', description: 'Permiso de Edición de la Tabla Kanban.' },
     { id: 'view_analytics', category: 'FINANCIAL', label: 'Ver Analíticas y BI', description: 'Acceso completo a dashboard de reportes.' },
     
     // Sistema
