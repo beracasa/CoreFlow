@@ -8,6 +8,8 @@ import { useAuth } from '../../contexts/AuthContext';
 
 export const UserManagement: React.FC = () => {
     const { users, roles, fetchUsers, fetchRoles, inviteUserWithPassword, updateUser, deleteUser, isLoading } = useUserStore();
+    const { user, hasPermission } = useAuth();
+    const canManage = hasPermission('manage_users');
 
     // Fetch on mount
     React.useEffect(() => {
@@ -25,10 +27,9 @@ export const UserManagement: React.FC = () => {
 
     // --- ACTIONS ---
 
-    const { user } = useAuth();
-
     const handleInvite = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!canManage) return;
 
         if (!newUser.role) {
             alert('Por favor, selecciona un rol para este usuario.');
@@ -79,7 +80,7 @@ export const UserManagement: React.FC = () => {
 
     const handleUpdateUser = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!editingUser) return;
+        if (!editingUser || !canManage) return;
         updateUser(editingUser);
         setEditingUser(null);
     };
@@ -112,12 +113,14 @@ export const UserManagement: React.FC = () => {
                 <h3 className="text-lg text-white font-medium flex items-center gap-2">
                     <Shield size={18} className="text-industrial-accent" /> Directorio de Personal
                 </h3>
-                <button
-                    onClick={() => setShowInviteModal(true)}
-                    className="bg-industrial-accent hover:bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium shadow-lg flex items-center gap-2 transition-colors"
-                >
-                    <Plus size={16} /> Invitar Usuario
-                </button>
+                {canManage && (
+                    <button
+                        onClick={() => setShowInviteModal(true)}
+                        className="bg-industrial-accent hover:bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium shadow-lg flex items-center gap-2 transition-colors"
+                    >
+                        <Plus size={16} /> Invitar Usuario
+                    </button>
+                )}
             </div>
 
             {/* Users Table */}
@@ -182,17 +185,28 @@ export const UserManagement: React.FC = () => {
                                     )}
                                 </td>
                                 <td className="px-6 py-4 text-right">
-                                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button
-                                            onClick={() => setEditingUser(user)}
-                                            className="p-1.5 text-industrial-400 hover:text-white hover:bg-industrial-600 rounded transition-colors"
-                                            title="Edit Profile"
-                                        >
-                                            <Pencil size={14} />
-                                        </button>
-                                        <button className="p-1.5 text-industrial-400 hover:text-red-400 hover:bg-industrial-600 rounded transition-colors">
-                                            <Trash2 size={14} />
-                                        </button>
+                                    <div className={`flex items-center justify-end gap-2 transition-opacity ${canManage ? 'opacity-0 group-hover:opacity-100' : 'opacity-0'}`}>
+                                        {canManage && (
+                                            <>
+                                                <button
+                                                    onClick={() => setEditingUser(user)}
+                                                    className="p-1.5 text-industrial-400 hover:text-white hover:bg-industrial-600 rounded transition-colors"
+                                                    title="Edit Profile"
+                                                >
+                                                    <Pencil size={14} />
+                                                </button>
+                                                <button 
+                                                    onClick={() => {
+                                                        if (confirm(`¿Eliminar al usuario ${user.full_name}?`)) {
+                                                            deleteUser(user.id);
+                                                        }
+                                                    }}
+                                                    className="p-1.5 text-industrial-400 hover:text-red-400 hover:bg-industrial-600 rounded transition-colors"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </>
+                                        )}
                                     </div>
                                 </td>
                             </tr>

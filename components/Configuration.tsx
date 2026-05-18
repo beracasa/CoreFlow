@@ -7,7 +7,7 @@ import { RoleManagement } from './user/RoleManagement';
 import { ProtocolBuilder } from './ProtocolBuilder';
 import { useMasterStore } from '../src/stores/useMasterStore';
 import { NotificationSettings } from './NotificationSettings';
-import { X, UserPlus, Mail, Briefcase, Clock, Calendar, Server, Cpu, Wifi, Plus, MapPin, Layout, Box, Settings, Shield, Pencil, Camera, FileText, Trash2, CornerDownRight, Edit2, Check, Scale, Bell } from 'lucide-react';
+import { X, UserPlus, Mail, Briefcase, Clock, Calendar, Server, Cpu, Wifi, Plus, MapPin, Layout, Box, Settings, Shield, Pencil, Camera, FileText, Trash2, CornerDownRight, Edit2, Check, Scale, Bell, Lock } from 'lucide-react';
 
 interface ConfigurationProps {
   machines: Machine[];
@@ -113,7 +113,7 @@ export const Configuration: React.FC<ConfigurationProps> = ({
   const [machineToAssociate, setMachineToAssociate] = useState<string>('');
   const [machineSearchQuery, setMachineSearchQuery] = useState('');
   const [isMachineSearchOpen, setIsMachineSearchOpen] = useState(false);
-  const { hasRole } = useAuth();
+  const { hasRole, hasPermission } = useAuth();
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
   // Interval Addition State
@@ -446,22 +446,30 @@ export const Configuration: React.FC<ConfigurationProps> = ({
         </button>
 
         <button
-          onClick={() => setActiveTab('WORKFORCE')}
-          className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === 'WORKFORCE'
-            ? 'text-white border-industrial-accent'
-            : 'text-industrial-500 border-transparent hover:text-industrial-300'
-            }`}
+          onClick={() => hasPermission('manage_users') && setActiveTab('WORKFORCE')}
+          className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex items-center gap-1.5 ${
+            !hasPermission('manage_users') 
+              ? 'text-industrial-600 border-transparent cursor-not-allowed opacity-50' 
+              : activeTab === 'WORKFORCE'
+                ? 'text-white border-industrial-accent'
+                : 'text-industrial-500 border-transparent hover:text-industrial-300'
+          }`}
         >
+          {!hasPermission('manage_users') && <Lock size={12} />}
           {t('workforce.title')}
         </button>
 
         <button
-          onClick={() => setActiveTab('ROLES')}
-          className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === 'ROLES'
-            ? 'text-white border-industrial-accent'
-            : 'text-industrial-500 border-transparent hover:text-industrial-300'
-            }`}
+          onClick={() => hasPermission('manage_roles') && setActiveTab('ROLES')}
+          className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex items-center gap-1.5 ${
+            !hasPermission('manage_roles') 
+              ? 'text-industrial-600 border-transparent cursor-not-allowed opacity-50' 
+              : activeTab === 'ROLES'
+                ? 'text-white border-industrial-accent'
+                : 'text-industrial-500 border-transparent hover:text-industrial-300'
+          }`}
         >
+          {!hasPermission('manage_roles') && <Lock size={12} />}
           {t('config.tab.roles')}
         </button>
 

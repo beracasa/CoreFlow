@@ -217,8 +217,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Si el rol de DB dice "Admin", "Manager" o "Supervisor" o es de sistema
       // consideramos que es un "ADMIN_SOLICITANTE" lógico para mantener compatibilidad
       if (allowedRoles.includes(UserRole.ADMIN_SOLICITANTE)) {
-        if (userRoleDef.name.toLowerCase().includes('admin') ||
-          userRoleDef.name.toLowerCase().includes('manager') ||
+        if (userRoleDef.name?.toLowerCase().includes('admin') ||
+          userRoleDef.name?.toLowerCase().includes('manager') ||
           userRoleDef.isSystem) {
           return true;
         }
@@ -226,8 +226,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       // Si se requiere tecnico
       if (allowedRoles.includes(UserRole.TECNICO_MANT)) {
-        if (userRoleDef.name.toLowerCase().includes('tecnico') ||
-          userRoleDef.name.toLowerCase().includes('mecanico')) {
+        if (userRoleDef.name?.toLowerCase().includes('tecnico') ||
+          userRoleDef.name?.toLowerCase().includes('mecanico')) {
           return true;
         }
       }
@@ -249,17 +249,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     // 2.5 New System Admin Bypass
     if (userRoleDef.isSystem ||
-      userRoleDef.name.toLowerCase().includes('admin') ||
-      userRoleDef.name.toLowerCase().includes('manager')) {
+      userRoleDef.name?.toLowerCase().includes('admin') ||
+      userRoleDef.name?.toLowerCase().includes('manager')) {
       return true;
     }
 
     // 3. Check specific permission
+    if (!userRoleDef.permissions) return false;
+
     if (Array.isArray(userRoleDef.permissions)) {
       return userRoleDef.permissions.includes(permissionId);
     } else {
       // Object format { [id]: boolean }
-      return !!userRoleDef.permissions[permissionId];
+      return !!(userRoleDef.permissions as Record<string, boolean>)[permissionId];
     }
   };
 

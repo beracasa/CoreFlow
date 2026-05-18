@@ -2,6 +2,8 @@
 import React, { useState } from 'react';
 import { RoleDefinition, Permission } from '../../types';
 import { Shield, Lock, CheckSquare, Square, Save, Plus, Trash2, ChevronDown, ChevronRight, Users, AlertCircle } from 'lucide-react';
+import { useUserStore } from '../../src/stores/useUserStore';
+import { useAuth } from '../../contexts/AuthContext';
 
 // --- DEFINICIÓN DE PERMISOS DEL SISTEMA ---
 const SYSTEM_PERMISSIONS: Permission[] = [
@@ -27,10 +29,8 @@ const SYSTEM_PERMISSIONS: Permission[] = [
     
     // Sistema
     { id: 'manage_users', category: 'SYSTEM', label: 'Gestionar Usuarios', description: 'Invitar usuarios y asignar roles.' },
-    { id: 'manage_roles', category: 'SYSTEM', label: 'Gestionar Roles', description: 'Configurar este módulo RBAC.' },
+    { id: 'manage_roles', category: 'SYSTEM', label: 'Gestionar Roles y Permisos', description: 'Configurar este módulo RBAC.' },
 ];
-
-import { useUserStore } from '../../src/stores/useUserStore';
 
 // Componente recursivo para mostrar árbol de roles
 interface RoleTreeItemProps {
@@ -107,6 +107,8 @@ const RoleTreeItem: React.FC<RoleTreeItemProps> = ({ role, selectedId, onSelect,
 
 export const RoleManagement: React.FC = () => {
     const { roles, roleTree, fetchRoles, addRole, updateRole, deleteRole } = useUserStore();
+    const { hasPermission } = useAuth();
+    const canManage = hasPermission('manage_roles');
     const [selectedRole, setSelectedRole] = useState<RoleDefinition | null>(null);
     const [isEditing, setIsEditing] = useState(false);
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -141,6 +143,7 @@ export const RoleManagement: React.FC = () => {
     };
 
     const handleCreateRole = () => {
+        if (!canManage) return;
         const newRoleData: Partial<RoleDefinition> = {
             name: 'Nuevo Rol',
             description: 'Descripción del rol...',
@@ -167,6 +170,7 @@ export const RoleManagement: React.FC = () => {
     };
 
     const togglePermission = (permId: string) => {
+        if (!canManage) return;
         const currentPerms = formData.permissions as Record<string, boolean> || {};
         const newPerms = {
             ...currentPerms,
@@ -177,6 +181,7 @@ export const RoleManagement: React.FC = () => {
     };
 
     const handleSave = async () => {
+        if (!canManage) return;
         if (!selectedRole) {
             // Modo creación
             await handleSaveNewRole();
@@ -193,7 +198,7 @@ export const RoleManagement: React.FC = () => {
     };
 
     const handleDelete = async () => {
-        if (!selectedRole) return;
+        if (!canManage || !selectedRole) return;
         
         const isProtected = selectedRole.isSystem || selectedRole.name.includes('Admin');
         
@@ -254,13 +259,15 @@ export const RoleManagement: React.FC = () => {
                     <h3 className="text-white font-bold flex items-center gap-2">
                         <Shield size={18} className="text-industrial-accent"/> Roles del Sistema
                     </h3>
-                    <button 
-                        onClick={handleCreateRole}
-                        className="p-1.5 bg-industrial-700 hover:bg-industrial-600 rounded text-white transition-colors"
-                        title="Crear Nuevo Rol"
-                    >
-                        <Plus size={16} />
-                    </button>
+                    {canManage && (
+                        <button 
+                            onClick={handleCreateRole}
+                            className="p-1.5 bg-industrial-700 hover:bg-industrial-600 rounded text-white transition-colors"
+                            title="Crear Nuevo Rol"
+                        >
+                            <Plus size={16} />
+                        </button>
+                    )}
                 </div>
                 
                 <div className="flex-1 overflow-y-auto p-2">
@@ -341,7 +348,7 @@ export const RoleManagement: React.FC = () => {
                                 
                                 {/* Botones de Acción */}
                                 <div className="flex gap-2 pt-2">
-                                    {isEditing && (
+                                    {isEditing && canManage && (
                                         <button 
                                             onClick={handleSave}
                                             className="px-4 py-2 bg-industrial-accent hover:bg-blue-600 text-white text-sm font-bold rounded shadow-lg flex items-center gap-2"
@@ -349,7 +356,7 @@ export const RoleManagement: React.FC = () => {
                                             <Save size={14} /> Guardar Cambios
                                         </button>
                                     )}
-                                    {selectedRole && !(selectedRole.isSystem || selectedRole.name.includes('Admin')) && (
+                                    {selectedRole && canManage && !(selectedRole.isSystem || selectedRole.name.includes('Admin')) && (
                                         <button 
                                             onClick={handleDelete}
                                             className="px-4 py-2 bg-red-900/30 hover:bg-red-900/50 text-red-400 border border-red-900/50 text-sm font-bold rounded flex items-center gap-2"
@@ -417,12 +424,14 @@ export const RoleManagement: React.FC = () => {
                     <div className="flex-1 flex flex-col items-center justify-center text-industrial-500 gap-4">
                         <Shield size={64} className="opacity-20" />
                         <p className="text-lg">Seleccione un rol para configurar</p>
-                        <button 
-                            onClick={handleCreateRole}
-                            className="px-4 py-2 bg-industrial-accent hover:bg-blue-600 text-white text-sm font-bold rounded flex items-center gap-2"
-                        >
-                            <Plus size={16} /> Crear Nuevo Rol
-                        </button>
+                        {canManage && (
+                            <button 
+                                onClick={handleCreateRole}
+                                className="px-4 py-2 bg-industrial-accent hover:bg-blue-600 text-white text-sm font-bold rounded flex items-center gap-2"
+                            >
+                                <Plus size={16} /> Crear Nuevo Rol
+                            </button>
+                        )}
                     </div>
                 )}
             </div>
