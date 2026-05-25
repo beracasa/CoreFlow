@@ -28,7 +28,8 @@ export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData,
         subLocation: '',
         cost: 0,
         photoUrl: '',
-        createdAt: new Date().toISOString().split('T')[0]
+        createdAt: new Date().toISOString().split('T')[0],
+        company: ''
     });
 
     // Formatting state for display
@@ -50,7 +51,8 @@ export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData,
                 maxStock: initialData.maxStock || 0,
                 cost: initialData.cost,
                 photoUrl: initialData.photoUrl || '',
-                createdAt: initialData.createdAt ? initialData.createdAt.split('T')[0] : new Date().toISOString().split('T')[0]
+                createdAt: initialData.createdAt ? initialData.createdAt.split('T')[0] : new Date().toISOString().split('T')[0],
+                company: initialData.company || ''
             });
             setDisplayCost(formatCurrency(initialData.cost).replace(/,/g, ',')); // Simplified format for display
         }
@@ -164,7 +166,8 @@ export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData,
                     subLocation: '',
                     cost: 0,
                     photoUrl: '',
-                    createdAt: new Date().toISOString().split('T')[0]
+                    createdAt: new Date().toISOString().split('T')[0],
+                    company: ''
                 });
                 setDisplayCost('');
                 if (onSuccess) onSuccess(created as any);
@@ -239,21 +242,37 @@ export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData,
                         />
                     </div>
 
-                    {/* Category */}
-                    <div className="relative">
-                        <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">Categoría</label>
-                        <select
-                            name="category"
-                            required
-                            className="w-full bg-industrial-900 border border-industrial-600 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-blue-500 transition-colors appearance-none cursor-pointer"
-                            value={formData.category}
-                            onChange={handleChange}
-                        >
-                            <option value="">Seleccionar...</option>
-                            {partCategories.map(cat => (
-                                <option key={cat} value={cat}>{cat}</option>
-                            ))}
-                        </select>
+                    {/* Empresa and Categoría */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">Empresa</label>
+                            <select
+                                name="company"
+                                required
+                                className="w-full bg-industrial-900 border border-industrial-600 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-blue-500 transition-colors appearance-none cursor-pointer"
+                                value={formData.company}
+                                onChange={handleChange}
+                            >
+                                <option value="">Seleccionar...</option>
+                                <option value="Ravi Caribe Inc.">Ravi Caribe Inc.</option>
+                                <option value="Labels Caribe Inc.">Labels Caribe Inc.</option>
+                            </select>
+                        </div>
+                        <div className="relative">
+                            <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">Categoría</label>
+                            <select
+                                name="category"
+                                required
+                                className="w-full bg-industrial-900 border border-industrial-600 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-blue-500 transition-colors appearance-none cursor-pointer"
+                                value={formData.category}
+                                onChange={handleChange}
+                            >
+                                <option value="">Seleccionar...</option>
+                                {partCategories.map(cat => (
+                                    <option key={cat} value={cat}>{cat}</option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
 
                     {/* Location and Sub-location */}

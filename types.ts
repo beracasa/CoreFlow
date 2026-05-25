@@ -314,6 +314,7 @@ export interface SparePart {
   unitOfMeasure?: string;
   supplier: string;
   leadTimeDays: number;
+  company?: string;
 }
 
 export interface Technician {

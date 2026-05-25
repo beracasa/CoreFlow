@@ -19,7 +19,8 @@ export class InventorySupabaseService implements IInventoryService {
             subLocation: record.sub_location || '',
             cost: Number(record.unit_cost || 0),
             photoUrl: record.image_url || null,
-            createdAt: record.created_at
+            createdAt: record.created_at,
+            company: record.company || ''
         };
     }
 
@@ -36,7 +37,8 @@ export class InventorySupabaseService implements IInventoryService {
             location_code: part.location,
             sub_location: part.subLocation,
             unit_cost: part.cost,
-            image_url: part.photoUrl
+            image_url: part.photoUrl,
+            company: part.company
         };
     }
 
@@ -100,7 +102,8 @@ export class InventorySupabaseService implements IInventoryService {
             p_sub_location:     partData.subLocation || null,
             p_unit_cost:        partData.cost || 0,
             p_image_url:        partData.photoUrl || null,
-            p_created_at:       partData.createdAt || null
+            p_created_at:       partData.createdAt || null,
+            p_company:          partData.company || null
         });
         if (error) throw error;
         return this.mapDBToPart(Array.isArray(data) ? data[0] : data);
@@ -121,7 +124,8 @@ export class InventorySupabaseService implements IInventoryService {
             p_sub_location:     updatedPart.subLocation || null,
             p_unit_cost:        updatedPart.cost || 0,
             p_image_url:        updatedPart.photoUrl || null,
-            p_created_at:       updatedPart.createdAt || null
+            p_created_at:       updatedPart.createdAt || null,
+            p_company:          updatedPart.company || null
         });
         if (error) throw error;
         return this.mapDBToPart(Array.isArray(data) ? data[0] : data);

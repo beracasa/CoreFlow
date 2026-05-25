@@ -7,11 +7,11 @@ const TRANSACTIONS_KEY = 'v2_inventory_transactions';
 const RECEPTIONS_KEY = 'v2_inventory_receptions';
 
 const INITIAL_PARTS: SparePart[] = [
-    { id: 'p1', name: 'Ball Bearing 6204', partNumber: 'BB-6204', description: 'Deep groove ball bearing', category: 'Bearings', unitOfMeasure: 'PCS', currentStock: 15, minStock: 5, location: 'A-01', cost: 5.50, createdAt: new Date().toISOString() },
-    { id: 'p2', name: 'Hydraulic Hose 1/2"', partNumber: 'HH-050', description: 'High pressure hose', category: 'Hydraulics', unitOfMeasure: 'M', currentStock: 2, minStock: 10, location: 'B-03', cost: 12.00, createdAt: new Date().toISOString() },
-    { id: 'p3', name: 'Limit Switch', partNumber: 'LS-001', description: 'Industrial limit switch', category: 'Electronics', unitOfMeasure: 'PCS', currentStock: 8, minStock: 3, location: 'C-02', cost: 45.00, createdAt: new Date().toISOString() },
-    { id: 'p4', name: 'V-Belt A-48', partNumber: 'VB-A48', description: 'Industrial drive belt', category: 'Transmission', unitOfMeasure: 'PCS', currentStock: 12, minStock: 4, location: 'A-05', cost: 8.75, createdAt: new Date().toISOString() },
-    { id: 'p5', name: 'Air Filter Element', partNumber: 'AF-500', description: 'Engine air intake filter', category: 'Filters', unitOfMeasure: 'PCS', currentStock: 20, minStock: 10, location: 'D-01', cost: 15.30, createdAt: new Date().toISOString() },
+    { id: 'p1', name: 'Ball Bearing 6204', partNumber: 'BB-6204', description: 'Deep groove ball bearing', category: 'Bearings', unitOfMeasure: 'PCS', currentStock: 15, minStock: 5, location: 'A-01', cost: 5.50, createdAt: new Date().toISOString(), company: 'Ravi Caribe Inc.' },
+    { id: 'p2', name: 'Hydraulic Hose 1/2"', partNumber: 'HH-050', description: 'High pressure hose', category: 'Hydraulics', unitOfMeasure: 'M', currentStock: 2, minStock: 10, location: 'B-03', cost: 12.00, createdAt: new Date().toISOString(), company: 'Labels Caribe Inc.' },
+    { id: 'p3', name: 'Limit Switch', partNumber: 'LS-001', description: 'Industrial limit switch', category: 'Electronics', unitOfMeasure: 'PCS', currentStock: 8, minStock: 3, location: 'C-02', cost: 45.00, createdAt: new Date().toISOString(), company: 'Ravi Caribe Inc.' },
+    { id: 'p4', name: 'V-Belt A-48', partNumber: 'VB-A48', description: 'Industrial drive belt', category: 'Transmission', unitOfMeasure: 'PCS', currentStock: 12, minStock: 4, location: 'A-05', cost: 8.75, createdAt: new Date().toISOString(), company: 'Labels Caribe Inc.' },
+    { id: 'p5', name: 'Air Filter Element', partNumber: 'AF-500', description: 'Engine air intake filter', category: 'Filters', unitOfMeasure: 'PCS', currentStock: 20, minStock: 10, location: 'D-01', cost: 15.30, createdAt: new Date().toISOString(), company: 'Ravi Caribe Inc.' },
 ];
 
 const INITIAL_REQUESTS: PartsRequest[] = [

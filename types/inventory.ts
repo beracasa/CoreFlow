@@ -81,6 +81,7 @@ export interface SparePart {
   
   created_at: string;
   updated_at: string;
+  company?: string;
 }
 
 export interface InventoryTransaction {

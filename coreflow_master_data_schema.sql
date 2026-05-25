@@ -79,6 +79,7 @@ CREATE TABLE IF NOT EXISTS public.spare_parts (
     
     -- Media
     image_url text,
+    company text,
     
     -- Audit
     created_at timestamptz DEFAULT now(),

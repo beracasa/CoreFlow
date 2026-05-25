@@ -13,6 +13,7 @@ export interface SparePart {
     cost: number;
     photoUrl?: string;
     createdAt?: string;
+    company?: string;
 }
 
 export type TransactionType = 'IN' | 'OUT' | 'ADJUSTMENT';
