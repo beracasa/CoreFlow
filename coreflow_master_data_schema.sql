@@ -125,7 +125,9 @@ CREATE TABLE IF NOT EXISTS public.maintenance_tasks (
     -- Technical Data
     reference_code text,
     lubricant_type text,
+    lubricant_name text,
     lubricant_code text,
+    lubricant_quantity text,
     
     -- Action Matrix (Bool flags)
     action_disassemble boolean DEFAULT false,

@@ -184,10 +184,12 @@ export interface MaintenanceTask {
   component: string;         // Columna: Punto de intervencion
   activity: string;          // Columna: Tipo de intervencion
 
-  // Datos Técnicos
+  // Datos Técnicos / Materiales & Repuestos
   referenceCode?: string;    // Columna: Ref de interv.
   lubricantType?: string;    // Columna: Tipo de Lub.
+  lubricantName?: string;    // Columna: Nombre (Nuevo)
   lubricantCode?: string;    // Columna: Codigo
+  lubricantQuantity?: string; // Columna: Cantidad (Nuevo)
   estimatedTime: number;     // Columna: Tiem. Estim min
 
   // Compatibility fields

@@ -57,7 +57,9 @@ export const ProtocolSupabaseService = {
                 estimatedTime: t.estimated_time,
                 referenceCode: t.reference_code,
                 lubricantType: t.lubricant_type,
+                lubricantName: t.lubricant_name,
                 lubricantCode: t.lubricant_code,
+                lubricantQuantity: t.lubricant_quantity,
                 notes: t.notes, // If stored
                 actionFlags: {
                     disassemble: t.action_disassemble || false,
@@ -144,7 +146,9 @@ export const ProtocolSupabaseService = {
                 estimated_time: t.estimatedTime,
                 reference_code: t.referenceCode,
                 lubricant_type: t.lubricantType,
+                lubricant_name: t.lubricantName,
                 lubricant_code: t.lubricantCode,
+                lubricant_quantity: t.lubricantQuantity,
                 // notes: t.notes
                 action_disassemble: t.actionFlags.disassemble,
                 action_clean: t.actionFlags.clean,

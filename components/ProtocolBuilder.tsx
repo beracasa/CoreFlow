@@ -73,13 +73,14 @@ const TaskRow = memo(({
                 />
             </td>
 
-            {/* Technical Data */}
+            {/* Technical Data / Materiales & Repuestos */}
             <td className="border border-industrial-600 p-1">
                 <input
                     type="text"
                     className="w-full bg-transparent outline-none px-1 font-mono text-center text-industrial-400"
                     value={task.referenceCode || ''}
                     onChange={(e) => onUpdateTask(task.id, 'referenceCode', e.target.value)}
+                    placeholder="Ref..."
                 />
             </td>
             <td className="border border-industrial-600 p-1">
@@ -88,6 +89,16 @@ const TaskRow = memo(({
                     className="w-full bg-transparent outline-none px-1 text-center"
                     value={task.lubricantType || ''}
                     onChange={(e) => onUpdateTask(task.id, 'lubricantType', e.target.value)}
+                    placeholder="Tipo..."
+                />
+            </td>
+            <td className="border border-industrial-600 p-1">
+                <input
+                    type="text"
+                    className="w-full bg-transparent outline-none px-1 text-center text-industrial-300"
+                    value={task.lubricantName || ''}
+                    onChange={(e) => onUpdateTask(task.id, 'lubricantName', e.target.value)}
+                    placeholder="Nombre..."
                 />
             </td>
             <td className="border border-industrial-600 p-1">
@@ -96,6 +107,16 @@ const TaskRow = memo(({
                     className="w-full bg-transparent outline-none px-1 text-center"
                     value={task.lubricantCode || ''}
                     onChange={(e) => onUpdateTask(task.id, 'lubricantCode', e.target.value)}
+                    placeholder="Código..."
+                />
+            </td>
+            <td className="border border-industrial-600 p-1">
+                <input
+                    type="text"
+                    className="w-full bg-transparent outline-none px-1 text-center"
+                    value={task.lubricantQuantity || ''}
+                    onChange={(e) => onUpdateTask(task.id, 'lubricantQuantity', e.target.value)}
+                    placeholder="Cantidad..."
                 />
             </td>
             <td className="border border-industrial-600 p-1">
@@ -157,6 +178,11 @@ export const ProtocolBuilder: React.FC<ProtocolBuilderProps> = ({ initialTasks, 
                 group: lastTask?.group || '', 
                 component: '',
                 activity: '',
+                referenceCode: '',
+                lubricantType: '',
+                lubricantName: '',
+                lubricantCode: '',
+                lubricantQuantity: '',
                 estimatedTime: 0,
                 actionFlags: {
                     disassemble: false,
@@ -313,7 +339,9 @@ export const ProtocolBuilder: React.FC<ProtocolBuilderProps> = ({ initialTasks, 
                 activity: String(getVal(['tipo', 'activity']) || ''),
                 referenceCode: String(getVal(['ref', 'cat. mtto']) || ''),
                 lubricantType: String(getVal(['tipo de lub', 'lubricante']) || ''),
+                lubricantName: String(getVal(['nombre', 'material', 'repuesto', 'name']) || ''),
                 lubricantCode: String(getVal(['codigo', 'code']) || ''),
+                lubricantQuantity: String(getVal(['cantidad', 'ctd', 'unid', 'cant', 'quantity']) || ''),
                 estimatedTime: parseInt(String(getVal(['tiem', 'time', 'estim']))) || 0,
                 actionFlags: {
                     disassemble: isFlag('disassembl') || isFlag('desmontaje'),
@@ -445,15 +473,17 @@ export const ProtocolBuilder: React.FC<ProtocolBuilderProps> = ({ initialTasks, 
                                 <th rowSpan={2} className="border border-industrial-600 p-2 w-32">Grupo</th>
                                 <th rowSpan={2} className="border border-industrial-600 p-2 w-48">Punto de Intervención</th>
                                 <th rowSpan={2} className="border border-industrial-600 p-2 w-48">Tipo de Intervención</th>
-                                <th colSpan={4} className="border border-industrial-600 p-1 bg-industrial-800 text-center font-bold">Datos Técnicos</th>
+                                <th rowSpan={2} className="border border-industrial-600 p-2 w-20">Ref. de interv. Cat. Mtto</th>
+                                <th colSpan={4} className="border border-industrial-600 p-1 bg-industrial-800 text-center font-bold">Materiales / Repuestos</th>
+                                <th rowSpan={2} className="border border-industrial-600 p-2 w-16 text-yellow-500 font-bold">Tiem. Estim min</th>
                                 <th colSpan={8} className="border border-industrial-600 p-1 bg-industrial-800 text-center font-bold">Matriz de Acciones</th>
                                 <th rowSpan={2} className="border border-industrial-600 p-2 w-10"></th>
                             </tr>
                             <tr>
-                                <th className="border border-industrial-600 p-2 w-20">Código Ref.</th>
-                                <th className="border border-industrial-600 p-2 w-16">Tipo Lub.</th>
-                                <th className="border border-industrial-600 p-2 w-16">Código Lub.</th>
-                                <th className="border border-industrial-600 p-2 w-16 text-yellow-500">Tiempo (m)</th>
+                                <th className="border border-industrial-600 p-2 w-16">Tipo de Lub.</th>
+                                <th className="border border-industrial-600 p-2 w-24">Nombre</th>
+                                <th className="border border-industrial-600 p-2 w-16">Código</th>
+                                <th className="border border-industrial-600 p-2 w-16">Cantidad</th>
                                 <th className="border border-industrial-600 p-1 w-8 rotate-text h-24"><div className="w-6 mx-auto writing-mode-vertical text-[10px]">Desmontaje</div></th>
                                 <th className="border border-industrial-600 p-1 w-8"><div className="w-6 mx-auto writing-mode-vertical text-[10px]">Limpieza</div></th>
                                 <th className="border border-industrial-600 p-1 w-8"><div className="w-6 mx-auto writing-mode-vertical text-[10px]">Controlar</div></th>
@@ -478,7 +508,7 @@ export const ProtocolBuilder: React.FC<ProtocolBuilderProps> = ({ initialTasks, 
                             ))}
                             {tasks.length === 0 && (
                                 <tr>
-                                    <td colSpan={16} className="p-8 text-center text-industrial-500 italic">
+                                    <td colSpan={19} className="p-8 text-center text-industrial-500 italic">
                                         No hay tareas definidas. Haga clic en "Agregar Fila" para comenzar.
                                     </td>
                                 </tr>

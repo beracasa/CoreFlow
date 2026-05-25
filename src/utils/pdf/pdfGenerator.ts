@@ -204,7 +204,9 @@ export const generateRMant02PDF = (order: WorkOrder, machine?: Machine) => {
       t.activity || '',
       t.referenceCode || '',
       t.lubricantType || '',
+      t.lubricantName || '',
       t.lubricantCode || '',
+      t.lubricantQuantity || '',
       t.estimatedTime || '',
       t.actionFlags?.disassemble ? 'X' : '',
       t.actionFlags?.clean ? 'X' : '',
@@ -221,7 +223,7 @@ export const generateRMant02PDF = (order: WorkOrder, machine?: Machine) => {
     startY: tableStartY,
     head: [[
       'Nº', 'Grupo', 'Punto de intervención', 'Tipo de intervención', 'Ref de interv.', 
-      'Tipo de Lub.', 'Codigo', 'Tiem. Estim min', 
+      'Tipo de Lub.', 'Nombre', 'Codigo', 'Cantidad', 'Tiem. Estim min', 
       'D', 'L', 'C', 'Lu', 'Ca', 'M', 'A-C', 'Ll'
     ]],
     body: tableData,
@@ -241,17 +243,17 @@ export const generateRMant02PDF = (order: WorkOrder, machine?: Machine) => {
     },
     columnStyles: {
       0: { halign: 'center', cellWidth: 8 },
-      1: { cellWidth: 25 },
-      2: { cellWidth: 35 },
+      1: { cellWidth: 20 },
+      2: { cellWidth: 30 },
       // Checkboxes columns narrow
-      8: { halign: 'center', cellWidth: 5 },
-      9: { halign: 'center', cellWidth: 5 },
-      10: { halign: 'center', cellWidth: 5 },
-      11: { halign: 'center', cellWidth: 5 },
-      12: { halign: 'center', cellWidth: 5 },
-      13: { halign: 'center', cellWidth: 5 },
-      14: { halign: 'center', cellWidth: 5 },
-      15: { halign: 'center', cellWidth: 5 },
+      10: { halign: 'center', cellWidth: 4 },
+      11: { halign: 'center', cellWidth: 4 },
+      12: { halign: 'center', cellWidth: 4 },
+      13: { halign: 'center', cellWidth: 4 },
+      14: { halign: 'center', cellWidth: 4 },
+      15: { halign: 'center', cellWidth: 4 },
+      16: { halign: 'center', cellWidth: 4 },
+      17: { halign: 'center', cellWidth: 4 },
     }
   });
 
