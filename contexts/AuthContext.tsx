@@ -69,6 +69,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     let mounted = true;
 
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      console.log("AuthContext: Mock mode active. Reading session from localStorage...");
+      const checkMockSession = () => {
+        const stored = localStorage.getItem('coreflow_mock_session');
+        if (stored && mounted) {
+          try {
+            setUser(JSON.parse(stored));
+          } catch (e) {
+            console.error("Failed to parse mock session", e);
+          }
+        }
+        if (mounted) {
+          setIsLoading(false);
+        }
+      };
+      checkMockSession();
+      return () => {
+        mounted = false;
+      };
+    }
+
     // 1. Initial Session Check with Timeout Race
     const checkSession = async () => {
       console.log("AuthContext: Starting session check...");
@@ -185,6 +206,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const login = async (email: string, password: string) => {
     // Do not set global loading here. Let the UI handle its own loading state.
     // setIsLoading(true); 
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      const mockUser: UserProfile = {
+        id: 'mock-user-id-' + email.replace(/[^a-zA-Z0-9]/g, ''),
+        email: email,
+        full_name: email.split('@')[0].toUpperCase(),
+        role: UserRole.ADMIN_SOLICITANTE, // Default to admin for full functionality
+        tenant_id: 'default-tenant',
+        status: 'ACTIVE',
+        job_title: 'Administrator',
+        specialties: [],
+        company_code: 'COMP-1'
+      };
+      localStorage.setItem('coreflow_mock_session', JSON.stringify(mockUser));
+      setUser(mockUser);
+      return;
+    }
+
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password
@@ -199,6 +237,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const logout = async () => {
     // setIsLoading(true);
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      localStorage.removeItem('coreflow_mock_session');
+      setUser(null);
+      return;
+    }
     await supabase.auth.signOut();
     setUser(null);
     // setIsLoading(false);

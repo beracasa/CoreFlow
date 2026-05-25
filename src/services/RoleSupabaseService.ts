@@ -5,6 +5,47 @@ import { RoleDefinition } from '../../types';
 export const RoleSupabaseService = {
   // Get all roles (flat list with parent_role_id)
   async getRoles(): Promise<RoleDefinition[]> {
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      const stored = localStorage.getItem('coreflow_mock_roles');
+      if (stored) {
+        return JSON.parse(stored);
+      }
+      const initialRoles: RoleDefinition[] = [
+        {
+          id: 'ADMIN_SOLICITANTE',
+          name: 'Administrador Solicitante',
+          description: 'Acceso total de administración y solicitudes',
+          parentRoleId: null,
+          isSystem: true,
+          permissions: { view_analytics: true },
+          shareDataWithPeers: true,
+          usersCount: 1
+        },
+        {
+          id: 'TECNICO_MANT',
+          name: 'Técnico de Mantenimiento',
+          description: 'Ejecutor de órdenes y lecturas',
+          parentRoleId: null,
+          isSystem: true,
+          permissions: {},
+          shareDataWithPeers: false,
+          usersCount: 1
+        },
+        {
+          id: 'AUDITOR',
+          name: 'Auditor',
+          description: 'Acceso de solo lectura',
+          parentRoleId: null,
+          isSystem: true,
+          permissions: {},
+          shareDataWithPeers: false,
+          usersCount: 0
+        }
+      ];
+      localStorage.setItem('coreflow_mock_roles', JSON.stringify(initialRoles));
+      return initialRoles;
+    }
+
     // 1. Obtener todos los roles
     const { data: rolesData, error: rolesError } = await supabase
       .from('app_roles')
@@ -45,6 +86,18 @@ export const RoleSupabaseService = {
 
   // Create Role
   async createRole(role: Omit<RoleDefinition, 'id'>): Promise<RoleDefinition> {
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      const roles = await this.getRoles();
+      const newRole: RoleDefinition = {
+        ...role,
+        id: 'role-' + Math.random().toString(36).substr(2, 9),
+        usersCount: 0
+      };
+      roles.push(newRole);
+      localStorage.setItem('coreflow_mock_roles', JSON.stringify(roles));
+      return newRole;
+    }
+
     const { data, error } = await supabase
       .from('app_roles')
       .insert({
@@ -74,6 +127,16 @@ export const RoleSupabaseService = {
 
   // Update Role
   async updateRole(role: RoleDefinition): Promise<void> {
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      const roles = await this.getRoles();
+      const index = roles.findIndex(r => r.id === role.id);
+      if (index !== -1) {
+        roles[index] = { ...roles[index], ...role };
+        localStorage.setItem('coreflow_mock_roles', JSON.stringify(roles));
+      }
+      return;
+    }
+
     const { error } = await supabase
       .from('app_roles')
       .update({
@@ -90,6 +153,16 @@ export const RoleSupabaseService = {
 
   // Update only permissions (método específico para panel de permisos)
   async updatePermissions(roleId: string, permissions: Record<string, boolean> | string[]): Promise<void> {
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      const roles = await this.getRoles();
+      const index = roles.findIndex(r => r.id === roleId);
+      if (index !== -1) {
+        roles[index].permissions = permissions;
+        localStorage.setItem('coreflow_mock_roles', JSON.stringify(roles));
+      }
+      return;
+    }
+
     const { error } = await supabase
       .from('app_roles')
       .update({ permissions })
@@ -100,6 +173,17 @@ export const RoleSupabaseService = {
 
   // Delete Role (valida que no tenga hijos)
   async deleteRole(id: string): Promise<void> {
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      const roles = await this.getRoles();
+      const hasChildren = roles.some(r => r.parentRoleId === id);
+      if (hasChildren) {
+        throw new Error('No se puede eliminar un rol que tiene roles subordinados. Primero reasigne o elimine los roles hijos.');
+      }
+      const filtered = roles.filter(r => r.id !== id);
+      localStorage.setItem('coreflow_mock_roles', JSON.stringify(filtered));
+      return;
+    }
+
     // Primero verificar si tiene roles hijos
     const { data: children, error: checkError } = await supabase
       .from('app_roles')

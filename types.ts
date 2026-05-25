@@ -198,13 +198,14 @@ export interface MaintenanceTask {
 
   // Matriz de Acciones
   actionFlags: {
+    disassemble: boolean;  // Desmontaje
     clean: boolean;        // Limpieza
     inspect: boolean;      // Controlar/Verificar
     lubricate: boolean;    // Lubricación
-    adjust: boolean;       // Regulación/Ajuste
+    replace: boolean;      // Sustitución/Cambio (Cambio)
+    mount: boolean;        // Desmontaje/Montaje (Montaje)
+    adjust: boolean;       // Regulación/Ajuste (Ajuste-Calibración)
     refill: boolean;       // Llenado/Recarga
-    replace: boolean;      // Sustitución/Cambio
-    mount: boolean;        // Desmontaje/Montaje
   };
 }
 

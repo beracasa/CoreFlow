@@ -206,13 +206,14 @@ export const generateRMant02PDF = (order: WorkOrder, machine?: Machine) => {
       t.lubricantType || '',
       t.lubricantCode || '',
       t.estimatedTime || '',
+      t.actionFlags?.disassemble ? 'X' : '',
       t.actionFlags?.clean ? 'X' : '',
       t.actionFlags?.inspect ? 'X' : '',
       t.actionFlags?.lubricate ? 'X' : '',
-      t.actionFlags?.adjust ? 'X' : '',
-      t.actionFlags?.refill ? 'X' : '',
       t.actionFlags?.replace ? 'X' : '',
-      t.actionFlags?.mount ? 'X' : ''
+      t.actionFlags?.mount ? 'X' : '',
+      t.actionFlags?.adjust ? 'X' : '',
+      t.actionFlags?.refill ? 'X' : ''
     ];
   }) || [];
 
@@ -221,7 +222,7 @@ export const generateRMant02PDF = (order: WorkOrder, machine?: Machine) => {
     head: [[
       'Nº', 'Grupo', 'Punto de intervención', 'Tipo de intervención', 'Ref de interv.', 
       'Tipo de Lub.', 'Codigo', 'Tiem. Estim min', 
-      'L', 'C', 'Lu', 'A', 'R', 'S', 'D/M'
+      'D', 'L', 'C', 'Lu', 'Ca', 'M', 'A-C', 'Ll'
     ]],
     body: tableData,
     theme: 'grid',
@@ -250,6 +251,7 @@ export const generateRMant02PDF = (order: WorkOrder, machine?: Machine) => {
       12: { halign: 'center', cellWidth: 5 },
       13: { halign: 'center', cellWidth: 5 },
       14: { halign: 'center', cellWidth: 5 },
+      15: { halign: 'center', cellWidth: 5 },
     }
   });
 

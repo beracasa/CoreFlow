@@ -81,13 +81,14 @@ export const ProtocolViewer: React.FC<ProtocolViewerProps> = ({ tasks, readOnly 
                         <th className="border border-black p-1 w-16 text-center font-bold text-[10px]">Tiem. min</th>
 
                         {/* Action Matrix Headers (Vertical) */}
+                        <th className="border border-black p-1 w-8"><div className="w-4 mx-auto rotate-180 writing-mode-vertical text-[9px] font-bold">Desmontaje</div></th>
                         <th className="border border-black p-1 w-8"><div className="w-4 mx-auto rotate-180 writing-mode-vertical text-[9px] font-bold">Limpieza</div></th>
                         <th className="border border-black p-1 w-8"><div className="w-4 mx-auto rotate-180 writing-mode-vertical text-[9px] font-bold">Controlar</div></th>
                         <th className="border border-black p-1 w-8"><div className="w-4 mx-auto rotate-180 writing-mode-vertical text-[9px] font-bold">Lubricacion</div></th>
-                        <th className="border border-black p-1 w-8"><div className="w-4 mx-auto rotate-180 writing-mode-vertical text-[9px] font-bold">Regulacion</div></th>
-                        <th className="border border-black p-1 w-8"><div className="w-4 mx-auto rotate-180 writing-mode-vertical text-[9px] font-bold">Llenado</div></th>
-                        <th className="border border-black p-1 w-8"><div className="w-4 mx-auto rotate-180 writing-mode-vertical text-[9px] font-bold">Sustitucion</div></th>
+                        <th className="border border-black p-1 w-8"><div className="w-4 mx-auto rotate-180 writing-mode-vertical text-[9px] font-bold">Cambio</div></th>
                         <th className="border border-black p-1 w-8"><div className="w-4 mx-auto rotate-180 writing-mode-vertical text-[9px] font-bold">Montaje</div></th>
+                        <th className="border border-black p-1 w-8"><div className="w-4 mx-auto rotate-180 writing-mode-vertical text-[9px] font-bold">Ajuste-Calib.</div></th>
+                        <th className="border border-black p-1 w-8"><div className="w-4 mx-auto rotate-180 writing-mode-vertical text-[9px] font-bold">Llenado</div></th>
                     </tr>
                     {/* The second row of headers is implicitly merged or empty for single headers in rowspan=2 */}
                     <tr className="bg-gray-200 h-0">
@@ -95,7 +96,7 @@ export const ProtocolViewer: React.FC<ProtocolViewerProps> = ({ tasks, readOnly 
                         <th className="hidden"></th><th className="hidden"></th><th className="hidden"></th><th className="hidden"></th>
                         <th className="hidden"></th><th className="hidden"></th><th className="hidden"></th><th className="hidden"></th>
                         <th className="hidden"></th><th className="hidden"></th><th className="hidden"></th><th className="hidden"></th>
-                        <th className="hidden"></th><th className="hidden"></th><th className="hidden"></th>
+                        <th className="hidden"></th><th className="hidden"></th><th className="hidden"></th><th className="hidden"></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -124,6 +125,7 @@ export const ProtocolViewer: React.FC<ProtocolViewerProps> = ({ tasks, readOnly 
                                 <td className="border border-black p-1 text-center font-bold">{task.estimatedTime}</td>
 
                                 {/* Grid Checkboxes - Added explicit handlers on TDs for debugging */}
+                                <td className="border border-black p-0 h-10 w-10 relative">{renderFlag(task, 'disassemble')}</td>
                                 <td
                                     className="border border-black p-0 h-10 w-10 relative"
                                     onClick={() => console.log('DEBUG: TD Clean Clicked')}
@@ -132,10 +134,10 @@ export const ProtocolViewer: React.FC<ProtocolViewerProps> = ({ tasks, readOnly 
                                 </td>
                                 <td className="border border-black p-0 h-10 w-10 relative">{renderFlag(task, 'inspect')}</td>
                                 <td className="border border-black p-0 h-10 w-10 relative">{renderFlag(task, 'lubricate')}</td>
-                                <td className="border border-black p-0 h-10 w-10 relative">{renderFlag(task, 'adjust')}</td>
-                                <td className="border border-black p-0 h-10 w-10 relative">{renderFlag(task, 'refill')}</td>
                                 <td className="border border-black p-0 h-10 w-10 relative">{renderFlag(task, 'replace')}</td>
                                 <td className="border border-black p-0 h-10 w-10 relative">{renderFlag(task, 'mount')}</td>
+                                <td className="border border-black p-0 h-10 w-10 relative">{renderFlag(task, 'adjust')}</td>
+                                <td className="border border-black p-0 h-10 w-10 relative">{renderFlag(task, 'refill')}</td>
                             </tr>
                         );
                     })}
@@ -146,7 +148,7 @@ export const ProtocolViewer: React.FC<ProtocolViewerProps> = ({ tasks, readOnly 
                         <td className="p-2 text-center font-bold border border-black bg-white">
                             {tasks.reduce((acc, t) => acc + (t.estimatedTime || 0), 0)} min
                         </td>
-                        <td colSpan={7} className="bg-gray-200 border border-black"></td>
+                        <td colSpan={8} className="bg-gray-200 border border-black"></td>
                     </tr>
                 </tfoot>
             </table>

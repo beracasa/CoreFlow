@@ -108,7 +108,7 @@ const TaskRow = memo(({
             </td>
 
             {/* Action Flags Checkboxes */}
-            {(['clean', 'inspect', 'lubricate', 'adjust', 'refill', 'replace', 'mount'] as const).map(flag => (
+            {(['disassemble', 'clean', 'inspect', 'lubricate', 'replace', 'mount', 'adjust', 'refill'] as const).map(flag => (
                 <td key={flag} className="border border-industrial-600 p-0 text-center hover:bg-white/5 cursor-pointer" onClick={() => onUpdateActionFlag(task.id, flag)}>
                     <div className="flex items-center justify-center h-full w-full py-2">
                         <input
@@ -159,13 +159,14 @@ export const ProtocolBuilder: React.FC<ProtocolBuilderProps> = ({ initialTasks, 
                 activity: '',
                 estimatedTime: 0,
                 actionFlags: {
+                    disassemble: false,
                     clean: false,
                     inspect: false,
                     lubricate: false,
-                    adjust: false,
-                    refill: false,
                     replace: false,
-                    mount: false
+                    mount: false,
+                    adjust: false,
+                    refill: false
                 }
             };
             return [...prev, newTask];
@@ -315,13 +316,14 @@ export const ProtocolBuilder: React.FC<ProtocolBuilderProps> = ({ initialTasks, 
                 lubricantCode: String(getVal(['codigo', 'code']) || ''),
                 estimatedTime: parseInt(String(getVal(['tiem', 'time', 'estim']))) || 0,
                 actionFlags: {
+                    disassemble: isFlag('disassembl') || isFlag('desmontaje'),
                     clean: isFlag('clean') || isFlag('limpieza'),
                     inspect: isFlag('inspect') || isFlag('controlar') || isFlag('verificar'),
                     lubricate: isFlag('lubric') || isFlag('lubricacion'),
-                    adjust: isFlag('adjust') || isFlag('regulacion') || isFlag('ajuste'),
-                    refill: isFlag('refill') || isFlag('llenado') || isFlag('nivel'),
                     replace: isFlag('replace') || isFlag('sustitucion') || isFlag('cambio'),
-                    mount: isFlag('mount') || isFlag('montaje')
+                    mount: isFlag('mount') || isFlag('montaje'),
+                    adjust: isFlag('adjust') || isFlag('regulacion') || isFlag('ajuste') || isFlag('calibracion'),
+                    refill: isFlag('refill') || isFlag('llenado') || isFlag('nivel')
                 }
             };
 
@@ -444,7 +446,7 @@ export const ProtocolBuilder: React.FC<ProtocolBuilderProps> = ({ initialTasks, 
                                 <th rowSpan={2} className="border border-industrial-600 p-2 w-48">Punto de Intervención</th>
                                 <th rowSpan={2} className="border border-industrial-600 p-2 w-48">Tipo de Intervención</th>
                                 <th colSpan={4} className="border border-industrial-600 p-1 bg-industrial-800 text-center font-bold">Datos Técnicos</th>
-                                <th colSpan={7} className="border border-industrial-600 p-1 bg-industrial-800 text-center font-bold">Matriz de Acciones</th>
+                                <th colSpan={8} className="border border-industrial-600 p-1 bg-industrial-800 text-center font-bold">Matriz de Acciones</th>
                                 <th rowSpan={2} className="border border-industrial-600 p-2 w-10"></th>
                             </tr>
                             <tr>
@@ -452,13 +454,14 @@ export const ProtocolBuilder: React.FC<ProtocolBuilderProps> = ({ initialTasks, 
                                 <th className="border border-industrial-600 p-2 w-16">Tipo Lub.</th>
                                 <th className="border border-industrial-600 p-2 w-16">Código Lub.</th>
                                 <th className="border border-industrial-600 p-2 w-16 text-yellow-500">Tiempo (m)</th>
-                                <th className="border border-industrial-600 p-1 w-8 rotate-text h-24"><div className="w-6 mx-auto writing-mode-vertical text-[10px]">Limpieza</div></th>
+                                <th className="border border-industrial-600 p-1 w-8 rotate-text h-24"><div className="w-6 mx-auto writing-mode-vertical text-[10px]">Desmontaje</div></th>
+                                <th className="border border-industrial-600 p-1 w-8"><div className="w-6 mx-auto writing-mode-vertical text-[10px]">Limpieza</div></th>
                                 <th className="border border-industrial-600 p-1 w-8"><div className="w-6 mx-auto writing-mode-vertical text-[10px]">Controlar</div></th>
                                 <th className="border border-industrial-600 p-1 w-8"><div className="w-6 mx-auto writing-mode-vertical text-[10px]">Lubricación</div></th>
-                                <th className="border border-industrial-600 p-1 w-8"><div className="w-6 mx-auto writing-mode-vertical text-[10px]">Ajuste</div></th>
-                                <th className="border border-industrial-600 p-1 w-8"><div className="w-6 mx-auto writing-mode-vertical text-[10px]">Llenado</div></th>
-                                <th className="border border-industrial-600 p-1 w-8"><div className="w-6 mx-auto writing-mode-vertical text-[10px]">Sustitución</div></th>
+                                <th className="border border-industrial-600 p-1 w-8"><div className="w-6 mx-auto writing-mode-vertical text-[10px]">Cambio</div></th>
                                 <th className="border border-industrial-600 p-1 w-8"><div className="w-6 mx-auto writing-mode-vertical text-[10px]">Montaje</div></th>
+                                <th className="border border-industrial-600 p-1 w-8"><div className="w-6 mx-auto writing-mode-vertical text-[10px]">Ajuste-Calibración</div></th>
+                                <th className="border border-industrial-600 p-1 w-8"><div className="w-6 mx-auto writing-mode-vertical text-[10px]">Llenado</div></th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-industrial-700">
