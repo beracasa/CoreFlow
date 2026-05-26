@@ -125,6 +125,32 @@ export class MasterMockService {
     async getPartUnits(): Promise<string[]> {
         return ['PCS', 'M', 'KG', 'L'];
     }
+
+    async createMachine(machine: Omit<Machine, 'id'>): Promise<Machine> {
+        const machines = loadFromStorage(MACHINES_KEY, INITIAL_MACHINES);
+        const newMachine: Machine = {
+            ...machine,
+            id: `m-${Date.now()}`
+        } as Machine;
+        machines.push(newMachine);
+        saveToStorage(MACHINES_KEY, machines);
+        return newMachine;
+    }
+
+    async updateMachine(machine: Machine): Promise<void> {
+        const machines = loadFromStorage(MACHINES_KEY, INITIAL_MACHINES);
+        const index = machines.findIndex(m => m.id === machine.id);
+        if (index !== -1) {
+            machines[index] = { ...machines[index], ...machine };
+            saveToStorage(MACHINES_KEY, machines);
+        }
+    }
+
+    async deleteMachine(id: string): Promise<void> {
+        const machines = loadFromStorage(MACHINES_KEY, INITIAL_MACHINES);
+        const filtered = machines.filter(m => m.id !== id);
+        saveToStorage(MACHINES_KEY, filtered);
+    }
 }
 
 export const masterMockService = new MasterMockService();

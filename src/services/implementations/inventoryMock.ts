@@ -1,4 +1,4 @@
-import { SparePart, PartsRequest, InventoryTransaction, RequestStatus, TransactionType, PurchaseRequest } from '../../types/inventory';
+import { SparePart, PartsRequest, InventoryTransaction, RequestStatus, TransactionType, PurchaseRequest, ExtendedPurchaseRequest, StockReception } from '../../types/inventory';
 import { saveToStorage, loadFromStorage } from '../../utils/persistence';
 
 const PARTS_KEY = 'v2_inventory_parts';
@@ -7,11 +7,11 @@ const TRANSACTIONS_KEY = 'v2_inventory_transactions';
 const RECEPTIONS_KEY = 'v2_inventory_receptions';
 
 const INITIAL_PARTS: SparePart[] = [
-    { id: 'p1', name: 'Ball Bearing 6204', partNumber: 'BB-6204', description: 'Deep groove ball bearing', category: 'Bearings', unitOfMeasure: 'PCS', currentStock: 15, minStock: 5, location: 'A-01', cost: 5.50, createdAt: new Date().toISOString(), company: 'Ravi Caribe Inc.' },
-    { id: 'p2', name: 'Hydraulic Hose 1/2"', partNumber: 'HH-050', description: 'High pressure hose', category: 'Hydraulics', unitOfMeasure: 'M', currentStock: 2, minStock: 10, location: 'B-03', cost: 12.00, createdAt: new Date().toISOString(), company: 'Labels Caribe Inc.' },
-    { id: 'p3', name: 'Limit Switch', partNumber: 'LS-001', description: 'Industrial limit switch', category: 'Electronics', unitOfMeasure: 'PCS', currentStock: 8, minStock: 3, location: 'C-02', cost: 45.00, createdAt: new Date().toISOString(), company: 'Ravi Caribe Inc.' },
-    { id: 'p4', name: 'V-Belt A-48', partNumber: 'VB-A48', description: 'Industrial drive belt', category: 'Transmission', unitOfMeasure: 'PCS', currentStock: 12, minStock: 4, location: 'A-05', cost: 8.75, createdAt: new Date().toISOString(), company: 'Labels Caribe Inc.' },
-    { id: 'p5', name: 'Air Filter Element', partNumber: 'AF-500', description: 'Engine air intake filter', category: 'Filters', unitOfMeasure: 'PCS', currentStock: 20, minStock: 10, location: 'D-01', cost: 15.30, createdAt: new Date().toISOString(), company: 'Ravi Caribe Inc.' },
+    { id: 'p1', name: 'Ball Bearing 6204', partNumber: 'BB-6204', description: 'Deep groove ball bearing', category: 'Bearings', unitOfMeasure: 'PCS', currentStock: 15, minStock: 5, maxStock: 100, location: 'A-01', subLocation: '', cost: 5.50, createdAt: new Date().toISOString(), company: 'Ravi Caribe Inc.' },
+    { id: 'p2', name: 'Hydraulic Hose 1/2"', partNumber: 'HH-050', description: 'High pressure hose', category: 'Hydraulics', unitOfMeasure: 'M', currentStock: 2, minStock: 10, maxStock: 50, location: 'B-03', subLocation: '', cost: 12.00, createdAt: new Date().toISOString(), company: 'Labels Caribe Inc.' },
+    { id: 'p3', name: 'Limit Switch', partNumber: 'LS-001', description: 'Industrial limit switch', category: 'Electronics', unitOfMeasure: 'PCS', currentStock: 8, minStock: 3, maxStock: 20, location: 'C-02', subLocation: '', cost: 45.00, createdAt: new Date().toISOString(), company: 'Ravi Caribe Inc.' },
+    { id: 'p4', name: 'V-Belt A-48', partNumber: 'VB-A48', description: 'Industrial drive belt', category: 'Transmission', unitOfMeasure: 'PCS', currentStock: 12, minStock: 4, maxStock: 40, location: 'A-05', subLocation: '', cost: 8.75, createdAt: new Date().toISOString(), company: 'Labels Caribe Inc.' },
+    { id: 'p5', name: 'Air Filter Element', partNumber: 'AF-500', description: 'Engine air intake filter', category: 'Filters', unitOfMeasure: 'PCS', currentStock: 20, minStock: 10, maxStock: 100, location: 'D-01', subLocation: '', cost: 15.30, createdAt: new Date().toISOString(), company: 'Ravi Caribe Inc.' },
 ];
 
 const INITIAL_REQUESTS: PartsRequest[] = [
@@ -102,7 +102,7 @@ export class InventoryMockService implements IInventoryService {
             }
             if (filters.status === 'low') {
                 parts = parts.filter(p => p.currentStock < p.minStock);
-            } else if (filters.status === 'normal' && filters.status !== 'all') {
+            } else if (filters.status === 'normal') {
                 parts = parts.filter(p => p.currentStock >= p.minStock);
             }
         }
@@ -461,7 +461,7 @@ export class InventoryMockService implements IInventoryService {
     }
 
     async saveReception(reception: Omit<StockReception, 'id' | 'receptionDate'>): Promise<StockReception> {
-        const receptions = loadFromStorage<StockReception>(RECEPTIONS_KEY, []);
+        const receptions = loadFromStorage<StockReception[]>(RECEPTIONS_KEY, []);
         const newReception: StockReception = {
             id: `REC-${Date.now()}`,
             receptionDate: new Date().toISOString(),
@@ -474,7 +474,7 @@ export class InventoryMockService implements IInventoryService {
     }
 
     async getReceptions(filters?: { searchTerm?: string; partId?: string }): Promise<{ data: StockReception[], total: number }> {
-        let receptions = loadFromStorage<StockReception>(RECEPTIONS_KEY, []);
+        let receptions = loadFromStorage<StockReception[]>(RECEPTIONS_KEY, []);
 
         if (filters?.searchTerm || filters?.partId) {
             const s = filters.searchTerm?.toLowerCase() || '';
@@ -504,5 +504,13 @@ export class InventoryMockService implements IInventoryService {
         }
 
         return { data: receptions, total: receptions.length };
+    }
+
+    async createDirectPurchaseRequest(items: { partId: string; quantity: number }[]): Promise<void> {
+        console.log('Mock: Direct purchase request created for items', items);
+    }
+
+    async updatePurchaseRequestStatus(requestId: string, status: 'Pendiente' | 'Parcial' | 'Recibido' | 'Cancelado'): Promise<void> {
+        console.log(`Mock: Updated purchase request ${requestId} to status ${status}`);
     }
 }

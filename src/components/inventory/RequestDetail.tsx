@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 import { PartRequestForm } from './PartRequestForm';
 import { PurchaseRequestModal } from './PurchaseRequestModal';
 import { UserSupabaseService } from '../../services/UserSupabaseService';
-import { UserProfile } from '../../types';
+import { UserProfile } from '../../../types';
 
 interface RequestDetailProps {
     request: PartsRequest;
@@ -89,7 +89,8 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
 
         // Validation before processing
         const errors: string[] = [];
-        Object.entries(deliveryQuantities).forEach(([partId, qty]) => {
+        Object.entries(deliveryQuantities).forEach(([partId, rawQty]) => {
+            const qty = Number(rawQty);
             if (qty <= 0) return;
 
             const part = activeParts.find(p => p.id === partId);

@@ -44,6 +44,11 @@ const parseExcelRow = (rawRow: any): Omit<SparePart, 'id'> | null => {
     } as Omit<SparePart, 'id'>;
 };
 
+interface ImportSparePartsProps {
+    onClose: () => void;
+    onSuccess: () => void;
+}
+
 export const ImportSpareParts: React.FC<ImportSparePartsProps> = ({ onClose, onSuccess }) => {
     const [file, setFile] = useState<File | null>(null);
     const [previewData, setPreviewData] = useState<Omit<SparePart, 'id'>[]>([]);

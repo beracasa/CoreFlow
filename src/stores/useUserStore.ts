@@ -13,7 +13,7 @@ interface UserState {
   // Actions
   fetchUsers: () => Promise<void>;
   addUser: (email: string, fullName: string, role: string, jobTitle: string, companyCode?: string, tenantId?: string) => Promise<void>;
-  inviteUserWithPassword: (email: string, fullName: string, role: string, jobTitle?: string, companyCode?: string, tenantId?: string, specialties?: string[]) => Promise<void>;
+  inviteUserWithPassword: (email: string, fullName: string, role: string, jobTitle?: string, companyCode?: string, tenantId?: string, specialties?: string[]) => Promise<any>;
   updateUser: (user: UserProfile) => Promise<void>;
   deleteUser: (id: string) => Promise<void>;
 

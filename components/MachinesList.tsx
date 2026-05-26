@@ -237,7 +237,7 @@ export const MachinesList: React.FC = () => {
         name: m.name,
         plate: m.plate || '',
         type: m.type || 'GENERIC',
-        zone: m.zone || (zones.length > 0 ? zones[0].name : ''),
+        zone: m.zone || (zones.length > 0 ? zones[0] : ''),
         customIntervals: intervals,
         ...commonFields
       });
@@ -674,7 +674,7 @@ export const MachinesList: React.FC = () => {
                                 <tr key={partId} className="hover:bg-industrial-800/50 transition-colors">
                                   <td className="px-4 py-3">
                                     <p className="font-medium text-white">{partData.name}</p>
-                                    <p className="text-[10px] text-industrial-500 font-mono mt-0.5">{partData.sku}</p>
+                                    <p className="text-[10px] text-industrial-500 font-mono mt-0.5">{partData.partNumber}</p>
                                   </td>
                                   <td className="px-4 py-3 text-right">
                                     <span className={`inline-flex px-2 py-1 rounded text-xs font-bold ${partData.currentStock <= partData.minStock ? 'bg-red-900/50 text-red-400 border border-red-800/50' : 'bg-emerald-900/50 text-emerald-400 border border-emerald-800/50'}`}>
@@ -1041,24 +1041,24 @@ export const MachinesList: React.FC = () => {
                       />
                       {isKardexDropdownOpenIot && (
                         <ul className="absolute z-50 w-[calc(100%-46px)] bg-industrial-800 border border-industrial-600 rounded mt-1 max-h-48 overflow-y-auto shadow-xl">
-                          {parts.filter(p => (p.name || '').toLowerCase().includes((searchKardexPartIot || '').toLowerCase()) || (p.sku || '').toLowerCase().includes((searchKardexPartIot || '').toLowerCase())).length === 0 ? (
+                          {parts.filter(p => (p.name || '').toLowerCase().includes((searchKardexPartIot || '').toLowerCase()) || (p.partNumber || '').toLowerCase().includes((searchKardexPartIot || '').toLowerCase())).length === 0 ? (
                             <li className="p-2 text-sm text-industrial-500 italic">No se encontraron repuestos</li>
                           ) : (
                             parts
-                              .filter(p => (p.name || '').toLowerCase().includes((searchKardexPartIot || '').toLowerCase()) || (p.sku || '').toLowerCase().includes((searchKardexPartIot || '').toLowerCase()))
+                              .filter(p => (p.name || '').toLowerCase().includes((searchKardexPartIot || '').toLowerCase()) || (p.partNumber || '').toLowerCase().includes((searchKardexPartIot || '').toLowerCase()))
                               .map(p => (
                                 <li 
                                   key={p.id} 
                                   className={`p-2 text-sm cursor-pointer border-b border-industrial-700/50 last:border-0 hover:bg-industrial-700 ${selectedKardexPartIot === p.id ? 'bg-industrial-700 text-white' : 'text-industrial-300'}`}
                                   onClick={() => {
                                     setSelectedKardexPartIot(p.id);
-                                    setSearchKardexPartIot(p.sku ? `${p.sku} - ${p.name}` : p.name);
+                                    setSearchKardexPartIot(p.partNumber ? `${p.partNumber} - ${p.name}` : p.name);
                                     setIsKardexDropdownOpenIot(false);
                                   }}
                                 >
                                   <div className="font-medium text-white">{p.name}</div>
                                   <div className="text-[10px] text-industrial-400 font-mono flex justify-between">
-                                    <span>{p.sku}</span>
+                                    <span>{p.partNumber}</span>
                                     <span className={p.currentStock > p.minStock ? 'text-emerald-400' : 'text-yellow-400'}>Stock: {p.currentStock}</span>
                                   </div>
                                 </li>
@@ -1095,7 +1095,7 @@ export const MachinesList: React.FC = () => {
                               <Box className="text-industrial-400" size={16} />
                               <div>
                                 <p className="text-sm text-white font-medium">{partObj.name}</p>
-                                <p className="text-[10px] text-industrial-500 font-mono">{partObj.sku}</p>
+                                <p className="text-[10px] text-industrial-500 font-mono">{partObj.partNumber}</p>
                               </div>
                             </div>
                             <div className="flex items-center gap-3">
@@ -1410,24 +1410,24 @@ export const MachinesList: React.FC = () => {
                       />
                       {isKardexDropdownOpenManual && (
                         <ul className="absolute z-50 w-[calc(100%-46px)] bg-industrial-800 border border-industrial-600 rounded mt-1 max-h-48 overflow-y-auto shadow-xl">
-                          {parts.filter(p => (p.name || '').toLowerCase().includes((searchKardexPartManual || '').toLowerCase()) || (p.sku || '').toLowerCase().includes((searchKardexPartManual || '').toLowerCase())).length === 0 ? (
+                          {parts.filter(p => (p.name || '').toLowerCase().includes((searchKardexPartManual || '').toLowerCase()) || (p.partNumber || '').toLowerCase().includes((searchKardexPartManual || '').toLowerCase())).length === 0 ? (
                             <li className="p-2 text-sm text-industrial-500 italic">No se encontraron repuestos</li>
                           ) : (
                             parts
-                              .filter(p => (p.name || '').toLowerCase().includes((searchKardexPartManual || '').toLowerCase()) || (p.sku || '').toLowerCase().includes((searchKardexPartManual || '').toLowerCase()))
+                              .filter(p => (p.name || '').toLowerCase().includes((searchKardexPartManual || '').toLowerCase()) || (p.partNumber || '').toLowerCase().includes((searchKardexPartManual || '').toLowerCase()))
                               .map(p => (
                                 <li 
                                   key={p.id} 
                                   className={`p-2 text-sm cursor-pointer border-b border-industrial-700/50 last:border-0 hover:bg-industrial-700 ${selectedKardexPartManual === p.id ? 'bg-industrial-700 text-white' : 'text-industrial-300'}`}
                                   onClick={() => {
                                     setSelectedKardexPartManual(p.id);
-                                    setSearchKardexPartManual(p.sku ? `${p.sku} - ${p.name}` : p.name);
+                                    setSearchKardexPartManual(p.partNumber ? `${p.partNumber} - ${p.name}` : p.name);
                                     setIsKardexDropdownOpenManual(false);
                                   }}
                                 >
                                   <div className="font-medium text-white">{p.name}</div>
                                   <div className="text-[10px] text-industrial-400 font-mono flex justify-between">
-                                    <span>{p.sku}</span>
+                                    <span>{p.partNumber}</span>
                                     <span className={p.currentStock > p.minStock ? 'text-emerald-400' : 'text-yellow-400'}>Stock: {p.currentStock}</span>
                                   </div>
                                 </li>
@@ -1464,7 +1464,7 @@ export const MachinesList: React.FC = () => {
                               <Box className="text-industrial-400" size={16} />
                               <div>
                                 <p className="text-sm text-white font-medium">{partObj.name}</p>
-                                <p className="text-[10px] text-industrial-500 font-mono">{partObj.sku}</p>
+                                <p className="text-[10px] text-industrial-500 font-mono">{partObj.partNumber}</p>
                               </div>
                             </div>
                             <div className="flex items-center gap-3">

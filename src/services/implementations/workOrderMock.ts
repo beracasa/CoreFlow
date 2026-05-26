@@ -79,4 +79,11 @@ export class WorkOrderMockService implements IWorkOrderService {
             console.error(`Order with ID ${id} not found in mock storage`);
         }
     }
+
+    async delete(id: string): Promise<void> {
+        await this.delay();
+        const orders = this.getFromStorage();
+        const filtered = orders.filter(o => o.id !== id);
+        this.saveToStorage(filtered);
+    }
 }

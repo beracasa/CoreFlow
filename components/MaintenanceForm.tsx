@@ -405,11 +405,12 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
       const result = Schema.safeParse(formData);
 
       if (!result.success) {
-         console.warn("DEBUG ZOD VALIDATION FAILED on Section 1:", result.error.issues);
+         const errorResult = result as any;
+         console.warn("DEBUG ZOD VALIDATION FAILED on Section 1:", errorResult.error.issues);
          setValidationError("Por favor complete todos los campos obligatorios de la Sección 1.");
 
          const fieldErrors = new Set<string>();
-         result.error.issues.forEach(issue => {
+         errorResult.error.issues.forEach((issue: any) => {
             fieldErrors.add(issue.path[0] as string);
          });
          setInvalidFields(fieldErrors);

@@ -58,10 +58,11 @@ interface ErrorBoundaryState {
 interface ErrorBoundaryProps {
   children?: React.ReactNode;
 }
-class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  constructor(props: ErrorBoundaryProps) {
+class ErrorBoundary extends React.Component<any, any> {
+  props: any;
+  state: any = { hasError: false, error: null };
+  constructor(props: any) {
     super(props);
-    this.state = { hasError: false, error: null };
   }
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { hasError: true, error };
@@ -314,7 +315,7 @@ const AppLayout = () => {
 
 // --- AUTH GUARD ---
 // --- AUTH GUARD ---
-const RequireAuth = ({ children }: { children: JSX.Element }) => {
+const RequireAuth = ({ children }: { children: React.ReactElement }) => {
   const { isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
 

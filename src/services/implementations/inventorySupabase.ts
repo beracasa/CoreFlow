@@ -1,6 +1,6 @@
 import { supabase, getPaginationRange } from '../supabaseClient';
 import { IInventoryService } from '../inventoryService';
-import { SparePart, PartsRequest } from '../../types/inventory';
+import { SparePart, PartsRequest, ExtendedPurchaseRequest, StockReception } from '../../types/inventory';
 
 export class InventorySupabaseService implements IInventoryService {
     private mapDBToPart(record: any): SparePart {

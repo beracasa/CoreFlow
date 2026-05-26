@@ -1,4 +1,4 @@
-import { SparePart, PartsRequest, InventoryTransaction, PurchaseRequest, StockReception, StockReceptionItem } from '../types/inventory';
+import { SparePart, PartsRequest, InventoryTransaction, PurchaseRequest, StockReception, StockReceptionItem, ExtendedPurchaseRequest } from '../types/inventory';
 
 export interface IInventoryService {
     getAllParts(page?: number, limit?: number, filters?: {

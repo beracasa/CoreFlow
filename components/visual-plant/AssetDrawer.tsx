@@ -152,7 +152,7 @@ export const AssetDrawer: React.FC<AssetDrawerProps> = ({ machine, onClose, anal
                     <div key={part.id} className="flex justify-between items-center p-3 bg-industrial-900 rounded border border-industrial-700">
                       <div>
                         <span className="block text-sm text-gray-300">{part.name}</span>
-                        <span className="block text-[10px] text-industrial-500 font-mono mt-0.5">{part.sku}</span>
+                        <span className="block text-[10px] text-industrial-500 font-mono mt-0.5">{part.partNumber || (part as any).sku}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-mono text-industrial-400 font-bold">Stock: {part.currentStock}</span>

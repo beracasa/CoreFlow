@@ -111,6 +111,9 @@ export interface Machine {
   documents?: MachineDocument[] | string[];   // Documentos adjuntos (soporta ambos formatos)
   maintenancePlans?: MaintenancePlan[]; // R-MANT-02 Protocols inside JSONB
   criticalParts?: string[]; // IDs of critical spare parts for this machine
+  specifications?: any;
+  code?: string;
+  serialNumber?: string;
 }
 
 /**
@@ -288,6 +291,8 @@ export interface WorkOrder {
   signatureExecutorDate?: string;
   signatureSupervisor?: string; // Name of supervisor
   signatureSupervisorDate?: string;
+  tasks?: any[];
+  branch?: string;
 }
 
 export interface MachineHourLog {

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { Machine, Technician, SparePart, ZoneStructure, MaintenancePlan, PlanTier } from '../../types';
+import { Machine, Technician, ZoneStructure, MaintenancePlan, PlanTier } from '../../types';
+import { SparePart } from '../types/inventory';
 import { MasterDataService } from '../services/masterDataService';
 import { inventoryService } from '../services'; // For parts
 import { SettingsSupabaseService, GeneralSettings } from '../services/implementations/SettingsSupabase';
@@ -11,6 +12,7 @@ interface MasterState {
     machines: Machine[];
     technicians: Technician[];
     parts: SparePart[];
+    selectedPart: SparePart | null;
     zones: ZoneStructure[];
     plantSettings: PlantSettings;
     currentPlan: PlanTier;
@@ -112,6 +114,7 @@ export const useMasterStore = create<MasterState>((set, get) => ({
     machines: [],
     technicians: [],
     parts: [],
+    selectedPart: null,
     zones: [],
 
     // Default Settings
@@ -361,7 +364,7 @@ export const useMasterStore = create<MasterState>((set, get) => ({
 
     addPart: async (part) => {
         try {
-            const newPart = await inventoryService.createPart(part);
+            const newPart = await inventoryService.createPart(part as any);
             set((state) => ({
                 parts: [newPart, ...state.parts]
             }));
@@ -381,6 +384,10 @@ export const useMasterStore = create<MasterState>((set, get) => ({
             set({ error: error.message });
             throw error;
         }
+    },
+
+    setSelectedPart: (part) => {
+        set({ selectedPart: part });
     },
 
     addZone: async (zone) => {
