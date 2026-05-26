@@ -242,41 +242,8 @@ export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData,
                         />
                     </div>
 
-                    {/* Empresa and Categoría */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                            <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">Empresa</label>
-                            <select
-                                name="company"
-                                required
-                                className="w-full bg-industrial-900 border border-industrial-600 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-blue-500 transition-colors appearance-none cursor-pointer"
-                                value={formData.company}
-                                onChange={handleChange}
-                            >
-                                <option value="">Seleccionar...</option>
-                                <option value="Ravi Caribe Inc.">Ravi Caribe Inc.</option>
-                                <option value="Labels Caribe Inc.">Labels Caribe Inc.</option>
-                            </select>
-                        </div>
-                        <div className="relative">
-                            <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">Categoría</label>
-                            <select
-                                name="category"
-                                required
-                                className="w-full bg-industrial-900 border border-industrial-600 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-blue-500 transition-colors appearance-none cursor-pointer"
-                                value={formData.category}
-                                onChange={handleChange}
-                            >
-                                <option value="">Seleccionar...</option>
-                                {partCategories.map(cat => (
-                                    <option key={cat} value={cat}>{cat}</option>
-                                ))}
-                            </select>
-                        </div>
-                    </div>
-
                     {/* Location and Sub-location */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                             <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">Tramo</label>
                             <select
@@ -361,6 +328,7 @@ export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData,
                             ))}
                         </select>
                     </div>
+
                     {/* Cost */}
                     <div>
                         <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">Costo Unitario (RD$)</label>
@@ -374,17 +342,48 @@ export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData,
                         />
                     </div>
 
-                    {/* Created At */}
-                    <div>
-                        <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">Fecha de Creación</label>
-                        <input
-                            type="date"
-                            name="createdAt"
-                            required
-                            className="w-full bg-industrial-900 border border-industrial-600 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-blue-500 transition-colors font-mono [color-scheme:dark]"
-                            value={formData.createdAt}
-                            onChange={handleChange}
-                        />
+                    {/* Empresa, Categoría and Fecha de Creación */}
+                    <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                            <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">Empresa</label>
+                            <select
+                                name="company"
+                                required
+                                className="w-full bg-industrial-900 border border-industrial-600 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-blue-500 transition-colors appearance-none cursor-pointer"
+                                value={formData.company}
+                                onChange={handleChange}
+                            >
+                                <option value="">Seleccionar...</option>
+                                <option value="Ravi Caribe Inc.">Ravi Caribe Inc.</option>
+                                <option value="Labels Caribe Inc.">Labels Caribe Inc.</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">Categoría</label>
+                            <select
+                                name="category"
+                                required
+                                className="w-full bg-industrial-900 border border-industrial-600 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-blue-500 transition-colors appearance-none cursor-pointer"
+                                value={formData.category}
+                                onChange={handleChange}
+                            >
+                                <option value="">Seleccionar...</option>
+                                {partCategories.map(cat => (
+                                    <option key={cat} value={cat}>{cat}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">Fecha de Creación</label>
+                            <input
+                                type="date"
+                                name="createdAt"
+                                required
+                                className="w-full bg-industrial-900 border border-industrial-600 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-blue-500 transition-colors font-mono [color-scheme:dark]"
+                                value={formData.createdAt}
+                                onChange={handleChange}
+                            />
+                        </div>
                     </div>
 
                     {/* Image Upload */}

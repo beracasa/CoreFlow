@@ -107,8 +107,8 @@ export const SparePartDetail: React.FC<SparePartDetailProps> = ({ part, onClose 
 
                 {/* Body */}
                 <div className="p-6">
-                    {/* Stats Grid */}
-                    <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
+                    {/* Stats Grid 1 */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                         <div className="bg-industrial-900/50 p-3 rounded-lg border border-industrial-700">
                             <p className="text-[10px] text-industrial-500 uppercase font-bold mb-1 tracking-wider">Stock Actual</p>
                             <p className={`text-xl font-bold ${currentPart.currentStock <= currentPart.minStock ? 'text-red-400' : 'text-emerald-400'
@@ -139,7 +139,10 @@ export const SparePartDetail: React.FC<SparePartDetailProps> = ({ part, onClose 
                                 {currentPart.subLocation || '-'}
                             </div>
                         </div>
+                    </div>
 
+                    {/* Stats Grid 2 */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                         <div className="bg-industrial-900/50 p-3 rounded-lg border border-industrial-700">
                             <p className="text-[10px] text-industrial-500 uppercase font-bold mb-1 tracking-wider">Empresa</p>
                             <p className="text-white text-xl font-bold truncate">
@@ -153,9 +156,7 @@ export const SparePartDetail: React.FC<SparePartDetailProps> = ({ part, onClose 
                                 {currentPart.category}
                             </p>
                         </div>
-                    </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                         <div className="bg-industrial-900/50 p-3 rounded-lg border border-industrial-700">
                             <p className="text-[10px] text-industrial-500 uppercase font-bold mb-1 tracking-wider">Fecha de Creación</p>
                             <p className="text-white text-lg font-bold">
