@@ -6,7 +6,9 @@ export interface IInventoryService {
         category?: string;
         location?: string;
         status?: 'all' | 'low' | 'normal';
+        company?: string;
     }): Promise<{ data: SparePart[], total: number }>;
+    getPartCompanies(): Promise<string[]>;
     getAllRequests(): Promise<PartsRequest[]>;
     createRequest(requestData: Omit<PartsRequest, 'id' | 'createdDate' | 'status' | 'requestNumber' | 'items'> & { items: { partId: string; quantity: number }[] }): Promise<PartsRequest>;
     deliverParts(requestId: string, itemsToDeliver: { partId: string; quantity: number }[], receiverId?: string): Promise<PartsRequest>;

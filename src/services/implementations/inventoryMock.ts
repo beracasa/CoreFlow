@@ -80,6 +80,7 @@ export class InventoryMockService implements IInventoryService {
             category?: string;
             location?: string;
             status?: 'all' | 'low' | 'normal';
+            company?: string;
         }
     ): Promise<{ data: SparePart[], total: number }> {
         let parts = this.getParts();
@@ -99,6 +100,9 @@ export class InventoryMockService implements IInventoryService {
             }
             if (filters.location && filters.location !== 'all') {
                 parts = parts.filter(p => p.location === filters.location);
+            }
+            if (filters.company && filters.company !== 'all') {
+                parts = parts.filter(p => p.company === filters.company);
             }
             if (filters.status === 'low') {
                 parts = parts.filter(p => p.currentStock < p.minStock);
@@ -123,6 +127,15 @@ export class InventoryMockService implements IInventoryService {
         const pagedData = parts.slice(from, to);
 
         return { data: pagedData, total };
+    }
+
+    async getPartCompanies(): Promise<string[]> {
+        const parts = this.getParts();
+        const companies = new Set<string>();
+        parts.forEach(p => {
+            if (p.company) companies.add(p.company);
+        });
+        return Array.from(companies).sort();
     }
 
     async getAllRequests(): Promise<PartsRequest[]> {

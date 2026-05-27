@@ -23,6 +23,7 @@ interface MasterState {
     partCategories: string[];
     partLocations: string[];
     partUnits: string[];
+    partCompanies: string[];
 
     // Maintenance Plans Actions
     addMaintenancePlan: (plan: MaintenancePlan) => void;
@@ -58,6 +59,7 @@ interface MasterState {
         category?: string;
         location?: string;
         status?: 'all' | 'low' | 'normal';
+        company?: string;
     };
 
     // Actions
@@ -185,6 +187,7 @@ export const useMasterStore = create<MasterState>((set, get) => ({
     partCategories: [],
     partLocations: [],
     partUnits: [],
+    partCompanies: [],
 
     setMachinePage: async (page: number) => {
         set((state) => ({ 
@@ -259,7 +262,8 @@ export const useMasterStore = create<MasterState>((set, get) => ({
                     plantSettings,
                     partCategories,
                     partLocations,
-                    partUnits
+                    partUnits,
+                    partCompanies
                 ] = await Promise.all([
                     safeFetch(MasterDataService.getMachines(machinePage, machineLimit, machineFilters), { data: [], total: 0 }, 'machines'),
                     safeFetch(MasterDataService.getTechnicians(), [], 'technicians'),
@@ -271,7 +275,8 @@ export const useMasterStore = create<MasterState>((set, get) => ({
                     safeFetch(SettingsSupabaseService.getSettings(), get().plantSettings, 'plantSettings'),
                     safeFetch(MasterDataService.getPartCategories(), [], 'partCategories'),
                     safeFetch(MasterDataService.getPartLocations(), [], 'partLocations'),
-                    safeFetch(MasterDataService.getPartUnits(), [], 'partUnits')
+                    safeFetch(MasterDataService.getPartUnits(), [], 'partUnits'),
+                    safeFetch(inventoryService.getPartCompanies(), [], 'partCompanies')
                 ]);
 
                 const currentState = get();
@@ -296,6 +301,7 @@ export const useMasterStore = create<MasterState>((set, get) => ({
                     partCategories: partCategories.length > 0 ? partCategories : currentState.partCategories,
                     partLocations: partLocations.length > 0 ? partLocations : currentState.partLocations,
                     partUnits: partUnits.length > 0 ? partUnits : currentState.partUnits,
+                    partCompanies: partCompanies.length > 0 ? partCompanies : currentState.partCompanies,
                     plantSettings: plantSettings,
                     maintenancePlans: extractedMaintenancePlans,
                     isLoading: false,

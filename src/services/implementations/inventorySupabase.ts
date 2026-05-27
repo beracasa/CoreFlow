@@ -50,6 +50,7 @@ export class InventorySupabaseService implements IInventoryService {
             category?: string;
             location?: string;
             status?: 'all' | 'low' | 'normal';
+            company?: string;
         }
     ): Promise<{ data: SparePart[], total: number }> {
         const { from, to } = getPaginationRange(page, limit);
@@ -68,6 +69,9 @@ export class InventorySupabaseService implements IInventoryService {
             if (filters.location && filters.location !== 'all') {
                 query = query.eq('location_code', filters.location);
             }
+            if (filters.company && filters.company !== 'all') {
+                query = query.eq('company', filters.company);
+            }
             if (filters.status === 'low') {
                 query = query.eq('is_low_stock', true);
             } else if (filters.status === 'normal') {
@@ -84,6 +88,24 @@ export class InventorySupabaseService implements IInventoryService {
             data: (data || []).map(this.mapDBToPart),
             total: count || 0
         };
+    }
+
+    async getPartCompanies(): Promise<string[]> {
+        const { data, error } = await supabase
+            .from('spare_parts')
+            .select('company');
+
+        if (error) throw error;
+
+        const companies = new Set<string>();
+        if (data) {
+            data.forEach((record: any) => {
+                if (record.company) {
+                    companies.add(record.company.trim());
+                }
+            });
+        }
+        return Array.from(companies).sort();
     }
 
     async createPart(partData: Omit<SparePart, 'id' | 'currentStock'> & { initialStock?: number }): Promise<SparePart> {
