@@ -556,7 +556,7 @@ export class InventorySupabaseService implements IInventoryService {
             throw error;
         }
 
-        const { data: parts } = await supabase.from('spare_parts').select('id, name, sku');
+        const { data: parts } = await supabase.from('spare_parts').select('id, name, sku, company');
         const partsMap = new Map((parts || []).map(p => [p.id, p]));
 
         const mappedData = (data || []).map(record => {
@@ -567,7 +567,8 @@ export class InventorySupabaseService implements IInventoryService {
                 return {
                     ...item,
                     partName: partInfo?.name || 'Repuesto Desconocido',
-                    partNumber: partInfo?.sku || 'N/A'
+                    partNumber: partInfo?.sku || 'N/A',
+                    company: partInfo?.company || ''
                 };
             });
 

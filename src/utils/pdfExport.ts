@@ -41,11 +41,12 @@ export const exportPurchaseRequestPDF = (request: ExtendedPurchaseRequest) => {
     doc.text(`SOLICITADO POR: ${request.requestedBy}`, pageWidth - 15, 72, { align: 'right' });
 
     // --- Items Table ---
-    const tableHeaders = [['CANT.', 'NÚMERO DE PARTE', 'DESCRIPCIÓN', 'ESTADO']];
+    const tableHeaders = [['CANT.', 'NÚMERO DE PARTE', 'DESCRIPCIÓN', 'EMPRESA', 'ESTADO']];
     const tableData = request.items.map(item => [
         item.quantity,
         item.partNumber || request.sparePartNumber || 'N/A',
         item.partName || request.sparePartName || 'N/A',
+        item.company || 'N/A',
         'PENDIENTE'
     ]);
 
@@ -65,9 +66,10 @@ export const exportPurchaseRequestPDF = (request: ExtendedPurchaseRequest) => {
             cellPadding: 4
         },
         columnStyles: {
-            0: { halign: 'center', cellWidth: 20 },
-            1: { cellWidth: 40 },
-            3: { halign: 'center', cellWidth: 30 }
+            0: { halign: 'center', cellWidth: 15 },
+            1: { cellWidth: 35 },
+            3: { cellWidth: 35 },
+            4: { halign: 'center', cellWidth: 25 }
         }
     });
 

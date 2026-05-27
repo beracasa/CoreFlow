@@ -56,6 +56,7 @@ export interface PurchaseRequestItem {
     quantity: number;
     partName?: string;
     partNumber?: string;
+    company?: string;
 }
 
 export interface PurchaseRequest {

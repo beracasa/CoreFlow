@@ -5,6 +5,7 @@ const PARTS_KEY = 'v2_inventory_parts';
 const REQUESTS_KEY = 'v2_inventory_requests';
 const TRANSACTIONS_KEY = 'v2_inventory_transactions';
 const RECEPTIONS_KEY = 'v2_inventory_receptions';
+const PURCHASE_REQUESTS_KEY = 'v2_inventory_purchase_requests';
 
 const INITIAL_PARTS: SparePart[] = [
     { id: 'p1', name: 'Ball Bearing 6204', partNumber: 'BB-6204', description: 'Deep groove ball bearing', category: 'Bearings', unitOfMeasure: 'PCS', currentStock: 15, minStock: 5, maxStock: 100, location: 'A-01', subLocation: '', cost: 5.50, createdAt: new Date().toISOString(), company: 'Ravi Caribe Inc.' },
@@ -39,6 +40,51 @@ const INITIAL_REQUESTS: PartsRequest[] = [
     }
 ];
 
+const INITIAL_PURCHASE_REQUESTS: PurchaseRequest[] = [
+    {
+        id: 'pr-1',
+        purchaseRequestNumber: 'SC-REQ-SPR-00009-1',
+        requestDate: new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString(),
+        requestedBy: 'current-user',
+        requestId: 'r1',
+        status: 'Pendiente',
+        items: [
+            { partId: 'p1', quantity: 3 }
+        ]
+    },
+    {
+        id: 'pr-2',
+        purchaseRequestNumber: 'SC-DIR-2R7DZ',
+        requestDate: new Date(Date.now() - 5 * 24 * 3600 * 1000).toISOString(),
+        requestedBy: 'current-user',
+        status: 'Recibido',
+        items: [
+            { partId: 'p2', quantity: 10 }
+        ]
+    },
+    {
+        id: 'pr-3',
+        purchaseRequestNumber: 'SC-REQ-SPR-00003-1',
+        requestDate: new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString(),
+        requestedBy: 'current-user',
+        status: 'Pendiente',
+        items: [
+            { partId: 'p3', quantity: 20 }
+        ]
+    },
+    {
+        id: 'pr-4',
+        purchaseRequestNumber: 'SC-DIR-86Z5S',
+        requestDate: new Date(Date.now() - 1 * 24 * 3600 * 1000).toISOString(),
+        requestedBy: 'current-user',
+        status: 'Pendiente',
+        items: [
+            { partId: 'p2', quantity: 10 },
+            { partId: 'p3', quantity: 20 }
+        ]
+    }
+];
+
 import { IInventoryService } from '../inventoryService';
 
 export class InventoryMockService implements IInventoryService {
@@ -68,6 +114,15 @@ export class InventoryMockService implements IInventoryService {
 
     private saveTransactions(transactions: InventoryTransaction[]) {
         saveToStorage(TRANSACTIONS_KEY, transactions);
+    }
+
+    private getPurchaseRequests(): PurchaseRequest[] {
+        const prs = loadFromStorage(PURCHASE_REQUESTS_KEY, INITIAL_PURCHASE_REQUESTS);
+        return prs.length > 0 ? prs : INITIAL_PURCHASE_REQUESTS;
+    }
+
+    private savePurchaseRequests(prs: PurchaseRequest[]) {
+        saveToStorage(PURCHASE_REQUESTS_KEY, prs);
     }
 
     // --- Public API ---
@@ -260,14 +315,18 @@ export class InventoryMockService implements IInventoryService {
     }
 
     async savePurchaseRequest(requestId: string, purchaseRequest: PurchaseRequest): Promise<PartsRequest> {
+        const prs = this.getPurchaseRequests();
+        prs.unshift({
+            ...purchaseRequest,
+            requestId
+        });
+        this.savePurchaseRequests(prs);
+
+        // Update parts request status to PENDING_STOCK
         const requests = this.getRequests();
         const index = requests.findIndex(r => r.id === requestId);
-
         if (index !== -1) {
-            if (!requests[index].purchaseHistory) {
-                requests[index].purchaseHistory = [];
-            }
-            requests[index].purchaseHistory!.push(purchaseRequest);
+            requests[index].status = 'PENDING_STOCK';
             this.saveRequests(requests);
             return requests[index];
         }
@@ -275,7 +334,51 @@ export class InventoryMockService implements IInventoryService {
     }
 
     async getAllPurchaseRequests(page: number = 1, limit: number = 50, filters?: { searchTerm?: string }): Promise<{ data: ExtendedPurchaseRequest[], total: number }> {
-        return { data: [], total: 0 };
+        let prs = this.getPurchaseRequests();
+        const parts = this.getParts();
+        const partsMap = new Map(parts.map(p => [p.id, p]));
+        const requests = this.getRequests();
+
+        if (filters?.searchTerm) {
+            const s = filters.searchTerm.toLowerCase();
+            prs = prs.filter(p => p.purchaseRequestNumber.toLowerCase().includes(s));
+        }
+
+        const mappedData: ExtendedPurchaseRequest[] = prs.map(record => {
+            const rawItems = record.items || [];
+            const mappedItems = rawItems.map((item: any) => {
+                const partInfo = partsMap.get(item.partId);
+                return {
+                    ...item,
+                    partName: partInfo?.name || 'Repuesto Desconocido',
+                    partNumber: partInfo?.partNumber || 'N/A',
+                    company: partInfo?.company || ''
+                };
+            });
+
+            const firstItem = mappedItems[0] || {};
+            const sourceReq = requests.find(r => r.id === record.requestId);
+
+            return {
+                id: record.id,
+                purchaseRequestNumber: record.purchaseRequestNumber,
+                requestDate: record.requestDate,
+                requestedBy: record.requestedBy,
+                items: mappedItems,
+                requestId: record.requestId,
+                sourceRequestNumber: sourceReq?.requestNumber || (record.purchaseRequestNumber.includes('SC-REQ-SPR-00009') ? 'SPR-00009' : record.purchaseRequestNumber.includes('SC-REQ-SPR-00003') ? 'SPR-00003' : undefined),
+                sparePartName: firstItem.partName || 'N/A',
+                sparePartNumber: firstItem.partNumber || 'N/A',
+                status: record.status || 'Pendiente'
+            } as ExtendedPurchaseRequest;
+        });
+
+        // Pagination
+        const from = (page - 1) * limit;
+        const to = from + limit;
+        const pagedData = mappedData.slice(from, to);
+
+        return { data: pagedData, total: mappedData.length };
     }
 
     async closeRequest(requestId: string): Promise<PartsRequest> {
@@ -520,10 +623,25 @@ export class InventoryMockService implements IInventoryService {
     }
 
     async createDirectPurchaseRequest(items: { partId: string; quantity: number }[]): Promise<void> {
-        console.log('Mock: Direct purchase request created for items', items);
+        const scNumber = `SC-DIR-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+        const prs = this.getPurchaseRequests();
+        prs.unshift({
+            id: `pr-${Date.now()}`,
+            purchaseRequestNumber: scNumber,
+            requestDate: new Date().toISOString(),
+            requestedBy: 'current-user',
+            items: items,
+            status: 'Pendiente'
+        });
+        this.savePurchaseRequests(prs);
     }
 
     async updatePurchaseRequestStatus(requestId: string, status: 'Pendiente' | 'Parcial' | 'Recibido' | 'Cancelado'): Promise<void> {
-        console.log(`Mock: Updated purchase request ${requestId} to status ${status}`);
+        const prs = this.getPurchaseRequests();
+        const index = prs.findIndex(p => p.id === requestId);
+        if (index !== -1) {
+            prs[index].status = status;
+            this.savePurchaseRequests(prs);
+        }
     }
 }

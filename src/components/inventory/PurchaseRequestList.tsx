@@ -183,8 +183,9 @@ export const PurchaseRequestList: React.FC = () => {
                                     <table className="w-full text-left text-sm">
                                         <thead className="bg-industrial-900/30 text-[10px] uppercase text-industrial-500 font-bold">
                                             <tr>
-                                                <th className="px-6 py-3">Código</th>
+                                                <th className="px-6 py-3">Solicitud</th>
                                                 <th className="px-6 py-3">Repuesto</th>
+                                                <th className="px-6 py-3">Empresa</th>
                                                 <th className="px-6 py-3 text-center">Cant.</th>
                                                 <th className="px-6 py-3">Fecha</th>
                                                 <th className="px-6 py-3 text-center">Estado</th>
@@ -194,21 +195,43 @@ export const PurchaseRequestList: React.FC = () => {
                                         <tbody className="divide-y divide-industrial-700">
                                             {groupedRequests[key].map(req => (
                                                 <tr key={req.id} className="hover:bg-industrial-700/20 transition-colors">
-                                                    <td className="px-6 py-4">
+                                                    <td className="px-6 py-4 align-middle">
                                                         <span className="text-white font-medium">{req.purchaseRequestNumber}</span>
                                                     </td>
-                                                    <td className="px-6 py-4">
-                                                        <span className="text-industrial-200">
-                                                            {req.items.length === 1 ? req.items[0].partName : req.items.length > 1 ? `Varios Repuestos (${req.items.length})` : 'N/A'}
-                                                        </span>
+                                                    <td className="px-6 py-4 align-middle">
+                                                        <div className="flex flex-col gap-1.5">
+                                                            {req.items.map((item, idx) => (
+                                                                <div key={idx} className="text-industrial-200 text-xs">
+                                                                    <span className="text-blue-400 font-mono font-bold mr-2">
+                                                                        [{item.partNumber || 'N/A'}]
+                                                                    </span>
+                                                                    <span>{item.partName || 'N/A'}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
                                                     </td>
-                                                    <td className="px-6 py-4 text-center font-mono text-white text-xs">
-                                                        {req.items.reduce((acc, i) => acc + i.quantity, 0)}
+                                                    <td className="px-6 py-4 align-middle">
+                                                        <div className="flex flex-col gap-1.5">
+                                                            {req.items.map((item, idx) => (
+                                                                <div key={idx} className="text-industrial-300 text-xs font-semibold">
+                                                                    {item.company || 'N/A'}
+                                                                </div>
+                                                            ))}
+                                                        </div>
                                                     </td>
-                                                    <td className="px-6 py-4 text-industrial-400 text-xs">
+                                                    <td className="px-6 py-4 align-middle text-center">
+                                                        <div className="flex flex-col gap-1.5">
+                                                            {req.items.map((item, idx) => (
+                                                                <div key={idx} className="font-mono text-white text-xs">
+                                                                    {item.quantity}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-industrial-400 text-xs align-middle">
                                                         {new Date(req.requestDate).toLocaleDateString()}
                                                     </td>
-                                                    <td className="px-6 py-4 text-center">
+                                                    <td className="px-6 py-4 text-center align-middle">
                                                         <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider ${req.status === 'Recibido'
                                                             ? 'bg-emerald-900/30 text-emerald-400 border border-emerald-800'
                                                             : req.status === 'Cancelado'
@@ -480,7 +503,15 @@ export const PurchaseRequestList: React.FC = () => {
                                                 </div>
                                                 <div>
                                                     <p className="text-white font-bold">{item.partName || selectedRequest.sparePartName}</p>
-                                                    <p className="text-[10px] text-industrial-500 font-mono">{item.partNumber || selectedRequest.sparePartNumber}</p>
+                                                    <div className="flex gap-2 items-center text-[10px] text-industrial-500 font-mono mt-0.5">
+                                                        <span>Código: {item.partNumber || selectedRequest.sparePartNumber}</span>
+                                                        {item.company && (
+                                                            <>
+                                                                <span className="text-industrial-600 font-bold">•</span>
+                                                                <span className="text-industrial-400">Empresa: <strong className="text-industrial-300">{item.company}</strong></span>
+                                                            </>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
                                             <span className="text-[10px] bg-yellow-900/30 text-yellow-500 font-black px-3 py-1 rounded-full border border-yellow-800 shadow-sm shadow-black">
