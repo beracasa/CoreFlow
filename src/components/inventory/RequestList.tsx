@@ -88,88 +88,72 @@ export const RequestList: React.FC<RequestListProps> = ({ onSelectRequest }) => 
     const generatePDF = () => {
         const doc = new jsPDF();
 
-        // Logo & Header
-        // Add Logo if available
+        // 1. Logo (Small size in top left)
+        let logoHeight = 0;
+        const margin = 14;
+
         if (plantSettings.logoUrl) {
             try {
                 const imgProps = doc.getImageProperties(plantSettings.logoUrl);
-                const logoWidth = 30;
-                const logoHeight = (imgProps.height * logoWidth) / imgProps.width;
-                doc.addImage(plantSettings.logoUrl, 'PNG', 14, 10, logoWidth, logoHeight);
+                const logoWidth = 25; // Small size
+                logoHeight = (imgProps.height * logoWidth) / imgProps.width;
+                doc.addImage(plantSettings.logoUrl, 'PNG', margin, 10, logoWidth, logoHeight);
             } catch (e) {
                 console.warn('Could not add logo to PDF', e);
             }
         } else {
             // Fallback text if no logo
             doc.setFontSize(14);
-            doc.text(plantSettings.plantName || 'CoreFlow', 14, 20);
+            doc.setFont('helvetica', 'bold');
+            doc.text(plantSettings.plantName || 'CoreFlow', margin, 18);
+            logoHeight = 10;
         }
 
-        // Title (Resultados del Reporte)
+        // Adjust Y coordinates based on logo height
+        const headerY = Math.max(25, 10 + logoHeight + 5);
+
+        // Title
         doc.setFontSize(16);
-        doc.text('Reporte de Solicitudes de Repuestos', 14, 35);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Reporte de Solicitudes de Repuestos', margin, headerY);
 
         // Date
         doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
         const dateStr = new Date().toLocaleDateString();
-        doc.text(`Fecha de Emisión: ${dateStr}`, 14, 42);
+        doc.text(`Fecha de Emisión: ${dateStr}`, margin, headerY + 7);
 
-        // REMOVED Filter Info as requested
+        const yPos = headerY + 15;
 
-        let yPos = 50;
-
-        // Loop through filtered requests
-        filteredRequests.forEach((req, index) => {
-            // Check if we need a new page
-            if (yPos > 250) {
-                doc.addPage();
-                yPos = 20;
-            }
-
-            // Request Header
-            doc.setFontSize(12);
-            doc.setFillColor(240, 240, 240);
-            doc.rect(14, yPos - 5, 182, 10, 'F');
-            doc.setFont('helvetica', 'bold');
-            doc.text(`${req.requestNumber} - ${new Date(req.createdDate).toLocaleDateString()} - ${req.technicianId} - ${getStatusLabel(req.status)}`, 16, yPos + 2);
-
-            yPos += 10;
-
-            // Items Table
-            const tableBody = req.items.map(item => {
+        // Flatten all request items into a single list of rows
+        const tableBody = filteredRequests.flatMap(req => {
+            const reqDate = new Date(req.createdDate).toLocaleDateString();
+            return req.items.map(item => {
                 const part = parts.find(p => p.id === item.partId);
-                const status = item.quantityDelivered >= item.quantityRequested ? 'Completado' :
-                    item.quantityDelivered > 0 ? 'Parcial' : 'Pendiente';
-
-                // Get receiver name if available
-                const receiver = req.deliveredTo
-                    ? (useMasterStore.getState().technicians.find(t => t.id === req.deliveredTo)?.name || req.deliveredTo)
-                    : '-';
-
                 return [
+                    reqDate,
                     part?.partNumber || 'N/A',
                     part?.name || item.partId,
                     item.usageLocation || '-',
+                    part?.company || '-',
                     item.quantityRequested,
-                    item.quantityDelivered,
-                    receiver,
-                    status
+                    item.quantityDelivered
                 ];
             });
+        });
 
-            autoTable(doc, {
-                startY: yPos,
-                head: [['Código', 'Repuesto', 'Lugar Uso', 'Solicitado', 'Entregado', 'Entregado a', 'Estado']],
-                body: tableBody,
-                theme: 'grid',
-                headStyles: { fillColor: [41, 128, 185], fontSize: 9 },
-                bodyStyles: { fontSize: 9 },
-                margin: { left: 14, right: 14 }
-            });
-
-            // Update yPos for next iteration
-            // @ts-ignore
-            yPos = doc.lastAutoTable.finalY + 15;
+        autoTable(doc, {
+            startY: yPos,
+            head: [['Fecha', 'Código', 'Nombre', 'Lugar Uso', 'Empresa', 'Solicitado', 'Entregado']],
+            body: tableBody,
+            theme: 'grid',
+            headStyles: { fillColor: [40, 40, 40], textColor: 255, fontStyle: 'bold', fontSize: 9 },
+            bodyStyles: { fontSize: 9 },
+            columnStyles: {
+                5: { halign: 'right' },
+                6: { halign: 'right' }
+            },
+            margin: { left: margin, right: margin }
         });
 
         doc.save('reporte_solicitudes.pdf');
