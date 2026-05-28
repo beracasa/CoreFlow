@@ -548,7 +548,7 @@ export class InventorySupabaseService implements IInventoryService {
         return result;
     }
 
-    async getReceptions(filters?: { searchTerm?: string; partId?: string }): Promise<{ data: StockReception[], total: number }> {
+    async getReceptions(filters?: { searchTerm?: string; partId?: string; startDate?: string; endDate?: string }): Promise<{ data: StockReception[], total: number }> {
         let query = supabase
             .from('stock_receptions')
             .select('*', { count: 'exact' })
@@ -559,6 +559,13 @@ export class InventorySupabaseService implements IInventoryService {
             query = query.or(`items.cs.[{"partId":"${filters.partId}"}],items.cs.[{"part_id":"${filters.partId}"}]`);
         } else if (filters?.searchTerm) {
             query = query.or(`document_number.ilike.%${filters.searchTerm}%,notes.ilike.%${filters.searchTerm}%`);
+        }
+
+        if (filters?.startDate) {
+            query = query.gte('reception_date', `${filters.startDate}T00:00:00`);
+        }
+        if (filters?.endDate) {
+            query = query.lte('reception_date', `${filters.endDate}T23:59:59`);
         }
 
         const { data, error } = await query;

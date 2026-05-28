@@ -35,6 +35,8 @@ export const ReceptionForm: React.FC = () => {
     const [historySearchTerm, setHistorySearchTerm] = useState('');
     const [showHistoryDropdown, setShowHistoryDropdown] = useState(false);
     const [selectedHistoryPartId, setSelectedHistoryPartId] = useState('');
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
 
     useEffect(() => {
         inventoryService.getAllParts(1, 1000).then(res => setParts(res.data));
@@ -45,7 +47,9 @@ export const ReceptionForm: React.FC = () => {
         setLoadingHistory(true);
         inventoryService.getReceptions({
             searchTerm: historySearchTerm || undefined,
-            partId: selectedHistoryPartId || undefined
+            partId: selectedHistoryPartId || undefined,
+            startDate: startDate || undefined,
+            endDate: endDate || undefined
         })
             .then(res => {
                 console.log("HISTORY LOAD RET", res.data.length, res.total);
@@ -56,7 +60,7 @@ export const ReceptionForm: React.FC = () => {
             .finally(() => setLoadingHistory(false));
     };
 
-    // Load history whenever switching to that tab, or search term (if no part selected) or partId changes
+    // Load history whenever switching to that tab, or search term (if no part selected), partId, or date range changes
     useEffect(() => {
         if (activeTab === 'history') {
             const timeoutId = setTimeout(() => {
@@ -64,12 +68,12 @@ export const ReceptionForm: React.FC = () => {
             }, 300); // Debounce search
             return () => clearTimeout(timeoutId);
         }
-    }, [activeTab, historySearchTerm, selectedHistoryPartId]);
+    }, [activeTab, historySearchTerm, selectedHistoryPartId, startDate, endDate]);
 
-    // Reset page on search
+    // Reset page on search or date range changes
     useEffect(() => {
         setCurrentPage(1);
-    }, [historySearchTerm, selectedHistoryPartId]);
+    }, [historySearchTerm, selectedHistoryPartId, startDate, endDate]);
 
     const handleAddItem = () => {
         if (!selectedPartId || quantity <= 0) return;
@@ -432,64 +436,97 @@ export const ReceptionForm: React.FC = () => {
             {/* ── TAB: Historial ── */}
             {activeTab === 'history' && (
                 <div className="p-6">
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-                        <div className="relative flex-1 w-full max-w-md">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-industrial-400" />
-                            <input
-                                type="text"
-                                className={`w-full bg-industrial-900 border border-industrial-600 rounded-lg pl-10 ${historySearchTerm ? 'pr-10' : 'pr-4'} py-2 text-white text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all`}
-                                placeholder="Buscar OC, Notas, o Repuesto..."
-                                value={historySearchTerm}
-                                onChange={(e) => {
-                                    setHistorySearchTerm(e.target.value);
-                                    setSelectedHistoryPartId('');
-                                    setShowHistoryDropdown(true);
-                                }}
-                                onFocus={() => setShowHistoryDropdown(true)}
-                                onBlur={() => setTimeout(() => setShowHistoryDropdown(false), 200)}
-                            />
-                            {historySearchTerm && (
-                                <button
-                                    onClick={() => {
-                                        setHistorySearchTerm('');
+                    <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-6">
+                        <div className="flex flex-col md:flex-row items-start md:items-center gap-4 flex-1 w-full">
+                            <div className="relative flex-1 w-full max-w-md">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-industrial-400" />
+                                <input
+                                    type="text"
+                                    className={`w-full bg-industrial-900 border border-industrial-600 rounded-lg pl-10 ${historySearchTerm ? 'pr-10' : 'pr-4'} py-2 text-white text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-all`}
+                                    placeholder="Buscar OC, Notas, o Repuesto..."
+                                    value={historySearchTerm}
+                                    onChange={(e) => {
+                                        setHistorySearchTerm(e.target.value);
                                         setSelectedHistoryPartId('');
+                                        setShowHistoryDropdown(true);
                                     }}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-industrial-400 hover:text-white"
-                                >
-                                    <X className="w-4 h-4" />
-                                </button>
-                            )}
+                                    onFocus={() => setShowHistoryDropdown(true)}
+                                    onBlur={() => setTimeout(() => setShowHistoryDropdown(false), 200)}
+                                />
+                                {historySearchTerm && (
+                                    <button
+                                        onClick={() => {
+                                            setHistorySearchTerm('');
+                                            setSelectedHistoryPartId('');
+                                        }}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-industrial-400 hover:text-white"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                )}
 
-                            {showHistoryDropdown && historySearchTerm && !selectedHistoryPartId && (
-                                <div className="absolute z-10 w-full mt-1 bg-industrial-800 border border-industrial-600 rounded-lg shadow-xl max-h-60 overflow-y-auto">
-                                    {historyFilteredParts.length > 0 ? (
-                                        <>
-                                            <div className="px-4 py-2 text-xs font-bold text-industrial-400 bg-industrial-900/50 uppercase">
-                                                Filtrar por Repuesto Específico
-                                            </div>
-                                            {historyFilteredParts.map(p => (
-                                                <div
-                                                    key={p.id}
-                                                    className="px-4 py-2 hover:bg-industrial-700 cursor-pointer text-white text-sm border-b border-industrial-700/50 last:border-0"
-                                                    onClick={() => {
-                                                        setSelectedHistoryPartId(p.id);
-                                                        setHistorySearchTerm(`${p.sku || p.partNumber} - ${p.name}`);
-                                                        setShowHistoryDropdown(false);
-                                                    }}
-                                                >
-                                                    <span className="font-bold text-emerald-400">{p.sku || p.partNumber}</span> - {p.name}
+                                {showHistoryDropdown && historySearchTerm && !selectedHistoryPartId && (
+                                    <div className="absolute z-10 w-full mt-1 bg-industrial-800 border border-industrial-600 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                                        {historyFilteredParts.length > 0 ? (
+                                            <>
+                                                <div className="px-4 py-2 text-xs font-bold text-industrial-400 bg-industrial-900/50 uppercase">
+                                                    Filtrar por Repuesto Específico
                                                 </div>
-                                            ))}
-                                        </>
-                                    ) : (
-                                        <div className="px-4 py-2 text-industrial-400 text-sm">
-                                            Se buscará texto libre en Documentos y Notas...
-                                        </div>
-                                    )}
+                                                {historyFilteredParts.map(p => (
+                                                    <div
+                                                        key={p.id}
+                                                        className="px-4 py-2 hover:bg-industrial-700 cursor-pointer text-white text-sm border-b border-industrial-700/50 last:border-0"
+                                                        onClick={() => {
+                                                            setSelectedHistoryPartId(p.id);
+                                                            setHistorySearchTerm(`${p.sku || p.partNumber} - ${p.name}`);
+                                                            setShowHistoryDropdown(false);
+                                                        }}
+                                                    >
+                                                        <span className="font-bold text-emerald-400">{p.sku || p.partNumber}</span> - {p.name}
+                                                    </div>
+                                                ))}
+                                            </>
+                                        ) : (
+                                            <div className="px-4 py-2 text-industrial-400 text-sm">
+                                                Se buscará texto libre en Documentos y Notas...
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Date range filters */}
+                            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-industrial-400 text-xs font-bold uppercase tracking-wider">Desde:</span>
+                                    <input
+                                        type="date"
+                                        className="bg-industrial-900 border border-industrial-600 rounded-lg px-3 py-1.5 text-white text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-colors"
+                                        value={startDate}
+                                        onChange={e => setStartDate(e.target.value)}
+                                    />
                                 </div>
-                            )}
+                                <div className="flex items-center gap-2">
+                                    <span className="text-industrial-400 text-xs font-bold uppercase tracking-wider">Hasta:</span>
+                                    <input
+                                        type="date"
+                                        className="bg-industrial-900 border border-industrial-600 rounded-lg px-3 py-1.5 text-white text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-colors"
+                                        value={endDate}
+                                        onChange={e => setEndDate(e.target.value)}
+                                    />
+                                </div>
+                                {(startDate || endDate) && (
+                                    <button
+                                        onClick={() => { setStartDate(''); setEndDate(''); }}
+                                        className="text-red-400 hover:text-red-300 text-xs font-bold px-2 py-1 rounded hover:bg-red-950/20 border border-transparent hover:border-red-900/30 transition-all"
+                                    >
+                                        Limpiar
+                                    </button>
+                                )}
+                            </div>
                         </div>
-                        <div className="flex gap-2">
+
+                        <div className="flex gap-2 w-full xl:w-auto justify-end">
                             <button
                                 onClick={generatePDF}
                                 disabled={receptions.length === 0}

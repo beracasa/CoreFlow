@@ -640,7 +640,7 @@ export class InventoryMockService implements IInventoryService {
         return result;
     }
 
-    async getReceptions(filters?: { searchTerm?: string; partId?: string }): Promise<{ data: StockReception[], total: number }> {
+    async getReceptions(filters?: { searchTerm?: string; partId?: string; startDate?: string; endDate?: string }): Promise<{ data: StockReception[], total: number }> {
         let receptions = loadFromStorage<StockReception[]>(RECEPTIONS_KEY, []);
 
         if (filters?.searchTerm || filters?.partId) {
@@ -668,6 +668,13 @@ export class InventoryMockService implements IInventoryService {
                 }
                 return false;
             });
+        }
+
+        if (filters?.startDate) {
+            receptions = receptions.filter(r => r.receptionDate >= `${filters.startDate}T00:00:00`);
+        }
+        if (filters?.endDate) {
+            receptions = receptions.filter(r => r.receptionDate <= `${filters.endDate}T23:59:59`);
         }
 
         const prs = this.getPurchaseRequests();
