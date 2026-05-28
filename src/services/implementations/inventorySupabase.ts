@@ -568,14 +568,32 @@ export class InventorySupabaseService implements IInventoryService {
             throw error;
         }
 
-        const mapped = (data || []).map(record => ({
-            id: record.id,
-            receptionDate: record.reception_date,
-            documentNumber: record.document_number,
-            receivedBy: record.received_by,
-            items: record.items || [],
-            notes: record.notes
-        }));
+        const { data: prsData } = await supabase
+            .from('purchase_requests')
+            .select('purchase_request_number, status');
+        
+        const prStatusMap = new Map<string, string>();
+        if (prsData) {
+            prsData.forEach((pr: any) => {
+                if (pr.purchase_request_number) {
+                    prStatusMap.set(pr.purchase_request_number.trim().toLowerCase(), pr.status || 'Pendiente');
+                }
+            });
+        }
+
+        const mapped = (data || []).map(record => {
+            const docNum = record.document_number?.trim();
+            const status = docNum ? prStatusMap.get(docNum.toLowerCase()) : undefined;
+            return {
+                id: record.id,
+                receptionDate: record.reception_date,
+                documentNumber: record.document_number,
+                receivedBy: record.received_by,
+                items: record.items || [],
+                notes: record.notes,
+                status: status
+            };
+        });
 
         const grouped = this.groupReceptions(mapped);
 

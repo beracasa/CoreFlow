@@ -91,4 +91,5 @@ export interface StockReception {
     receivedBy?: string;
     items: StockReceptionItem[];
     notes?: string;
+    status?: string;
 }

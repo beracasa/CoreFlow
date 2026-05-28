@@ -670,7 +670,24 @@ export class InventoryMockService implements IInventoryService {
             });
         }
 
-        const grouped = this.groupReceptions(receptions);
+        const prs = this.getPurchaseRequests();
+        const prStatusMap = new Map<string, string>();
+        prs.forEach(pr => {
+            if (pr.purchaseRequestNumber) {
+                prStatusMap.set(pr.purchaseRequestNumber.trim().toLowerCase(), pr.status || 'Pendiente');
+            }
+        });
+
+        const mapped = receptions.map(rec => {
+            const docNum = rec.documentNumber?.trim();
+            const status = docNum ? prStatusMap.get(docNum.toLowerCase()) : undefined;
+            return {
+                ...rec,
+                status: status
+            };
+        });
+
+        const grouped = this.groupReceptions(mapped);
 
         return { data: grouped, total: grouped.length };
     }

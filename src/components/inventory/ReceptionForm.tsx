@@ -528,10 +528,23 @@ export const ReceptionForm: React.FC = () => {
                                                 <ArrowDownCircle className="w-4 h-4 text-emerald-400" />
                                             </span>
                                             <div>
-                                                <p className="text-white text-sm font-semibold">
+                                                <p className="text-white text-sm font-semibold flex items-center gap-2">
                                                     {rec.documentNumber
                                                         ? <><span className="font-mono text-emerald-400">{rec.documentNumber}</span></>
                                                         : <span className="text-industrial-400 italic">Sin documento</span>}
+                                                    {rec.status && (
+                                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                                                            rec.status.toLowerCase() === 'recibido'
+                                                                ? 'bg-emerald-900/30 text-emerald-400 border border-emerald-800'
+                                                                : rec.status.toLowerCase() === 'cancelado'
+                                                                    ? 'bg-red-900/30 text-red-400 border border-red-800'
+                                                                    : rec.status.toLowerCase() === 'parcial'
+                                                                        ? 'bg-blue-900/30 text-blue-400 border border-blue-800'
+                                                                        : 'bg-yellow-900/30 text-yellow-500 border border-yellow-800'
+                                                        }`}>
+                                                            {rec.status}
+                                                        </span>
+                                                    )}
                                                 </p>
                                                 <p className="text-industrial-500 text-xs">
                                                     {new Date(rec.receptionDate).toLocaleString('es', {
