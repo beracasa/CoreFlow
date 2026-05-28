@@ -644,4 +644,69 @@ export class InventoryMockService implements IInventoryService {
             this.savePurchaseRequests(prs);
         }
     }
+
+    async getPurchaseRequestsForReception(): Promise<ExtendedPurchaseRequest[]> {
+        const res = await this.getAllPurchaseRequests(1, 1000);
+        return res.data.filter(pr => 
+            pr.status?.toLowerCase() === 'pendiente' || 
+            pr.status?.toLowerCase() === 'parcial'
+        );
+    }
+
+    async processPurchaseReception(purchaseRequestId: string, itemsReceived: { partId: string; qtyReceived: number }[], notes?: string): Promise<void> {
+        const prs = this.getPurchaseRequests();
+        const parts = this.getParts();
+        const transactions = this.getTransactions();
+
+        const index = prs.findIndex(p => p.id === purchaseRequestId);
+        if (index === -1) throw new Error('Purchase request not found');
+
+        const request = prs[index];
+        const currentItems = request.items || [];
+        let anyItemReceived = false;
+        let allItemsFullyReceived = true;
+
+        for (const receivedItem of itemsReceived) {
+            if (receivedItem.qtyReceived <= 0) continue;
+
+            const reqItem = currentItems.find(i => i.partId === receivedItem.partId);
+            if (!reqItem) continue;
+
+            // Increment stock
+            const partIndex = parts.findIndex(p => p.id === receivedItem.partId);
+            if (partIndex !== -1) {
+                parts[partIndex].currentStock += receivedItem.qtyReceived;
+            }
+
+            // Create transaction type 'IN'
+            transactions.push({
+                id: `TX-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+                partId: receivedItem.partId,
+                type: 'IN',
+                quantity: receivedItem.qtyReceived,
+                date: new Date().toISOString(),
+                userId: 'current-user',
+                relatedDocumentId: purchaseRequestId,
+                purchaseRequestId: purchaseRequestId
+            });
+
+            // Update quantityReceived
+            reqItem.quantityReceived = (reqItem.quantityReceived || 0) + receivedItem.qtyReceived;
+        }
+
+        // Calculate global status
+        for (const item of currentItems) {
+            const received = item.quantityReceived || 0;
+            if (received > 0) anyItemReceived = true;
+            if (received < item.quantity) {
+                allItemsFullyReceived = false;
+            }
+        }
+
+        request.status = allItemsFullyReceived ? 'Recibido' : (anyItemReceived ? 'Parcial' : 'Pendiente');
+        
+        this.saveParts(parts);
+        this.saveTransactions(transactions);
+        this.savePurchaseRequests(prs);
+    }
 }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { inventoryService } from '../../services';
-import { SparePart, StockReception } from '../../types/inventory';
+import { SparePart, StockReception, ExtendedPurchaseRequest } from '../../types/inventory';
 import { ArrowDownCircle, Clock, FileText, Package, ChevronDown, ChevronRight, Search, FileDown, Filter, X } from 'lucide-react';
 import { TablePagination } from '../shared/TablePagination';
 import jsPDF from 'jspdf';
@@ -20,6 +20,10 @@ export const ReceptionForm: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [showDropdown, setShowDropdown] = useState(false);
     const [itemsToReceive, setItemsToReceive] = useState<{ partId: string; partName: string; partNumber: string; quantity: number }[]>([]);
+    
+    // Purchase Request Linking State
+    const [purchaseRequests, setPurchaseRequests] = useState<ExtendedPurchaseRequest[]>([]);
+    const [selectedPurchaseRequestId, setSelectedPurchaseRequestId] = useState('');
 
     // --- History State ---
     const [receptions, setReceptions] = useState<StockReception[]>([]);
@@ -34,6 +38,7 @@ export const ReceptionForm: React.FC = () => {
 
     useEffect(() => {
         inventoryService.getAllParts(1, 1000).then(res => setParts(res.data));
+        inventoryService.getPurchaseRequestsForReception().then(res => setPurchaseRequests(res));
     }, []);
 
     const loadHistory = () => {
@@ -81,6 +86,29 @@ export const ReceptionForm: React.FC = () => {
 
     const handleRemoveItem = (index: number) => {
         setItemsToReceive(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const handlePurchaseRequestChange = (prId: string) => {
+        setSelectedPurchaseRequestId(prId);
+        if (!prId) {
+            setItemsToReceive([]);
+            setRelatedDocId('');
+            return;
+        }
+
+        const pr = purchaseRequests.find(p => p.id === prId);
+        if (pr) {
+            setRelatedDocId(pr.purchaseRequestNumber);
+            const pendingItems = pr.items
+                .filter(item => (item.quantityReceived || 0) < item.quantity)
+                .map(item => ({
+                    partId: item.partId,
+                    partName: item.partName || '',
+                    partNumber: item.partNumber || '',
+                    quantity: item.quantity - (item.quantityReceived || 0)
+                }));
+            setItemsToReceive(pendingItems);
+        }
     };
 
     const generatePDF = () => {
@@ -167,17 +195,31 @@ export const ReceptionForm: React.FC = () => {
         }
 
         try {
-            // 1. Update stock for each item
-            for (const item of itemsToReceive) {
-                await inventoryService.addStock(item.partId, item.quantity, relatedDocId);
-            }
+            if (selectedPurchaseRequestId) {
+                // Use the central method for processing Purchase Receptions
+                await inventoryService.processPurchaseReception(
+                    selectedPurchaseRequestId,
+                    itemsToReceive.map(i => ({ partId: i.partId, qtyReceived: i.quantity })),
+                    notes
+                );
+                
+                // Refresh list of PRs
+                inventoryService.getPurchaseRequestsForReception().then(res => setPurchaseRequests(res));
+                setSelectedPurchaseRequestId('');
+            } else {
+                // Original independent reception
+                // 1. Update stock for each item
+                for (const item of itemsToReceive) {
+                    await inventoryService.addStock(item.partId, item.quantity, relatedDocId);
+                }
 
-            // 2. Save the consolidated reception record
-            await inventoryService.saveReception({
-                documentNumber: relatedDocId || undefined,
-                notes: notes || undefined,
-                items: itemsToReceive
-            });
+                // 2. Save the consolidated reception record
+                await inventoryService.saveReception({
+                    documentNumber: relatedDocId || undefined,
+                    notes: notes || undefined,
+                    items: itemsToReceive
+                });
+            }
 
             setMessage({ type: 'success', text: 'Recepción registrada correctamente.' });
             setItemsToReceive([]);
@@ -248,6 +290,23 @@ export const ReceptionForm: React.FC = () => {
                             <span className="font-medium text-sm">{message.text}</span>
                         </div>
                     )}
+
+                    {/* Link to Purchase Request */}
+                    <div>
+                        <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">Vincular a Solicitud de Compra (Opcional)</label>
+                        <select
+                            className="w-full bg-industrial-900 border border-industrial-600 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-emerald-500 transition-colors"
+                            value={selectedPurchaseRequestId}
+                            onChange={e => handlePurchaseRequestChange(e.target.value)}
+                        >
+                            <option value="">-- Ninguna (Recepción Manual) --</option>
+                            {purchaseRequests.map(pr => (
+                                <option key={pr.id} value={pr.id}>
+                                    {pr.purchaseRequestNumber} - Estado: {pr.status}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
 
                     {/* Document Number */}
                     <div>

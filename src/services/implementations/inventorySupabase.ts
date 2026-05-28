@@ -628,4 +628,83 @@ export class InventorySupabaseService implements IInventoryService {
             throw error;
         }
     }
+
+    async getPurchaseRequestsForReception(): Promise<ExtendedPurchaseRequest[]> {
+        // Fetch all purchase requests, we will filter for Pending/Partial since there could be differences in casing
+        const res = await this.getAllPurchaseRequests(1, 1000);
+        return res.data.filter(pr => 
+            pr.status?.toLowerCase() === 'pendiente' || 
+            pr.status?.toLowerCase() === 'parcial'
+        );
+    }
+
+    async processPurchaseReception(purchaseRequestId: string, itemsReceived: { partId: string; qtyReceived: number }[], notes?: string): Promise<void> {
+        // 1. Fetch the original purchase request
+        const { data: request, error: reqError } = await supabase
+            .from('purchase_requests')
+            .select('*')
+            .eq('id', purchaseRequestId)
+            .single();
+
+        if (reqError) throw reqError;
+
+        const currentItems = request.items || [];
+        let anyItemReceived = false;
+        let allItemsFullyReceived = true;
+
+        // 2. Process each received item
+        for (const receivedItem of itemsReceived) {
+            if (receivedItem.qtyReceived <= 0) continue;
+
+            const reqItem = currentItems.find((i: any) => i.partId === receivedItem.partId);
+            if (!reqItem) continue;
+
+            // Increment stock
+            const { error: stockError } = await supabase.rpc('increment_part_stock', {
+                p_part_id: receivedItem.partId,
+                p_quantity: receivedItem.qtyReceived
+            });
+            if (stockError) {
+                // Fallback for missing RPC
+                const { data: part } = await supabase.from('spare_parts').select('current_stock').eq('id', receivedItem.partId).single();
+                if (part) {
+                    await supabase.from('spare_parts').update({ current_stock: (part.current_stock || 0) + receivedItem.qtyReceived }).eq('id', receivedItem.partId);
+                }
+            }
+
+            // Create inventory transaction type 'IN'
+            await supabase.from('inventory_transactions').insert({
+                part_id: receivedItem.partId,
+                transaction_type: 'INBOUND', // using INBOUND or IN, depends on the DB ENUM/VARCHAR, fallback to 'INBOUND'
+                quantity: receivedItem.qtyReceived,
+                purchase_request_id: purchaseRequestId,
+                reference_id: purchaseRequestId, // Also saving reference_id for backward compatibility
+                notes: notes || `Recepción de compra ${request.purchase_request_number}`
+            });
+
+            // Update item quantityReceived
+            reqItem.quantityReceived = (reqItem.quantityReceived || 0) + receivedItem.qtyReceived;
+        }
+
+        // 3. Update the items JSONB and recalculate global status
+        for (const item of currentItems) {
+            const received = item.quantityReceived || 0;
+            if (received > 0) anyItemReceived = true;
+            if (received < item.quantity) {
+                allItemsFullyReceived = false;
+            }
+        }
+
+        const newStatus = allItemsFullyReceived ? 'Recibido' : (anyItemReceived ? 'Parcial' : 'Pendiente');
+
+        const { error: updateError } = await supabase
+            .from('purchase_requests')
+            .update({
+                items: currentItems,
+                status: newStatus
+            })
+            .eq('id', purchaseRequestId);
+
+        if (updateError) throw updateError;
+    }
 }
