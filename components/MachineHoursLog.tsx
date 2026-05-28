@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Machine, MachineHourLog } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from "../contexts/AuthContext";
-import { MachineSupabaseService } from "../src/services/implementations/machineSupabase";
+import { MasterDataService } from "../src/services/masterDataService";
 import { Clock, History, Save, FileDown, Filter, X, Lock, AlertCircle } from 'lucide-react';
 import { TablePagination } from './shared/TablePagination';
 import jsPDF from 'jspdf';
@@ -46,7 +46,7 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
         const fetchLogs = async () => {
             try {
                 setIsLoading(true);
-                const result = await MachineSupabaseService.getFilteredMachineHourLogs({
+                const result = await MasterDataService.getFilteredMachineHourLogs({
                     machineId: selectedMachineId || undefined,
                     startDate: startDate || undefined,
                     endDate: endDate || undefined,
@@ -86,7 +86,7 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
 
         try {
             setIsLoading(true);
-            const newLog = await MachineSupabaseService.logMachineHours({
+            const newLog = await MasterDataService.logMachineHours({
                 machineId: selectedMachine.id,
                 hoursLogged: currentReading,
                 unit: selectedUnit,
@@ -96,7 +96,7 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
             // Update history locally if it matches current filters (simplified: just prepend if no date filter or within range)
             // Ideally, re-fetch to be safe, but prepending is faster feedback.
             // For now, let's re-fetch to ensure sort order and consistency
-            const logs = await MachineSupabaseService.getFilteredMachineHourLogs({
+            const logs = await MasterDataService.getFilteredMachineHourLogs({
                 machineId: selectedMachineId || undefined,
                 startDate: startDate || undefined,
                 endDate: endDate || undefined

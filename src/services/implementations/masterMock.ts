@@ -1,9 +1,40 @@
-import { Machine, Technician, ZoneStructure, MachineStatus } from '../../../types';
+import { Machine, Technician, ZoneStructure, MachineStatus, MachineHourLog } from '../../../types';
 import { saveToStorage, loadFromStorage } from '../../utils/persistence';
 
 const MACHINES_KEY = 'v2_cmms_machines';
 const TECHS_KEY = 'v2_cmms_technicians';
 const ZONES_KEY = 'v2_cmms_zones';
+const MACHINE_LOGS_KEY = 'v2_cmms_machine_hour_logs';
+
+const INITIAL_MACHINE_LOGS: MachineHourLog[] = [
+    {
+        id: 'log-1',
+        machineId: 'm1',
+        date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        hoursLogged: 1200,
+        unit: 'h',
+        operator: 'Juan Perez',
+        comments: 'Lectura de rutina'
+    },
+    {
+        id: 'log-2',
+        machineId: 'm1',
+        date: new Date().toISOString().split('T')[0],
+        hoursLogged: 1250,
+        unit: 'h',
+        operator: 'Juan Perez',
+        comments: 'Lectura de rutina'
+    },
+    {
+        id: 'log-3',
+        machineId: 'm2',
+        date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        hoursLogged: 850,
+        unit: 'h',
+        operator: 'Maria Garcia',
+        comments: 'Lectura de rutina'
+    }
+];
 
 const INITIAL_MACHINES: Machine[] = [
     {
@@ -150,6 +181,68 @@ export class MasterMockService {
         const machines = loadFromStorage(MACHINES_KEY, INITIAL_MACHINES);
         const filtered = machines.filter(m => m.id !== id);
         saveToStorage(MACHINES_KEY, filtered);
+    }
+
+    async getFilteredMachineHourLogs(filters: { 
+        machineId?: string; 
+        startDate?: string; 
+        endDate?: string;
+        page?: number;
+        limit?: number;
+    }): Promise<{ data: MachineHourLog[]; total: number }> {
+        let logs = loadFromStorage(MACHINE_LOGS_KEY, INITIAL_MACHINE_LOGS);
+
+        if (filters.machineId) {
+            logs = logs.filter(l => l.machineId === filters.machineId);
+        }
+        if (filters.startDate) {
+            logs = logs.filter(l => l.date >= filters.startDate!);
+        }
+        if (filters.endDate) {
+            logs = logs.filter(l => l.date <= filters.endDate!);
+        }
+
+        // Sort by date desc, then by id desc
+        logs.sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+
+        const total = logs.length;
+        const page = filters.page || 1;
+        const limit = filters.limit || 50;
+        const from = (page - 1) * limit;
+        const to = from + limit;
+
+        return { data: logs.slice(from, to), total };
+    }
+
+    async logMachineHours(log: { 
+        machineId: string; 
+        hoursLogged: number; 
+        unit: 'h' | 'km'; 
+        operator: string; 
+        comments?: string; 
+    }): Promise<MachineHourLog> {
+        const logs = loadFromStorage(MACHINE_LOGS_KEY, INITIAL_MACHINE_LOGS);
+        const newLog: MachineHourLog = {
+            id: `log-${Date.now()}`,
+            machineId: log.machineId,
+            date: new Date().toISOString().split('T')[0],
+            hoursLogged: log.hoursLogged,
+            unit: log.unit,
+            operator: log.operator,
+            comments: log.comments
+        };
+        logs.unshift(newLog);
+        saveToStorage(MACHINE_LOGS_KEY, logs);
+
+        // Also update the machine's runningHours in localStorage
+        const machines = loadFromStorage(MACHINES_KEY, INITIAL_MACHINES);
+        const machineIndex = machines.findIndex(m => m.id === log.machineId);
+        if (machineIndex !== -1) {
+            machines[machineIndex].runningHours = log.hoursLogged;
+            saveToStorage(MACHINES_KEY, machines);
+        }
+
+        return newLog;
     }
 }
 

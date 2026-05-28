@@ -20,6 +20,26 @@ export const MasterDataService = {
     return machineService.deleteMachine(id);
   },
 
+  async getFilteredMachineHourLogs(filters: { 
+    machineId?: string; 
+    startDate?: string; 
+    endDate?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<{ data: any[]; total: number }> {
+    return (machineService as any).getFilteredMachineHourLogs(filters);
+  },
+
+  async logMachineHours(log: { 
+    machineId: string; 
+    hoursLogged: number; 
+    unit: 'h' | 'km'; 
+    operator: string; 
+    comments?: string; 
+  }): Promise<any> {
+    return (machineService as any).logMachineHours(log);
+  },
+
   // TECHNICIANS
   async getTechnicians(): Promise<Technician[]> {
     if (import.meta.env.VITE_USE_MOCK === 'true') {
