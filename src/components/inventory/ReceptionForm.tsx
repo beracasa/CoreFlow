@@ -321,59 +321,61 @@ export const ReceptionForm: React.FC = () => {
                     </div>
 
                     {/* Add Item */}
-                    <div className="p-4 bg-industrial-900/50 border border-industrial-700 rounded-lg space-y-4">
-                        <h3 className="text-white font-bold text-sm">Agregar Ítem</h3>
+                    {!selectedPurchaseRequestId && (
+                        <div className="p-4 bg-industrial-900/50 border border-industrial-700 rounded-lg space-y-4">
+                            <h3 className="text-white font-bold text-sm">Agregar Ítem</h3>
 
-                        <div className="relative">
-                            <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">Repuesto</label>
-                            <input
-                                type="text"
-                                placeholder="Buscar repuesto por código o nombre..."
-                                className="w-full bg-industrial-900 border border-industrial-600 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-emerald-500 transition-colors"
-                                value={searchTerm}
-                                onChange={e => { setSearchTerm(e.target.value); setSelectedPartId(''); setShowDropdown(true); }}
-                                onFocus={() => setShowDropdown(true)}
-                                onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
-                            />
-                            {showDropdown && (
-                                <div className="absolute z-10 w-full mt-1 bg-industrial-800 border border-industrial-600 rounded-lg shadow-xl max-h-60 overflow-y-auto">
-                                    {filteredParts.length > 0 ? filteredParts.map(p => (
-                                        <div
-                                            key={p.id}
-                                            className="px-4 py-2 hover:bg-industrial-700 cursor-pointer text-white text-sm border-b border-industrial-700/50 last:border-0"
-                                            onClick={() => { setSelectedPartId(p.id); setSearchTerm(`${p.partNumber} - ${p.name}`); setShowDropdown(false); }}
-                                        >
-                                            <span className="font-bold text-emerald-400">{p.partNumber}</span> - {p.name}
-                                        </div>
-                                    )) : (
-                                        <div className="px-4 py-2 text-industrial-400 text-sm">No se encontraron resultados</div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4 items-end">
-                            <div>
-                                <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">Cantidad</label>
+                            <div className="relative">
+                                <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">Repuesto</label>
                                 <input
-                                    type="number"
-                                    min="1"
-                                    className="w-full bg-industrial-900 border border-industrial-600 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-emerald-500 transition-colors font-mono"
-                                    value={quantity === 0 ? '' : quantity}
-                                    onFocus={e => e.target.select()}
-                                    onChange={e => { const val = e.target.value; setQuantity(val === '' ? 0 : parseInt(val)); }}
+                                    type="text"
+                                    placeholder="Buscar repuesto por código o nombre..."
+                                    className="w-full bg-industrial-900 border border-industrial-600 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-emerald-500 transition-colors"
+                                    value={searchTerm}
+                                    onChange={e => { setSearchTerm(e.target.value); setSelectedPartId(''); setShowDropdown(true); }}
+                                    onFocus={() => setShowDropdown(true)}
+                                    onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
                                 />
+                                {showDropdown && (
+                                    <div className="absolute z-10 w-full mt-1 bg-industrial-800 border border-industrial-600 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                                        {filteredParts.length > 0 ? filteredParts.map(p => (
+                                            <div
+                                                key={p.id}
+                                                className="px-4 py-2 hover:bg-industrial-700 cursor-pointer text-white text-sm border-b border-industrial-700/50 last:border-0"
+                                                onClick={() => { setSelectedPartId(p.id); setSearchTerm(`${p.partNumber} - ${p.name}`); setShowDropdown(false); }}
+                                            >
+                                                <span className="font-bold text-emerald-400">{p.partNumber}</span> - {p.name}
+                                            </div>
+                                        )) : (
+                                            <div className="px-4 py-2 text-industrial-400 text-sm">No se encontraron resultados</div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
-                            <button
-                                type="button"
-                                onClick={handleAddItem}
-                                disabled={!selectedPartId || quantity <= 0}
-                                className="w-full px-4 py-2.5 border border-transparent rounded-lg text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg"
-                            >
-                                + Agregar a Lista
-                            </button>
+
+                            <div className="grid grid-cols-2 gap-4 items-end">
+                                <div>
+                                    <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">Cantidad</label>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        className="w-full bg-industrial-900 border border-industrial-600 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-emerald-500 transition-colors font-mono"
+                                        value={quantity === 0 ? '' : quantity}
+                                        onFocus={e => e.target.select()}
+                                        onChange={e => { const val = e.target.value; setQuantity(val === '' ? 0 : parseInt(val)); }}
+                                    />
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleAddItem}
+                                    disabled={!selectedPartId || quantity <= 0}
+                                    className="w-full px-4 py-2.5 border border-transparent rounded-lg text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg"
+                                >
+                                    + Agregar a Lista
+                                </button>
+                            </div>
                         </div>
-                    </div>
+                    )}
 
                     {/* Items Table */}
                     {itemsToReceive.length > 0 && (

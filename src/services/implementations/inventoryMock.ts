@@ -589,6 +589,57 @@ export class InventoryMockService implements IInventoryService {
         return newReception;
     }
 
+    private groupReceptions(receptions: StockReception[]): StockReception[] {
+        const grouped = new Map<string, StockReception>();
+        
+        for (const rec of receptions) {
+            const docNum = rec.documentNumber?.trim();
+            if (!docNum) continue;
+
+            const existing = grouped.get(docNum);
+            if (!existing) {
+                grouped.set(docNum, {
+                    ...rec,
+                    items: rec.items.map(i => ({ ...i }))
+                });
+            } else {
+                // Merge items
+                for (const item of rec.items) {
+                    const existingItem = existing.items.find(i => i.partId === item.partId);
+                    if (existingItem) {
+                        existingItem.quantity += item.quantity;
+                    } else {
+                        existing.items.push({ ...item });
+                    }
+                }
+                // Keep the latest receptionDate (since receptions are sorted descending, the first we find is the latest)
+                if (!existing.notes && rec.notes) {
+                    existing.notes = rec.notes;
+                } else if (existing.notes && rec.notes && existing.notes !== rec.notes && !existing.notes.includes(rec.notes)) {
+                    existing.notes = `${existing.notes} | ${rec.notes}`;
+                }
+            }
+        }
+
+        const result: StockReception[] = [];
+        const addedDocs = new Set<string>();
+
+        for (const rec of receptions) {
+            const docNum = rec.documentNumber?.trim();
+            if (!docNum) {
+                result.push(rec);
+            } else if (!addedDocs.has(docNum)) {
+                const merged = grouped.get(docNum);
+                if (merged) {
+                    result.push(merged);
+                    addedDocs.add(docNum);
+                }
+            }
+        }
+
+        return result;
+    }
+
     async getReceptions(filters?: { searchTerm?: string; partId?: string }): Promise<{ data: StockReception[], total: number }> {
         let receptions = loadFromStorage<StockReception[]>(RECEPTIONS_KEY, []);
 
@@ -619,7 +670,9 @@ export class InventoryMockService implements IInventoryService {
             });
         }
 
-        return { data: receptions, total: receptions.length };
+        const grouped = this.groupReceptions(receptions);
+
+        return { data: grouped, total: grouped.length };
     }
 
     async createDirectPurchaseRequest(items: { partId: string; quantity: number }[]): Promise<void> {
@@ -666,6 +719,8 @@ export class InventoryMockService implements IInventoryService {
         let anyItemReceived = false;
         let allItemsFullyReceived = true;
 
+        const receptionItemsToLog: any[] = [];
+
         for (const receivedItem of itemsReceived) {
             if (receivedItem.qtyReceived <= 0) continue;
 
@@ -674,8 +729,12 @@ export class InventoryMockService implements IInventoryService {
 
             // Increment stock
             const partIndex = parts.findIndex(p => p.id === receivedItem.partId);
+            let partName = 'Repuesto Desconocido';
+            let partNumber = 'N/A';
             if (partIndex !== -1) {
                 parts[partIndex].currentStock += receivedItem.qtyReceived;
+                partName = parts[partIndex].name;
+                partNumber = parts[partIndex].partNumber || 'N/A';
             }
 
             // Create transaction type 'IN'
@@ -692,6 +751,13 @@ export class InventoryMockService implements IInventoryService {
 
             // Update quantityReceived
             reqItem.quantityReceived = (reqItem.quantityReceived || 0) + receivedItem.qtyReceived;
+
+            receptionItemsToLog.push({
+                partId: receivedItem.partId,
+                partName: partName,
+                partNumber: partNumber,
+                quantity: receivedItem.qtyReceived
+            });
         }
 
         // Calculate global status
@@ -708,5 +774,13 @@ export class InventoryMockService implements IInventoryService {
         this.saveParts(parts);
         this.saveTransactions(transactions);
         this.savePurchaseRequests(prs);
+
+        if (receptionItemsToLog.length > 0) {
+            await this.saveReception({
+                documentNumber: request.purchaseRequestNumber || undefined,
+                notes: notes || `Recepción de compra ${request.purchaseRequestNumber}`,
+                items: receptionItemsToLog
+            });
+        }
     }
 }

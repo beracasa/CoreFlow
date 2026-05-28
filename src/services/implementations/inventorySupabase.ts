@@ -497,6 +497,57 @@ export class InventorySupabaseService implements IInventoryService {
         };
     }
 
+    private groupReceptions(receptions: StockReception[]): StockReception[] {
+        const grouped = new Map<string, StockReception>();
+        
+        for (const rec of receptions) {
+            const docNum = rec.documentNumber?.trim();
+            if (!docNum) continue;
+
+            const existing = grouped.get(docNum);
+            if (!existing) {
+                grouped.set(docNum, {
+                    ...rec,
+                    items: rec.items.map(i => ({ ...i }))
+                });
+            } else {
+                // Merge items
+                for (const item of rec.items) {
+                    const existingItem = existing.items.find(i => i.partId === item.partId);
+                    if (existingItem) {
+                        existingItem.quantity += item.quantity;
+                    } else {
+                        existing.items.push({ ...item });
+                    }
+                }
+                // Keep the latest receptionDate (since receptions are sorted descending, the first we find is the latest)
+                if (!existing.notes && rec.notes) {
+                    existing.notes = rec.notes;
+                } else if (existing.notes && rec.notes && existing.notes !== rec.notes && !existing.notes.includes(rec.notes)) {
+                    existing.notes = `${existing.notes} | ${rec.notes}`;
+                }
+            }
+        }
+
+        const result: StockReception[] = [];
+        const addedDocs = new Set<string>();
+
+        for (const rec of receptions) {
+            const docNum = rec.documentNumber?.trim();
+            if (!docNum) {
+                result.push(rec);
+            } else if (!addedDocs.has(docNum)) {
+                const merged = grouped.get(docNum);
+                if (merged) {
+                    result.push(merged);
+                    addedDocs.add(docNum);
+                }
+            }
+        }
+
+        return result;
+    }
+
     async getReceptions(filters?: { searchTerm?: string; partId?: string }): Promise<{ data: StockReception[], total: number }> {
         let query = supabase
             .from('stock_receptions')
@@ -510,23 +561,27 @@ export class InventorySupabaseService implements IInventoryService {
             query = query.or(`document_number.ilike.%${filters.searchTerm}%,notes.ilike.%${filters.searchTerm}%`);
         }
 
-        const { data, error, count } = await query;
+        const { data, error } = await query;
 
         if (error) {
             console.error('Error fetching receptions:', error);
             throw error;
         }
 
+        const mapped = (data || []).map(record => ({
+            id: record.id,
+            receptionDate: record.reception_date,
+            documentNumber: record.document_number,
+            receivedBy: record.received_by,
+            items: record.items || [],
+            notes: record.notes
+        }));
+
+        const grouped = this.groupReceptions(mapped);
+
         return { 
-            data: (data || []).map(record => ({
-                id: record.id,
-                receptionDate: record.reception_date,
-                documentNumber: record.document_number,
-                receivedBy: record.received_by,
-                items: record.items || [],
-                notes: record.notes
-            })), 
-            total: count || 0 
+            data: grouped, 
+            total: grouped.length 
         };
     }
 
@@ -652,6 +707,21 @@ export class InventorySupabaseService implements IInventoryService {
         let anyItemReceived = false;
         let allItemsFullyReceived = true;
 
+        // Fetch received parts details for reception log
+        const partIdsToFetch = itemsReceived.filter(i => i.qtyReceived > 0).map(i => i.partId);
+        let partsMap = new Map<string, { name: string; sku: string }>();
+        if (partIdsToFetch.length > 0) {
+            const { data: partsData } = await supabase
+                .from('spare_parts')
+                .select('id, name, sku')
+                .in('id', partIdsToFetch);
+            if (partsData) {
+                partsMap = new Map(partsData.map(p => [p.id, { name: p.name, sku: p.sku || 'N/A' }]));
+            }
+        }
+
+        const receptionItemsToLog: any[] = [];
+
         // 2. Process each received item
         for (const receivedItem of itemsReceived) {
             if (receivedItem.qtyReceived <= 0) continue;
@@ -684,6 +754,14 @@ export class InventorySupabaseService implements IInventoryService {
 
             // Update item quantityReceived
             reqItem.quantityReceived = (reqItem.quantityReceived || 0) + receivedItem.qtyReceived;
+
+            const partInfo = partsMap.get(receivedItem.partId);
+            receptionItemsToLog.push({
+                partId: receivedItem.partId,
+                partName: partInfo?.name || 'Repuesto Desconocido',
+                partNumber: partInfo?.sku || 'N/A',
+                quantity: receivedItem.qtyReceived
+            });
         }
 
         // 3. Update the items JSONB and recalculate global status
@@ -706,5 +784,14 @@ export class InventorySupabaseService implements IInventoryService {
             .eq('id', purchaseRequestId);
 
         if (updateError) throw updateError;
+
+        // 4. Save consolidated reception history record
+        if (receptionItemsToLog.length > 0) {
+            await this.saveReception({
+                documentNumber: request.purchase_request_number || undefined,
+                notes: notes || `Recepción de compra ${request.purchase_request_number}`,
+                items: receptionItemsToLog
+            });
+        }
     }
 }
