@@ -12,6 +12,8 @@ import { useMasterStore } from '../../stores/useMasterStore';
 import { TablePagination } from '../shared/TablePagination';
 
 import { useAuth } from '../../../contexts/AuthContext';
+import { UserSupabaseService } from '../../services/UserSupabaseService';
+import { UserProfile } from '../../../types';
 
 // Service initialized in index.ts
 
@@ -24,7 +26,8 @@ export const RequestList: React.FC<RequestListProps> = ({ onSelectRequest }) => 
     const canManage = hasPermission('manage_inventory');
     const [requests, setRequests] = useState<PartsRequest[]>([]);
     const [parts, setParts] = useState<SparePart[]>([]); // Need parts to show names in report
-    const { plantSettings } = useMasterStore();
+    const { plantSettings, technicians } = useMasterStore();
+    const [systemUsers, setSystemUsers] = useState<UserProfile[]>([]);
     const [loading, setLoading] = useState(false);
 
     // Refs for date pickers
@@ -44,6 +47,12 @@ export const RequestList: React.FC<RequestListProps> = ({ onSelectRequest }) => 
     useEffect(() => {
         loadData();
     }, [pagination.page]);
+
+    useEffect(() => {
+        UserSupabaseService.getUsers()
+            .then(users => setSystemUsers(users))
+            .catch(err => console.error('Error loading users:', err));
+    }, []);
 
     const loadData = async () => {
         setLoading(true);
@@ -128,6 +137,11 @@ export const RequestList: React.FC<RequestListProps> = ({ onSelectRequest }) => 
         // Flatten all request items into a single list of rows
         const tableBody = filteredRequests.flatMap(req => {
             const reqDate = new Date(req.createdDate).toLocaleDateString();
+            const deliveredToName = req.deliveredTo
+                ? (systemUsers.find(u => u.id === req.deliveredTo)?.full_name
+                    || technicians.find(t => t.id === req.deliveredTo)?.name
+                    || req.deliveredTo)
+                : '-';
             return req.items.map(item => {
                 const part = parts.find(p => p.id === item.partId);
                 return [
@@ -137,14 +151,15 @@ export const RequestList: React.FC<RequestListProps> = ({ onSelectRequest }) => 
                     item.usageLocation || '-',
                     part?.company || '-',
                     item.quantityRequested,
-                    item.quantityDelivered
+                    item.quantityDelivered,
+                    deliveredToName
                 ];
             });
         });
 
         autoTable(doc, {
             startY: yPos,
-            head: [['Fecha', 'Código', 'Nombre', 'Lugar Uso', 'Empresa', 'Solicitado', 'Entregado']],
+            head: [['Fecha', 'Código', 'Nombre', 'Lugar Uso', 'Empresa', 'Solicitado', 'Entregado', 'Entregado a']],
             body: tableBody,
             theme: 'grid',
             headStyles: { fillColor: [40, 40, 40], textColor: 255, fontStyle: 'bold', fontSize: 9 },
