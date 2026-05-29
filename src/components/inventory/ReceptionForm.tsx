@@ -119,34 +119,44 @@ export const ReceptionForm: React.FC = () => {
         const { plantSettings } = useMasterStore.getState() as any;
         const doc = new jsPDF();
 
-        let currentY = 15;
+        // 1. Logo (Small size in top left)
+        let logoHeight = 0;
+        const margin = 14;
 
-        // 1. Logo (No distortion)
         if (plantSettings.logoUrl) {
             try {
                 const imgProps = doc.getImageProperties(plantSettings.logoUrl);
-                const logoWidth = 35;
-                const logoHeight = (imgProps.height * logoWidth) / imgProps.width;
-                doc.addImage(plantSettings.logoUrl, 'PNG', 14, 10, logoWidth, logoHeight);
-                currentY = 10 + logoHeight + 10;
+                const logoWidth = 25; // Small size
+                logoHeight = (imgProps.height * logoWidth) / imgProps.width;
+                doc.addImage(plantSettings.logoUrl, 'PNG', margin, 10, logoWidth, logoHeight);
             } catch (e) {
-                console.warn('Could not add logo', e);
-                currentY = 20;
+                console.warn('Could not add logo to PDF', e);
             }
         } else {
-            currentY = 20;
+            // Fallback text if no logo
+            doc.setFontSize(14);
+            doc.setFont('helvetica', 'bold');
+            doc.text(plantSettings.plantName || 'CoreFlow', margin, 18);
+            logoHeight = 10;
         }
 
-        // 2. Title (14pt)
-        doc.setFontSize(14);
-        doc.setTextColor(40);
-        doc.text('Reporte de Recepción de Mercadería', 14, currentY);
-        currentY += 8;
+        // Adjust Y coordinates based on logo height
+        const headerY = Math.max(25, 10 + logoHeight + 5);
 
-        // 3. Filters
+        // Title
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Reporte de Recepción de Repuestos', margin, headerY);
+
+        // Date
         doc.setFontSize(10);
-        doc.setTextColor(100);
+        doc.setFont('helvetica', 'normal');
+        const dateStr = new Date().toLocaleDateString('es-DO', {
+            day: '2-digit', month: '2-digit', year: 'numeric'
+        });
+        doc.text(`Fecha de Emisión: ${dateStr}`, margin, headerY + 7);
 
+        // Filters under date
         let filterStr = 'Filtros: Todos los registros';
         if (selectedHistoryPartId) {
             const selectedPart = parts.find(p => p.id === selectedHistoryPartId);
@@ -155,37 +165,49 @@ export const ReceptionForm: React.FC = () => {
             filterStr = `Búsqueda: "${historySearchTerm}"`;
         }
 
-        doc.text(filterStr, 14, currentY);
-        currentY += 10;
+        doc.setFontSize(9);
+        doc.setTextColor(100);
+        doc.text(filterStr, margin, headerY + 14);
 
-        // 4. Content Table
-        const tableColumn = ["Fecha", "Documento", "Repuestos (Código - Nombre - Cantidad)", "Notas"];
+        const yPos = headerY + 22;
+
+        // Content Table Restructuring
+        const tableColumn = ["Fecha", "Solicitud", "Código", "Repuesto", "Cantidad", "Notas"];
         const tableRows: any[] = [];
 
         receptions.forEach(rec => {
-            const itemsStr = rec.items.map(i => `${i.partNumber} - ${i.partName} (${i.quantity})`).join('\n');
             const date = new Date(rec.receptionDate).toLocaleDateString('es-DO', {
-                day: '2-digit', month: '2-digit', year: 'numeric',
-                hour: '2-digit', minute: '2-digit'
+                day: '2-digit', month: '2-digit', year: 'numeric'
             });
 
-            tableRows.push([
-                date,
-                rec.documentNumber || 'N/A',
-                itemsStr,
-                rec.notes || '-'
-            ]);
+            // Filter items in the PDF table if a specific spare part filter is active
+            const itemsToShow = selectedHistoryPartId
+                ? rec.items.filter(i => i.partId === selectedHistoryPartId)
+                : rec.items;
+
+            itemsToShow.forEach(item => {
+                tableRows.push([
+                    date,
+                    rec.documentNumber || 'N/A',
+                    item.partNumber || '-',
+                    item.partName || '-',
+                    item.quantity,
+                    rec.notes || '-'
+                ]);
+            });
         });
 
         autoTable(doc, {
+            startY: yPos,
             head: [tableColumn],
             body: tableRows,
-            startY: currentY,
-            headStyles: { fillColor: [16, 185, 129] }, // Emerald-500
-            styles: { fontSize: 9, cellPadding: 3 },
+            theme: 'grid',
+            headStyles: { fillColor: [40, 40, 40], textColor: 255, fontStyle: 'bold', fontSize: 8 },
+            bodyStyles: { fontSize: 8 },
             columnStyles: {
-                2: { cellWidth: 80 } // Give more space to items list
-            }
+                4: { halign: 'right' }
+            },
+            margin: { left: margin, right: margin }
         });
 
         doc.save(`reporte_recepciones_${new Date().toISOString().split('T')[0]}.pdf`);
