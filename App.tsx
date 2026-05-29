@@ -102,7 +102,7 @@ const MachineHoursPage = () => {
 };
 
 const ConfigurationPage = () => {
-  const { technicians, plantSettings, addTechnician, updateSettings, zones, addZone, updateZone, removeZone } = useMasterStore();
+  const { technicians, plantSettings, addTechnician, updateSettings, zones, addZone, updateZone, deleteZone } = useMasterStore();
   const { hasRole } = useAuth();
 
   if (!hasRole([UserRole.ADMIN_SOLICITANTE])) {
@@ -117,7 +117,7 @@ const ConfigurationPage = () => {
       zoneStructures={zones} // Pass store 'zones' to prop 'zoneStructures'
       onAddZone={addZone}
       onUpdateZone={updateZone}
-      onRemoveZone={removeZone}
+      onRemoveZone={deleteZone}
     />
   );
 };

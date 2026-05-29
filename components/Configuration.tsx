@@ -331,7 +331,10 @@ export const Configuration: React.FC<ConfigurationProps> = ({
   };
 
   const handleDeleteZone = (id: string) => {
-    onRemoveZone(id);
+    const zone = zoneStructures.find(z => z.id === id);
+    if (zone && confirm(`¿Está seguro de que desea eliminar por completo la zona "${zone.name}"? Esta acción no se puede deshacer.`)) {
+      onRemoveZone(id);
+    }
   };
 
   const handleMoveZone = (zoneId: string, direction: 'up' | 'down') => {

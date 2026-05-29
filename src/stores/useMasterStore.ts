@@ -80,6 +80,7 @@ interface MasterState {
     updateZone: (zone: ZoneStructure) => Promise<void>;
     reorderZones: (sourceIndex: number, destinationIndex: number) => Promise<void>;
     removeZone: (id: string) => Promise<void>;
+    deleteZone: (id: string) => Promise<void>;
 
     removeMachine: (id: string) => Promise<void>;
 
@@ -478,6 +479,18 @@ export const useMasterStore = create<MasterState>((set, get) => ({
             }
         } catch (error: any) {
             set({ error: error.message });
+        }
+    },
+
+    deleteZone: async (id) => {
+        try {
+            await MasterDataService.removeZone(id);
+            set((state) => ({
+                zones: state.zones.filter(z => z.id !== id)
+            }));
+        } catch (error: any) {
+            set({ error: error.message });
+            throw error;
         }
     },
 
