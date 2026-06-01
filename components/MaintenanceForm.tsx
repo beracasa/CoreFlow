@@ -118,18 +118,11 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
    // Helper UI renderers - Defined early to avoid TDZ and usage in handlers
-   const isSection1Editable = (formData.currentStage === WorkOrderStage.DRAFT || editingSection === 1) && hasRole([UserRole.ADMIN_SOLICITANTE]);
-   // Allow editing section 2 in DRAFT, REQUESTED, EXECUTION
-   const isSection2Editable = ((formData.currentStage === WorkOrderStage.DRAFT || formData.currentStage === WorkOrderStage.EXECUTION || formData.currentStage === WorkOrderStage.REQUESTED) || editingSection === 2) && hasRole([UserRole.TECNICO_MANT, UserRole.ADMIN_SOLICITANTE]);
+   const isSection1Editable = (formData.currentStage === WorkOrderStage.DRAFT && hasPermission('create_wo')) || (editingSection === 1 && hasPermission('edit_wo'));
+   
+   const isSection2Editable = ((formData.currentStage === WorkOrderStage.DRAFT || formData.currentStage === WorkOrderStage.EXECUTION || formData.currentStage === WorkOrderStage.REQUESTED) && hasPermission('execute_wo')) || (editingSection === 2 && hasPermission('edit_wo'));
 
-   console.log('DEBUG: MaintenanceForm Render', {
-      stage: formData.currentStage,
-      role: user?.role,
-      isSection2Editable,
-      tasksCount: formData.tasks?.length
-   });
-
-   const isSection3Editable = (formData.currentStage === WorkOrderStage.HANDOVER || editingSection === 3) && (hasRole([UserRole.ADMIN_SOLICITANTE]) || hasPermission('supervise_order'));
+   const isSection3Editable = (formData.currentStage === WorkOrderStage.HANDOVER && hasPermission('supervise_order')) || (editingSection === 3 && hasPermission('edit_wo'));
 
 
    // -- INITIALIZATION EFFECT --
@@ -401,9 +394,9 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
    // -- STATE MACHINE TRANSITIONS --
 
    const transitionToRequested = () => {
-      // RBAC: Only Admin
-      if (!hasRole([UserRole.ADMIN_SOLICITANTE])) {
-         setValidationError("Acceso denegado: Solo los administradores pueden solicitar mantenimiento.");
+      // RBAC: Check permission
+      if (!hasPermission('create_wo')) {
+         setValidationError("Acceso denegado: No tiene permiso para crear órdenes de trabajo.");
          return;
       }
 
@@ -412,11 +405,12 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
       const result = Schema.safeParse(formData);
 
       if (!result.success) {
-         console.warn("DEBUG ZOD VALIDATION FAILED on Section 1:", result.error.issues);
+         const errorResult = result as any;
+         console.warn("DEBUG ZOD VALIDATION FAILED on Section 1:", errorResult.error.issues);
          setValidationError("Por favor complete todos los campos obligatorios de la Sección 1.");
 
          const fieldErrors = new Set<string>();
-         result.error.issues.forEach(issue => {
+         errorResult.error.issues.forEach((issue: any) => {
             fieldErrors.add(issue.path[0] as string);
          });
          setInvalidFields(fieldErrors);
@@ -435,8 +429,8 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
    };
 
    const startExecution = () => {
-      // RBAC: Tech or Admin
-      if (!hasRole([UserRole.TECNICO_MANT, UserRole.ADMIN_SOLICITANTE])) return;
+      // RBAC: Check permission
+      if (!hasPermission('execute_wo')) return;
 
       const now = new Date();
       const updated: Partial<WorkOrder> = {
@@ -456,8 +450,8 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
    };
 
    const finishExecution = () => {
-      // RBAC: Tech or Admin
-      if (!hasRole([UserRole.TECNICO_MANT, UserRole.ADMIN_SOLICITANTE])) return;
+      // RBAC: Check permission
+      if (!hasPermission('execute_wo')) return;
 
       // REMOVED: Mandatory Task Completion Check
       // Some tasks might not be completed/marked as per user request.
@@ -474,9 +468,9 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
    };
 
    const closeWorkOrder = () => {
-      // RBAC: Only Admin/Solicitante can sign off
-      if (!hasRole([UserRole.ADMIN_SOLICITANTE])) {
-         setValidationError("Acceso denegado: Solo los supervisores pueden firmar y cerrar el ticket.");
+      // RBAC: Check permission
+      if (!hasPermission('supervise_order')) {
+         setValidationError("Acceso denegado: No tiene permiso para supervisar y cerrar órdenes.");
          return;
       }
 
@@ -586,7 +580,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                      Descargar PDF
                   </button>
                )}
-               {formData.id && hasRole([UserRole.ADMIN_SOLICITANTE]) && (
+               {formData.id && hasPermission('edit_wo') && (
                   <button
                      type="button"
                      onClick={(e) => {
@@ -626,8 +620,15 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                      <h3 className={`${isSection1Editable ? 'text-emerald-400' : 'text-industrial-400'} font-bold flex items-center gap-2`}>
                         {type === 'R-MANT-02' ? '1. Solicitud de Mantenimiento' : '1. Solicitud de Servicio / Avería'} {!isSection1Editable && <Lock size={14} />}
                      </h3>
-                     {!isSection1Editable && hasRole([UserRole.ADMIN_SOLICITANTE]) && (
-                        <button onClick={() => setEditingSection(1)} className="bg-emerald-900/50 hover:bg-emerald-800 text-emerald-400 px-4 py-2 rounded text-sm font-bold transition-colors border border-emerald-500/30">
+                     {!isSection1Editable && (
+                        <button 
+                           onClick={() => hasPermission('edit_wo') && setEditingSection(1)} 
+                           className={`px-4 py-2 rounded text-sm font-bold transition-colors border ${
+                              hasPermission('edit_wo') 
+                              ? 'bg-emerald-900/50 hover:bg-emerald-800 text-emerald-400 border-emerald-500/30' 
+                              : 'bg-emerald-900/10 text-emerald-400/30 border-emerald-500/10 cursor-not-allowed opacity-50'
+                           }`}
+                        >
                            Editar
                         </button>
                      )}
@@ -1056,13 +1057,20 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                         2. Intervenciones de Mantenimiento {!isSection2Editable && <Lock size={14} />}
                      </h3>
                      <div className="flex gap-2">
-                        {formData.currentStage === WorkOrderStage.REQUESTED && hasRole([UserRole.TECNICO_MANT, UserRole.ADMIN_SOLICITANTE]) && (
+                        {formData.currentStage === WorkOrderStage.REQUESTED && hasPermission('execute_wo') && (
                            <button onClick={startExecution} className="bg-pink-600 hover:bg-pink-500 text-white px-4 py-1 rounded text-sm font-bold flex items-center gap-1 animate-pulse">
                               <PlayCircle size={14} /> Iniciar Trabajo
                            </button>
                         )}
-                        {!isSection2Editable && hasRole([UserRole.ADMIN_SOLICITANTE, UserRole.TECNICO_MANT]) && (
-                           <button onClick={() => setEditingSection(2)} className="bg-pink-900/50 hover:bg-pink-800 text-pink-400 px-4 py-2 rounded text-sm font-bold transition-colors border border-pink-500/30">
+                        {!isSection2Editable && (
+                           <button 
+                              onClick={() => hasPermission('edit_wo') && setEditingSection(2)} 
+                              className={`px-4 py-2 rounded text-sm font-bold transition-colors border ${
+                                 hasPermission('edit_wo') 
+                                 ? 'bg-pink-900/50 hover:bg-pink-800 text-pink-400 border-pink-500/30' 
+                                 : 'bg-pink-900/10 text-pink-400/30 border-pink-500/10 cursor-not-allowed opacity-50'
+                              }`}
+                           >
                               Editar
                            </button>
                         )}
@@ -1426,6 +1434,166 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                               </div>
                            </div>
 
+                            {/* Repuestos Utilizados */}
+                            <div className="mb-6 border-t border-industrial-700 pt-6">
+                               <h4 className="text-sm font-bold text-white mb-4 flex items-center gap-2"><Package size={14} className="text-pink-500" /> Repuestos Utilizados</h4>
+                               <div className="bg-industrial-900 rounded border border-industrial-700 mb-2">
+                                  <table className="w-full text-sm text-left text-industrial-300">
+                                     <thead className="bg-industrial-800 text-industrial-400 font-bold">
+                                        <tr>
+                                           <th className="p-3">Código / Repuesto</th>
+                                           <th className="p-3 w-32">Unidad</th>
+                                           <th className="p-3 w-24">Cant.</th>
+                                           <th className="p-3 w-32 text-right">Costo Unit.</th>
+                                           <th className="p-3 w-32 text-right">Total</th>
+                                           {isSection2Editable && <th className="p-3 w-10"></th>}
+                                        </tr>
+                                     </thead>
+                                     <tbody>
+                                        {(formData.consumedParts || []).map((part, idx) => (
+                                           <tr key={idx} className="border-b border-industrial-800 last:border-0 hover:bg-industrial-800/30 transition-colors">
+                                              <td className="p-2">
+                                                 <div className="relative group">
+                                                    <input
+                                                       type="text"
+                                                       disabled={!isSection2Editable}
+                                                       className={`w-full bg-industrial-900 border ${!part.partId && part.partName ? 'border-pink-500' : 'border-industrial-600'} rounded p-1 text-white text-xs focus:border-pink-500 outline-none placeholder-industrial-600`}
+                                                       placeholder="Buscar repuesto..."
+                                                       value={part.partName || ''}
+                                                       onChange={(e) => {
+                                                          const val = e.target.value;
+                                                          const updated = [...(formData.consumedParts || [])];
+                                                          updated[idx] = { ...updated[idx], partName: val, partId: '', unitCost: 0, totalCost: 0 };
+                                                          setFormData({ ...formData, consumedParts: updated });
+                                                       }}
+                                                    />
+                                                    {!part.partId && part.partName && (
+                                                       <div className="absolute left-0 top-full mt-1 w-[360px] z-50 bg-industrial-800 border border-industrial-600 rounded-md shadow-xl max-h-60 overflow-y-auto">
+                                                          {(spareParts || []).filter(p =>
+                                                             p.name.toLowerCase().includes(part.partName.toLowerCase()) ||
+                                                             p.partNumber.toLowerCase().includes(part.partName.toLowerCase())
+                                                          ).length > 0 ? (
+                                                             (spareParts || []).filter(p =>
+                                                                p.name.toLowerCase().includes(part.partName.toLowerCase()) ||
+                                                                p.partNumber.toLowerCase().includes(part.partName.toLowerCase())
+                                                             ).map(sp => (
+                                                                <div
+                                                                   key={sp.id}
+                                                                   className="p-2.5 hover:bg-industrial-700 cursor-pointer border-b border-industrial-700/50 last:border-0 flex justify-between items-center gap-3"
+                                                                   onClick={() => {
+                                                                      const updated = [...(formData.consumedParts || [])];
+                                                                      updated[idx] = {
+                                                                         ...updated[idx],
+                                                                         partId: sp.id,
+                                                                         partName: `${sp.partNumber} - ${sp.name}`,
+                                                                         sku: sp.partNumber,
+                                                                         unitCost: Math.max(0, sp.cost || 0),
+                                                                         totalCost: Math.max(0, (sp.cost || 0) * (updated[idx].quantity || 0)),
+                                                                         unit: sp.unitOfMeasure || 'Unidad'
+                                                                      };
+                                                                      const totalCost = updated.reduce((sum, p) => sum + (p.totalCost || 0), 0);
+                                                                      setFormData({ ...formData, consumedParts: updated, totalMaintenanceCost: totalCost });
+                                                                   }}
+                                                                >
+                                                                   <div className="flex flex-col flex-1 min-w-0">
+                                                                      <span className="text-white text-xs font-bold truncate">
+                                                                         <span className="text-pink-400 mr-1">{sp.partNumber}</span>
+                                                                         {sp.name}
+                                                                      </span>
+                                                                      <span className="text-industrial-400 text-[10px]">
+                                                                         {sp.unitOfMeasure || 'Unidad'} &bull; RD${(sp.cost || 0).toFixed(2)}
+                                                                      </span>
+                                                                   </div>
+                                                                   <div className={`flex-shrink-0 text-[10px] px-2 py-0.5 rounded font-bold ${sp.currentStock <= sp.minStock
+                                                                      ? 'bg-red-900/50 text-red-400 border border-red-500/30'
+                                                                      : 'bg-emerald-900/50 text-emerald-400 border border-emerald-500/30'
+                                                                      }`}>
+                                                                      Stock: {sp.currentStock}
+                                                                   </div>
+                                                                </div>
+                                                             ))
+                                                          ) : (
+                                                             <div className="p-3 text-industrial-500 text-xs italic text-center">No se encontraron repuestos</div>
+                                                          )}
+                                                       </div>
+                                                    )}
+                                                 </div>
+                                              </td>
+                                              <td className="p-2">
+                                                 <input type="text" readOnly className="w-full bg-industrial-900/50 border border-industrial-800 rounded p-1 text-xs text-industrial-400" value={part.unit || 'Unidad'} />
+                                              </td>
+                                              <td className="p-2">
+                                                 <input
+                                                    type="number"
+                                                    min="0"
+                                                    disabled={!isSection2Editable}
+                                                    className="w-full bg-industrial-900 border border-industrial-600 rounded p-1 text-white text-xs focus:border-pink-500 outline-none text-right"
+                                                    value={part.quantity}
+                                                    onChange={(e) => {
+                                                       const qty = Math.max(0, parseFloat(e.target.value) || 0);
+                                                       const updated = [...(formData.consumedParts || [])];
+                                                       updated[idx] = {
+                                                          ...updated[idx],
+                                                          quantity: qty,
+                                                          totalCost: qty * (updated[idx].unitCost || 0)
+                                                       };
+                                                       const totalCost = updated.reduce((sum, p) => sum + (p.totalCost || 0), 0);
+                                                       setFormData({ ...formData, consumedParts: updated, totalMaintenanceCost: totalCost });
+                                                    }}
+                                                 />
+                                              </td>
+                                              <td className="p-2 text-right font-mono text-xs">
+                                                 RD${part.unitCost.toFixed(2)}
+                                              </td>
+                                              <td className="p-2 text-right font-mono text-xs font-bold text-emerald-400">
+                                                 RD${part.totalCost.toFixed(2)}
+                                              </td>
+                                              {isSection2Editable && (
+                                                 <td className="p-2 text-center">
+                                                    <button
+                                                       onClick={() => {
+                                                          const updated = [...(formData.consumedParts || [])];
+                                                          updated.splice(idx, 1);
+                                                          const totalCost = updated.reduce((sum, p) => sum + (p.totalCost || 0), 0);
+                                                          setFormData({ ...formData, consumedParts: updated, totalMaintenanceCost: totalCost });
+                                                       }}
+                                                       className="text-industrial-500 hover:text-red-400 p-1"
+                                                    >
+                                                       <Trash2 size={14} />
+                                                    </button>
+                                                 </td>
+                                              )}
+                                           </tr>
+                                        ))}
+                                     </tbody>
+                                  </table>
+                                  {isSection2Editable && (
+                                     <div className="p-2 border-t border-industrial-700 bg-industrial-800/50">
+                                        <button
+                                           onClick={() => setFormData(p => {
+                                              const updated = [...(p.consumedParts || []), { partId: '', partName: '', sku: '', quantity: 1, unit: 'Unidad', unitCost: 0, totalCost: 0 }];
+                                              const totalCost = updated.reduce((sum, p) => sum + (p.totalCost || 0), 0);
+                                              return { ...p, consumedParts: updated, totalMaintenanceCost: totalCost };
+                                           })}
+                                           className="text-pink-400 hover:text-pink-300 text-xs font-bold flex items-center gap-1"
+                                        >
+                                           <Plus size={14} /> Add Part
+                                        </button>
+                                     </div>
+                                  )}
+                               </div>
+
+                               {/* Total Cost Summary */}
+                               <div className="flex justify-end">
+                                  <div className="bg-industrial-900 p-3 rounded border border-industrial-700 min-w-[200px]">
+                                     <span className="text-xs text-industrial-500 block">Costo Total Repuestos</span>
+                                     <span className="text-xl font-mono text-emerald-400 font-bold">
+                                        RD${(formData.consumedParts?.reduce((sum, p) => sum + p.totalCost, 0) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                     </span>
+                                  </div>
+                               </div>
+                            </div>
+
                            {/* Executors (Multiple) */}
                            <div className="mb-6">
                               <h4 className="text-sm font-bold text-white mb-2 flex items-center gap-2"><User size={14} className="text-pink-500" /> Personal Ejecutante</h4>
@@ -1484,8 +1652,15 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                      <h3 className={`${isSection3Editable ? 'text-emerald-400' : 'text-industrial-400'} font-bold flex items-center gap-2`}>
                         3. Cierre y Entrega {!isSection3Editable && <Lock size={14} />}
                      </h3>
-                     {!isSection3Editable && hasRole([UserRole.ADMIN_SOLICITANTE]) && formData.currentStage === WorkOrderStage.CLOSED && (
-                        <button onClick={() => setEditingSection(3)} className="bg-emerald-900/50 hover:bg-emerald-800 text-emerald-400 px-4 py-2 rounded text-sm font-bold transition-colors border border-emerald-500/30">
+                     {!isSection3Editable && formData.currentStage === WorkOrderStage.CLOSED && (
+                        <button 
+                           onClick={() => hasPermission('edit_wo') && setEditingSection(3)} 
+                           className={`px-4 py-2 rounded text-sm font-bold transition-colors border ${
+                              hasPermission('edit_wo') 
+                              ? 'bg-emerald-900/50 hover:bg-emerald-800 text-emerald-400 border-emerald-500/30' 
+                              : 'bg-emerald-900/10 text-emerald-400/30 border-emerald-500/10 cursor-not-allowed opacity-50'
+                           }`}
+                        >
                            Editar
                         </button>
                      )}

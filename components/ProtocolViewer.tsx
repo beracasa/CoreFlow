@@ -73,29 +73,27 @@ export const ProtocolViewer: React.FC<ProtocolViewerProps> = ({ tasks, readOnly 
                         <th rowSpan={2} className="border border-black p-2 w-32 text-center font-bold">Grupo</th>
                         <th rowSpan={2} className="border border-black p-2 text-center font-bold">Punto de intervención</th>
                         <th rowSpan={2} className="border border-black p-2 text-center font-bold">Tipo de intervención</th>
+                        <th rowSpan={2} className="border border-black p-2 w-20 text-center font-bold text-[10px]">Ref. de interv. Cat. Mtto</th>
 
-                        {/* Technical Specs */}
-                        <th className="border border-black p-1 w-20 text-center font-bold text-[10px]">Ref de interv.</th>
-                        <th className="border border-black p-1 w-16 text-center font-bold text-[10px]">Tipo de Lub.</th>
-                        <th className="border border-black p-1 w-16 text-center font-bold text-[10px]">Codigo</th>
-                        <th className="border border-black p-1 w-16 text-center font-bold text-[10px]">Tiem. min</th>
+                        {/* Materiales / Repuestos Header */}
+                        <th colSpan={4} className="border border-black p-1 text-center font-bold bg-gray-300">Materiales / Repuestos</th>
+                        <th rowSpan={2} className="border border-black p-2 w-16 text-center font-bold text-[10px]">Tiem. Estim min</th>
 
                         {/* Action Matrix Headers (Vertical) */}
-                        <th className="border border-black p-1 w-8"><div className="w-4 mx-auto rotate-180 writing-mode-vertical text-[9px] font-bold">Limpieza</div></th>
-                        <th className="border border-black p-1 w-8"><div className="w-4 mx-auto rotate-180 writing-mode-vertical text-[9px] font-bold">Controlar</div></th>
-                        <th className="border border-black p-1 w-8"><div className="w-4 mx-auto rotate-180 writing-mode-vertical text-[9px] font-bold">Lubricacion</div></th>
-                        <th className="border border-black p-1 w-8"><div className="w-4 mx-auto rotate-180 writing-mode-vertical text-[9px] font-bold">Regulacion</div></th>
-                        <th className="border border-black p-1 w-8"><div className="w-4 mx-auto rotate-180 writing-mode-vertical text-[9px] font-bold">Llenado</div></th>
-                        <th className="border border-black p-1 w-8"><div className="w-4 mx-auto rotate-180 writing-mode-vertical text-[9px] font-bold">Sustitucion</div></th>
-                        <th className="border border-black p-1 w-8"><div className="w-4 mx-auto rotate-180 writing-mode-vertical text-[9px] font-bold">Montaje</div></th>
+                        <th rowSpan={2} className="border border-black p-1 w-8"><div className="w-4 mx-auto rotate-180 writing-mode-vertical text-[9px] font-bold">Desmontaje</div></th>
+                        <th rowSpan={2} className="border border-black p-1 w-8"><div className="w-4 mx-auto rotate-180 writing-mode-vertical text-[9px] font-bold">Limpieza</div></th>
+                        <th rowSpan={2} className="border border-black p-1 w-8"><div className="w-4 mx-auto rotate-180 writing-mode-vertical text-[9px] font-bold">Controlar</div></th>
+                        <th rowSpan={2} className="border border-black p-1 w-8"><div className="w-4 mx-auto rotate-180 writing-mode-vertical text-[9px] font-bold">Lubricacion</div></th>
+                        <th rowSpan={2} className="border border-black p-1 w-8"><div className="w-4 mx-auto rotate-180 writing-mode-vertical text-[9px] font-bold">Cambio</div></th>
+                        <th rowSpan={2} className="border border-black p-1 w-8"><div className="w-4 mx-auto rotate-180 writing-mode-vertical text-[9px] font-bold">Montaje</div></th>
+                        <th rowSpan={2} className="border border-black p-1 w-8"><div className="w-4 mx-auto rotate-180 writing-mode-vertical text-[9px] font-bold">Ajuste-Calib.</div></th>
+                        <th rowSpan={2} className="border border-black p-1 w-8"><div className="w-4 mx-auto rotate-180 writing-mode-vertical text-[9px] font-bold">Llenado</div></th>
                     </tr>
-                    {/* The second row of headers is implicitly merged or empty for single headers in rowspan=2 */}
-                    <tr className="bg-gray-200 h-0">
-                        {/* Hidden empty cells or just handled by rowspan above */}
-                        <th className="hidden"></th><th className="hidden"></th><th className="hidden"></th><th className="hidden"></th>
-                        <th className="hidden"></th><th className="hidden"></th><th className="hidden"></th><th className="hidden"></th>
-                        <th className="hidden"></th><th className="hidden"></th><th className="hidden"></th><th className="hidden"></th>
-                        <th className="hidden"></th><th className="hidden"></th><th className="hidden"></th>
+                    <tr className="bg-gray-200">
+                        <th className="border border-black p-1 w-16 text-center font-bold text-[10px]">Tipo de Lub.</th>
+                        <th className="border border-black p-1 w-24 text-center font-bold text-[10px]">Nombre</th>
+                        <th className="border border-black p-1 w-16 text-center font-bold text-[10px]">Código</th>
+                        <th className="border border-black p-1 w-16 text-center font-bold text-[10px]">Cantidad</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -117,13 +115,16 @@ export const ProtocolViewer: React.FC<ProtocolViewerProps> = ({ tasks, readOnly 
                                 <td className="border border-black p-1.5 px-2 align-middle">{task.component}</td>
                                 <td className="border border-black p-1.5 px-2 align-middle">{task.activity}</td>
 
-                                {/* Specs */}
+                                {/* Specs & Materials */}
                                 <td className="border border-black p-1 text-center font-mono text-[10px]">{task.referenceCode}</td>
                                 <td className="border border-black p-1 text-center text-[10px]">{task.lubricantType}</td>
+                                <td className="border border-black p-1 text-center text-[10px]">{task.lubricantName}</td>
                                 <td className="border border-black p-1 text-center text-[10px]">{task.lubricantCode}</td>
+                                <td className="border border-black p-1 text-center text-[10px]">{task.lubricantQuantity}</td>
                                 <td className="border border-black p-1 text-center font-bold">{task.estimatedTime}</td>
 
                                 {/* Grid Checkboxes - Added explicit handlers on TDs for debugging */}
+                                <td className="border border-black p-0 h-10 w-10 relative">{renderFlag(task, 'disassemble')}</td>
                                 <td
                                     className="border border-black p-0 h-10 w-10 relative"
                                     onClick={() => console.log('DEBUG: TD Clean Clicked')}
@@ -132,21 +133,21 @@ export const ProtocolViewer: React.FC<ProtocolViewerProps> = ({ tasks, readOnly 
                                 </td>
                                 <td className="border border-black p-0 h-10 w-10 relative">{renderFlag(task, 'inspect')}</td>
                                 <td className="border border-black p-0 h-10 w-10 relative">{renderFlag(task, 'lubricate')}</td>
-                                <td className="border border-black p-0 h-10 w-10 relative">{renderFlag(task, 'adjust')}</td>
-                                <td className="border border-black p-0 h-10 w-10 relative">{renderFlag(task, 'refill')}</td>
                                 <td className="border border-black p-0 h-10 w-10 relative">{renderFlag(task, 'replace')}</td>
                                 <td className="border border-black p-0 h-10 w-10 relative">{renderFlag(task, 'mount')}</td>
+                                <td className="border border-black p-0 h-10 w-10 relative">{renderFlag(task, 'adjust')}</td>
+                                <td className="border border-black p-0 h-10 w-10 relative">{renderFlag(task, 'refill')}</td>
                             </tr>
                         );
                     })}
                 </tbody>
                 <tfoot>
                     <tr className="bg-gray-100 border-t-2 border-black">
-                        <td colSpan={7} className="p-2 text-right font-bold">Total Tiempo Estimado:</td>
+                        <td colSpan={9} className="p-2 text-right font-bold">Total Tiempo Estimado:</td>
                         <td className="p-2 text-center font-bold border border-black bg-white">
                             {tasks.reduce((acc, t) => acc + (t.estimatedTime || 0), 0)} min
                         </td>
-                        <td colSpan={7} className="bg-gray-200 border border-black"></td>
+                        <td colSpan={8} className="bg-gray-200 border border-black"></td>
                     </tr>
                 </tfoot>
             </table>

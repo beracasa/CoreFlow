@@ -79,6 +79,7 @@ CREATE TABLE IF NOT EXISTS public.spare_parts (
     
     -- Media
     image_url text,
+    company text,
     
     -- Audit
     created_at timestamptz DEFAULT now(),
@@ -125,16 +126,19 @@ CREATE TABLE IF NOT EXISTS public.maintenance_tasks (
     -- Technical Data
     reference_code text,
     lubricant_type text,
+    lubricant_name text,
     lubricant_code text,
+    lubricant_quantity text,
     
     -- Action Matrix (Bool flags)
+    action_disassemble boolean DEFAULT false,
     action_clean boolean DEFAULT false,
     action_inspect boolean DEFAULT false,
     action_lubricate boolean DEFAULT false,
-    action_adjust boolean DEFAULT false,
-    action_refill boolean DEFAULT false,
     action_replace boolean DEFAULT false,
     action_mount boolean DEFAULT false,
+    action_adjust boolean DEFAULT false,
+    action_refill boolean DEFAULT false,
     
     created_at timestamptz DEFAULT now()
 );

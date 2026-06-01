@@ -8,6 +8,8 @@ import { useAuth } from '../../contexts/AuthContext';
 
 export const UserManagement: React.FC = () => {
     const { users, roles, fetchUsers, fetchRoles, inviteUserWithPassword, updateUser, deleteUser, isLoading } = useUserStore();
+    const { user, hasPermission } = useAuth();
+    const canManage = hasPermission('manage_users');
 
     // Fetch on mount
     React.useEffect(() => {
@@ -17,7 +19,7 @@ export const UserManagement: React.FC = () => {
 
     // Invite Modal State
     const [showInviteModal, setShowInviteModal] = useState(false);
-    const [newUser, setNewUser] = useState({ email: '', role: '', fullName: '', title: '', companyCode: '' });
+    const [newUser, setNewUser] = useState({ email: '', role: '', fullName: '', title: '', companyCode: '', specialties: [] as string[] });
 
     // Edit Modal State
     const [editingUser, setEditingUser] = useState<UserProfile | null>(null);
@@ -25,10 +27,9 @@ export const UserManagement: React.FC = () => {
 
     // --- ACTIONS ---
 
-    const { user } = useAuth();
-
     const handleInvite = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!canManage) return;
 
         if (!newUser.role) {
             alert('Por favor, selecciona un rol para este usuario.');
@@ -37,15 +38,27 @@ export const UserManagement: React.FC = () => {
 
         if (newUser.email && newUser.fullName) {
             try {
-                // Use the NEW invitation flow with provisional password
+                // DIAGNÓSTICO: Ver exactamente qué datos se envían
+                console.log('=== INVITE USER DEBUG ===');
+                console.log('Email:', newUser.email);
+                console.log('Full Name:', newUser.fullName);
+                console.log('Role ID:', newUser.role);
+                console.log('Job Title (title):', newUser.title);
+                console.log('Company Code:', newUser.companyCode);
+                console.log('Tenant ID:', user?.tenant_id);
+                console.log('Specialties:', newUser.specialties);
+
                 const result = await inviteUserWithPassword(
                     newUser.email,
                     newUser.fullName,
                     newUser.role,
                     newUser.title,
                     newUser.companyCode,
-                    user?.tenant_id
+                    user?.tenant_id,
+                    newUser.specialties || []
                 );
+
+                console.log('=== INVITE RESULT ===', result);
 
                 if (result && result.emailSent === false) {
                     alert(`⚠️ Usuario creado exitosamente, pero NO se pudo enviar el correo de bienvenida.\n\nMotivo: ${result.warning || 'Restricción de dominio de Resend.'}\n\nDile al usuario que su clave provisional es: CF-XXXXXX (visible en consola edge) o restablece su contraseña.`);
@@ -54,7 +67,7 @@ export const UserManagement: React.FC = () => {
                 }
                 
                 setShowInviteModal(false);
-                setNewUser({ email: '', role: '', fullName: '', title: '', companyCode: '' });
+                setNewUser({ email: '', role: '', fullName: '', title: '', companyCode: '', specialties: [] });
 
                 // Refrescamos lista
                 await fetchUsers();
@@ -67,7 +80,7 @@ export const UserManagement: React.FC = () => {
 
     const handleUpdateUser = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!editingUser) return;
+        if (!editingUser || !canManage) return;
         updateUser(editingUser);
         setEditingUser(null);
     };
@@ -100,12 +113,14 @@ export const UserManagement: React.FC = () => {
                 <h3 className="text-lg text-white font-medium flex items-center gap-2">
                     <Shield size={18} className="text-industrial-accent" /> Directorio de Personal
                 </h3>
-                <button
-                    onClick={() => setShowInviteModal(true)}
-                    className="bg-industrial-accent hover:bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium shadow-lg flex items-center gap-2 transition-colors"
-                >
-                    <Plus size={16} /> Invitar Usuario
-                </button>
+                {canManage && (
+                    <button
+                        onClick={() => setShowInviteModal(true)}
+                        className="bg-industrial-accent hover:bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium shadow-lg flex items-center gap-2 transition-colors"
+                    >
+                        <Plus size={16} /> Invitar Usuario
+                    </button>
+                )}
             </div>
 
             {/* Users Table */}
@@ -126,7 +141,7 @@ export const UserManagement: React.FC = () => {
                                 <td className="px-6 py-4">
                                     <div className="flex items-center gap-3">
                                         <div className="w-8 h-8 rounded-full bg-industrial-700 border border-industrial-600 flex items-center justify-center text-xs text-white font-bold shadow-sm">
-                                            {user.full_name.substring(0, 2).toUpperCase()}
+                                            {(user.full_name || user.email || 'US').substring(0, 2).toUpperCase()}
                                         </div>
                                         <div>
                                             <p className="text-white font-medium">{user.full_name}</p>
@@ -170,17 +185,28 @@ export const UserManagement: React.FC = () => {
                                     )}
                                 </td>
                                 <td className="px-6 py-4 text-right">
-                                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button
-                                            onClick={() => setEditingUser(user)}
-                                            className="p-1.5 text-industrial-400 hover:text-white hover:bg-industrial-600 rounded transition-colors"
-                                            title="Edit Profile"
-                                        >
-                                            <Pencil size={14} />
-                                        </button>
-                                        <button className="p-1.5 text-industrial-400 hover:text-red-400 hover:bg-industrial-600 rounded transition-colors">
-                                            <Trash2 size={14} />
-                                        </button>
+                                    <div className={`flex items-center justify-end gap-2 transition-opacity ${canManage ? 'opacity-0 group-hover:opacity-100' : 'opacity-0'}`}>
+                                        {canManage && (
+                                            <>
+                                                <button
+                                                    onClick={() => setEditingUser(user)}
+                                                    className="p-1.5 text-industrial-400 hover:text-white hover:bg-industrial-600 rounded transition-colors"
+                                                    title="Edit Profile"
+                                                >
+                                                    <Pencil size={14} />
+                                                </button>
+                                                <button 
+                                                    onClick={() => {
+                                                        if (confirm(`¿Eliminar al usuario ${user.full_name}?`)) {
+                                                            deleteUser(user.id);
+                                                        }
+                                                    }}
+                                                    className="p-1.5 text-industrial-400 hover:text-red-400 hover:bg-industrial-600 rounded transition-colors"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </>
+                                        )}
                                     </div>
                                 </td>
                             </tr>
@@ -269,7 +295,7 @@ export const UserManagement: React.FC = () => {
                             {/* Avatar & Basic Info Header */}
                             <div className="flex items-center gap-4 pb-4 border-b border-industrial-700">
                                 <div className="w-16 h-16 rounded-full bg-industrial-700 border-2 border-industrial-600 flex items-center justify-center text-2xl font-bold text-white">
-                                    {editingUser.full_name.substring(0, 2).toUpperCase()}
+                                    {(editingUser.full_name || editingUser.email || 'US').substring(0, 2).toUpperCase()}
                                 </div>
                                 <div className="flex-1">
                                     <label className="text-[10px] text-industrial-500 font-bold uppercase">Nombre Completo</label>
@@ -297,9 +323,10 @@ export const UserManagement: React.FC = () => {
                                     <label className="text-xs text-industrial-400 font-bold uppercase">Rol</label>
                                     <select
                                         className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm focus:border-industrial-accent outline-none"
-                                        value={editingUser.role}
+                                        value={editingUser.role || ''}
                                         onChange={e => setEditingUser({ ...editingUser, role: e.target.value })}
                                     >
+                                        <option value="">-- Sin Rol Asignado --</option>
                                         {roles.map(role => (
                                             <option key={role.id} value={role.id}>{role.name}</option>
                                         ))}

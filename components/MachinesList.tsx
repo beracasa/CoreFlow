@@ -4,10 +4,9 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useMasterStore } from '../src/stores/useMasterStore';
 import { DocumentService } from '../src/services/documentService';
 import { supabase } from '../src/services/supabaseClient';
-import {
-  Box, Wifi, Plus, X, Camera, FileText, Server, Clock, Calendar, Pencil, Eye, Download, Trash2
-} from 'lucide-react';
+import { Box, Wifi, Plus, X, Camera, FileText, Server, Clock, Calendar, Pencil, Eye, Download, Trash2, Lock, AlertCircle } from 'lucide-react';
 import { TablePagination } from './shared/TablePagination';
+import { useAuth } from '../contexts/AuthContext';
 
 export const MachinesList: React.FC = () => {
   const {
@@ -19,6 +18,8 @@ export const MachinesList: React.FC = () => {
   } = useMasterStore();
 
   const { t } = useLanguage();
+  const { hasPermission } = useAuth();
+  const canManage = hasPermission('manage_assets');
 
   // Flatten Zones for Selection
   const zones = zoneStructures.flatMap(z =>
@@ -166,6 +167,7 @@ export const MachinesList: React.FC = () => {
   });
 
   const openAddGateway = () => {
+    if (!canManage) return;
     setEditingId(null);
     setNewMachine({
       name: '', plate: '', type: 'GENERIC', runningHours: 0, customIntervals: '',
@@ -176,6 +178,7 @@ export const MachinesList: React.FC = () => {
   };
 
   const openAddManual = () => {
+    if (!canManage) return;
     setEditingId(null);
     setNewManualAsset({
       name: '', plate: '', type: 'GENERIC', zone: zones[0] || '', customIntervals: '',
@@ -186,11 +189,13 @@ export const MachinesList: React.FC = () => {
   };
 
   const handleEditFromDetail = (m: Machine) => {
+    if (!canManage) return;
     setViewingMachine(null);
     handleEditMachine(m);
   };
 
   const handleEditMachine = (m: Machine) => {
+    if (!canManage) return;
     setEditingId(m.id);
     const intervals = m.intervals ? m.intervals.join(', ') : '';
 
@@ -232,7 +237,7 @@ export const MachinesList: React.FC = () => {
         name: m.name,
         plate: m.plate || '',
         type: m.type || 'GENERIC',
-        zone: m.zone || (zones.length > 0 ? zones[0].name : ''),
+        zone: m.zone || (zones.length > 0 ? zones[0] : ''),
         customIntervals: intervals,
         ...commonFields
       });
@@ -379,16 +384,21 @@ export const MachinesList: React.FC = () => {
           <div className="flex gap-3">
             <button
               onClick={openAddManual}
-              className="bg-industrial-800 hover:bg-industrial-700 text-white border border-industrial-600 px-3 py-1.5 rounded text-xs transition-colors flex items-center gap-2"
+              disabled={!canManage}
+              className={`${canManage ? 'bg-industrial-800 hover:bg-industrial-700' : 'bg-industrial-800/50 opacity-50 cursor-not-allowed'} text-white border border-industrial-600 px-3 py-1.5 rounded text-xs transition-colors flex items-center gap-2`}
+              title={!canManage ? "No tiene permisos para agregar equipos" : ""}
             >
-              <Box className="w-3 h-3" />
+              {canManage ? <Box className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
               Agregar Equipo
             </button>
             <button
               onClick={openAddGateway}
-              className="bg-industrial-accent hover:bg-blue-600 text-white px-3 py-1.5 rounded text-xs font-medium shadow-lg transition-colors flex items-center gap-2"
+              disabled={!canManage}
+              className={`${canManage ? 'bg-industrial-accent hover:bg-blue-600 shadow-lg' : 'bg-industrial-accent/50 opacity-50 cursor-not-allowed'} text-white px-3 py-1.5 rounded text-xs font-medium transition-colors flex items-center gap-2`}
+              title={!canManage ? "No tiene permisos para agregar equipos" : ""}
             >
-              <Wifi className="w-3 h-3" /> {t('assets.provision')}
+              {canManage ? <Wifi className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
+              {t('assets.provision')}
             </button>
           </div>
         </div>
@@ -646,7 +656,7 @@ export const MachinesList: React.FC = () => {
                   {viewingMachine.criticalParts && viewingMachine.criticalParts.length > 0 && (
                     <div className="mb-6">
                       <h4 className="text-xs font-bold text-industrial-400 uppercase border-b border-industrial-700 pb-2 mb-3">
-                        Repuestos Críticos (Kardex)
+                        Repuestos Asociados (Kardex)
                       </h4>
                       <div className="bg-industrial-900/50 rounded border border-industrial-700/50 overflow-hidden">
                         <table className="w-full text-left text-sm text-white">
@@ -664,7 +674,7 @@ export const MachinesList: React.FC = () => {
                                 <tr key={partId} className="hover:bg-industrial-800/50 transition-colors">
                                   <td className="px-4 py-3">
                                     <p className="font-medium text-white">{partData.name}</p>
-                                    <p className="text-[10px] text-industrial-500 font-mono mt-0.5">{partData.sku}</p>
+                                    <p className="text-[10px] text-industrial-500 font-mono mt-0.5">{partData.partNumber}</p>
                                   </td>
                                   <td className="px-4 py-3 text-right">
                                     <span className={`inline-flex px-2 py-1 rounded text-xs font-bold ${partData.currentStock <= partData.minStock ? 'bg-red-900/50 text-red-400 border border-red-800/50' : 'bg-emerald-900/50 text-emerald-400 border border-emerald-800/50'}`}>
@@ -813,9 +823,11 @@ export const MachinesList: React.FC = () => {
                   </button>
                   <button
                     onClick={() => handleEditFromDetail(viewingMachine)}
-                    className="px-4 py-2 bg-industrial-600 hover:bg-industrial-500 text-white rounded text-sm font-bold shadow flex items-center gap-2"
+                    disabled={!canManage}
+                    className={`px-4 py-2 ${canManage ? 'bg-industrial-600 hover:bg-industrial-500' : 'bg-industrial-700/50 opacity-50 cursor-not-allowed'} text-white rounded text-sm font-bold shadow flex items-center gap-2`}
+                    title={!canManage ? "No tiene permisos para editar equipos" : ""}
                   >
-                    <Pencil size={14} /> Editar Equipo
+                    {canManage ? <Pencil size={14} /> : <Lock size={14} />} Editar Equipo
                   </button>
                 </div>
               </div>
@@ -1008,7 +1020,7 @@ export const MachinesList: React.FC = () => {
 
               {/* Critical Spare Parts Section (Kardex) */}
               <div className="pt-4 mt-4 border-t border-industrial-700">
-                <h4 className="text-sm font-bold text-white mb-3">Repuestos Críticos (Kardex)</h4>
+                <h4 className="text-sm font-bold text-white mb-3">Repuestos Asociados (Kardex)</h4>
                 
                 <div className="bg-industrial-900/50 p-4 rounded border border-industrial-700/50 space-y-4">
                   <div className="flex gap-2 items-end relative">
@@ -1029,24 +1041,24 @@ export const MachinesList: React.FC = () => {
                       />
                       {isKardexDropdownOpenIot && (
                         <ul className="absolute z-50 w-[calc(100%-46px)] bg-industrial-800 border border-industrial-600 rounded mt-1 max-h-48 overflow-y-auto shadow-xl">
-                          {parts.filter(p => (p.name || '').toLowerCase().includes((searchKardexPartIot || '').toLowerCase()) || (p.sku || '').toLowerCase().includes((searchKardexPartIot || '').toLowerCase())).length === 0 ? (
+                          {parts.filter(p => (p.name || '').toLowerCase().includes((searchKardexPartIot || '').toLowerCase()) || (p.partNumber || '').toLowerCase().includes((searchKardexPartIot || '').toLowerCase())).length === 0 ? (
                             <li className="p-2 text-sm text-industrial-500 italic">No se encontraron repuestos</li>
                           ) : (
                             parts
-                              .filter(p => (p.name || '').toLowerCase().includes((searchKardexPartIot || '').toLowerCase()) || (p.sku || '').toLowerCase().includes((searchKardexPartIot || '').toLowerCase()))
+                              .filter(p => (p.name || '').toLowerCase().includes((searchKardexPartIot || '').toLowerCase()) || (p.partNumber || '').toLowerCase().includes((searchKardexPartIot || '').toLowerCase()))
                               .map(p => (
                                 <li 
                                   key={p.id} 
                                   className={`p-2 text-sm cursor-pointer border-b border-industrial-700/50 last:border-0 hover:bg-industrial-700 ${selectedKardexPartIot === p.id ? 'bg-industrial-700 text-white' : 'text-industrial-300'}`}
                                   onClick={() => {
                                     setSelectedKardexPartIot(p.id);
-                                    setSearchKardexPartIot(p.sku ? `${p.sku} - ${p.name}` : p.name);
+                                    setSearchKardexPartIot(p.partNumber ? `${p.partNumber} - ${p.name}` : p.name);
                                     setIsKardexDropdownOpenIot(false);
                                   }}
                                 >
                                   <div className="font-medium text-white">{p.name}</div>
                                   <div className="text-[10px] text-industrial-400 font-mono flex justify-between">
-                                    <span>{p.sku}</span>
+                                    <span>{p.partNumber}</span>
                                     <span className={p.currentStock > p.minStock ? 'text-emerald-400' : 'text-yellow-400'}>Stock: {p.currentStock}</span>
                                   </div>
                                 </li>
@@ -1083,7 +1095,7 @@ export const MachinesList: React.FC = () => {
                               <Box className="text-industrial-400" size={16} />
                               <div>
                                 <p className="text-sm text-white font-medium">{partObj.name}</p>
-                                <p className="text-[10px] text-industrial-500 font-mono">{partObj.sku}</p>
+                                <p className="text-[10px] text-industrial-500 font-mono">{partObj.partNumber}</p>
                               </div>
                             </div>
                             <div className="flex items-center gap-3">
@@ -1377,7 +1389,7 @@ export const MachinesList: React.FC = () => {
 
               {/* Critical Spare Parts Section (Kardex) */}
               <div className="pt-4 mt-4 border-t border-industrial-700">
-                <h4 className="text-sm font-bold text-white mb-3">Repuestos Críticos (Kardex)</h4>
+                <h4 className="text-sm font-bold text-white mb-3">Repuestos Asociados (Kardex)</h4>
                 
                 <div className="bg-industrial-900/50 p-4 rounded border border-industrial-700/50 space-y-4">
                   <div className="flex gap-2 items-end relative">
@@ -1398,24 +1410,24 @@ export const MachinesList: React.FC = () => {
                       />
                       {isKardexDropdownOpenManual && (
                         <ul className="absolute z-50 w-[calc(100%-46px)] bg-industrial-800 border border-industrial-600 rounded mt-1 max-h-48 overflow-y-auto shadow-xl">
-                          {parts.filter(p => (p.name || '').toLowerCase().includes((searchKardexPartManual || '').toLowerCase()) || (p.sku || '').toLowerCase().includes((searchKardexPartManual || '').toLowerCase())).length === 0 ? (
+                          {parts.filter(p => (p.name || '').toLowerCase().includes((searchKardexPartManual || '').toLowerCase()) || (p.partNumber || '').toLowerCase().includes((searchKardexPartManual || '').toLowerCase())).length === 0 ? (
                             <li className="p-2 text-sm text-industrial-500 italic">No se encontraron repuestos</li>
                           ) : (
                             parts
-                              .filter(p => (p.name || '').toLowerCase().includes((searchKardexPartManual || '').toLowerCase()) || (p.sku || '').toLowerCase().includes((searchKardexPartManual || '').toLowerCase()))
+                              .filter(p => (p.name || '').toLowerCase().includes((searchKardexPartManual || '').toLowerCase()) || (p.partNumber || '').toLowerCase().includes((searchKardexPartManual || '').toLowerCase()))
                               .map(p => (
                                 <li 
                                   key={p.id} 
                                   className={`p-2 text-sm cursor-pointer border-b border-industrial-700/50 last:border-0 hover:bg-industrial-700 ${selectedKardexPartManual === p.id ? 'bg-industrial-700 text-white' : 'text-industrial-300'}`}
                                   onClick={() => {
                                     setSelectedKardexPartManual(p.id);
-                                    setSearchKardexPartManual(p.sku ? `${p.sku} - ${p.name}` : p.name);
+                                    setSearchKardexPartManual(p.partNumber ? `${p.partNumber} - ${p.name}` : p.name);
                                     setIsKardexDropdownOpenManual(false);
                                   }}
                                 >
                                   <div className="font-medium text-white">{p.name}</div>
                                   <div className="text-[10px] text-industrial-400 font-mono flex justify-between">
-                                    <span>{p.sku}</span>
+                                    <span>{p.partNumber}</span>
                                     <span className={p.currentStock > p.minStock ? 'text-emerald-400' : 'text-yellow-400'}>Stock: {p.currentStock}</span>
                                   </div>
                                 </li>
@@ -1452,7 +1464,7 @@ export const MachinesList: React.FC = () => {
                               <Box className="text-industrial-400" size={16} />
                               <div>
                                 <p className="text-sm text-white font-medium">{partObj.name}</p>
-                                <p className="text-[10px] text-industrial-500 font-mono">{partObj.sku}</p>
+                                <p className="text-[10px] text-industrial-500 font-mono">{partObj.partNumber}</p>
                               </div>
                             </div>
                             <div className="flex items-center gap-3">

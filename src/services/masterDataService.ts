@@ -20,8 +20,40 @@ export const MasterDataService = {
     return machineService.deleteMachine(id);
   },
 
+  async getFilteredMachineHourLogs(filters: { 
+    machineId?: string; 
+    startDate?: string; 
+    endDate?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<{ data: any[]; total: number }> {
+    return (machineService as any).getFilteredMachineHourLogs(filters);
+  },
+
+  async logMachineHours(log: { 
+    machineId: string; 
+    hoursLogged: number; 
+    unit: 'h' | 'km'; 
+    operator: string; 
+    comments?: string; 
+  }): Promise<any> {
+    return (machineService as any).logMachineHours(log);
+  },
+
   // TECHNICIANS
   async getTechnicians(): Promise<Technician[]> {
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      const stored = localStorage.getItem('v2_cmms_technicians');
+      if (stored) {
+        return JSON.parse(stored);
+      }
+      const initialTechs = [
+        { id: 'T1', name: 'Juan Perez', role: 'MECHANICAL', shift: 'MORNING', status: 'ACTIVE', email: 'juan@example.com' },
+        { id: 'T2', name: 'Maria Garcia', role: 'ELECTRICAL', shift: 'AFTERNOON', status: 'ACTIVE', email: 'maria@example.com' }
+      ];
+      localStorage.setItem('v2_cmms_technicians', JSON.stringify(initialTechs));
+      return initialTechs as Technician[];
+    }
     if (technicianService) return technicianService.getTechnicians();
     const { data, error } = await supabase.from('technicians').select('*');
     if (error) throw error;
@@ -29,6 +61,13 @@ export const MasterDataService = {
   },
 
   async createTechnician(tech: Technician): Promise<Technician> {
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      const techs = await this.getTechnicians();
+      const newTech = { ...tech, id: 'T-' + Math.random().toString(36).substr(2, 9) };
+      techs.push(newTech);
+      localStorage.setItem('v2_cmms_technicians', JSON.stringify(techs));
+      return newTech as Technician;
+    }
     if (technicianService) throw new Error("Mock does not support creating technicians yet");
     const { data, error } = await supabase.from('technicians').insert(tech).select().single();
     if (error) throw error;
@@ -37,6 +76,18 @@ export const MasterDataService = {
 
   // ZONES
   async getZones(): Promise<ZoneStructure[]> {
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      const stored = localStorage.getItem('v2_cmms_zones');
+      if (stored) {
+        return JSON.parse(stored);
+      }
+      const initialZones = [
+        { id: 'z1', name: 'Zone A', lines: ['Line 1', 'Line 2'], color: '#ef4444' },
+        { id: 'z2', name: 'Zone B', lines: ['Line 3'], color: '#3b82f6' }
+      ];
+      localStorage.setItem('v2_cmms_zones', JSON.stringify(initialZones));
+      return initialZones as ZoneStructure[];
+    }
     if (configService) return configService.getZones();
     const { data, error } = await supabase.from('zones').select('*').order('order_index', { ascending: true });
     if (error) throw error;
@@ -47,6 +98,13 @@ export const MasterDataService = {
   },
 
   async createZone(zone: ZoneStructure): Promise<ZoneStructure> {
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      const zones = await this.getZones();
+      const newZone = { ...zone, id: zone.id || 'z-' + Math.random().toString(36).substr(2, 9) };
+      zones.push(newZone);
+      localStorage.setItem('v2_cmms_zones', JSON.stringify(zones));
+      return newZone;
+    }
     const { data, error } = await supabase.from('zones').insert({
       id: zone.id,
       name: zone.name,
@@ -64,6 +122,15 @@ export const MasterDataService = {
   },
 
   async updateZone(zone: ZoneStructure): Promise<void> {
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      const zones = await this.getZones();
+      const index = zones.findIndex(z => z.id === zone.id);
+      if (index !== -1) {
+        zones[index] = { ...zones[index], ...zone };
+        localStorage.setItem('v2_cmms_zones', JSON.stringify(zones));
+      }
+      return;
+    }
     const { error } = await supabase.from('zones').update({
       name: zone.name,
       lines: zone.lines,
@@ -77,10 +144,14 @@ export const MasterDataService = {
     if (error) throw error;
   },
 
-  async updateZoneOrder(zones: ZoneStructure[]): Promise<void> {
+  async updateZoneOrder(zonesList: ZoneStructure[]): Promise<void> {
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      localStorage.setItem('v2_cmms_zones', JSON.stringify(zonesList));
+      return;
+    }
     // Upsert all zones with new order_index
     // Prepare payload
-    const updates = zones.map(z => ({
+    const updates = zonesList.map(z => ({
       id: z.id,
       name: z.name,
       lines: z.lines,
@@ -97,67 +168,149 @@ export const MasterDataService = {
   },
 
   async removeZone(id: string): Promise<void> {
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      const zones = await this.getZones();
+      const filtered = zones.filter(z => z.id !== id);
+      localStorage.setItem('v2_cmms_zones', JSON.stringify(filtered));
+      return;
+    }
     const { error } = await supabase.from('zones').delete().eq('id', id);
     if (error) throw error;
   },
 
   // BRANCHES
   async getBranches(): Promise<string[]> {
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      const stored = localStorage.getItem('v2_cmms_branches');
+      if (stored) return JSON.parse(stored);
+      const defaults = ['Planta Principal', 'Sucursal Norte', 'Sucursal Sur'];
+      localStorage.setItem('v2_cmms_branches', JSON.stringify(defaults));
+      return defaults;
+    }
     if (configService) return configService.getBranches();
     const { data, error } = await supabase.from('branches').select('name').order('name');
     if (error) throw error;
     return data.map((b: any) => b.name);
   },
   async createBranch(name: string): Promise<string> {
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      const list = await this.getBranches();
+      if (!list.includes(name)) {
+        list.push(name);
+        localStorage.setItem('v2_cmms_branches', JSON.stringify(list));
+      }
+      return name;
+    }
     const { data, error } = await supabase.from('branches').insert({ name }).select('name').single();
     if (error) throw error;
     return data.name;
   },
   async removeBranch(name: string): Promise<void> {
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      const list = await this.getBranches();
+      const filtered = list.filter(b => b !== name);
+      localStorage.setItem('v2_cmms_branches', JSON.stringify(filtered));
+      return;
+    }
     const { error } = await supabase.from('branches').delete().eq('name', name);
     if (error) throw error;
   },
 
   // CATEGORIES
   async getCategories(): Promise<string[]> {
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      const stored = localStorage.getItem('v2_cmms_categories');
+      if (stored) return JSON.parse(stored);
+      const defaults = ['Producción', 'Impresión', 'Empaque', 'Servicios'];
+      localStorage.setItem('v2_cmms_categories', JSON.stringify(defaults));
+      return defaults;
+    }
     if (configService) return configService.getCategories();
     const { data, error } = await supabase.from('asset_categories').select('name').order('name');
     if (error) throw error;
     return data.map((c: any) => c.name);
   },
   async createCategory(name: string): Promise<string> {
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      const list = await this.getCategories();
+      if (!list.includes(name)) {
+        list.push(name);
+        localStorage.setItem('v2_cmms_categories', JSON.stringify(list));
+      }
+      return name;
+    }
     const { data, error } = await supabase.from('asset_categories').insert({ name }).select('name').single();
     if (error) throw error;
     return data.name;
   },
   async removeCategory(name: string): Promise<void> {
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      const list = await this.getCategories();
+      const filtered = list.filter(c => c !== name);
+      localStorage.setItem('v2_cmms_categories', JSON.stringify(filtered));
+      return;
+    }
     const { error } = await supabase.from('asset_categories').delete().eq('name', name);
     if (error) throw error;
   },
 
   // ASSET TYPES
   async getAssetTypes(): Promise<string[]> {
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      const stored = localStorage.getItem('v2_cmms_asset_types');
+      if (stored) return JSON.parse(stored);
+      const defaults = ['SACMI', 'MOSS', 'PMV', 'GENERIC'];
+      localStorage.setItem('v2_cmms_asset_types', JSON.stringify(defaults));
+      return defaults;
+    }
     if (configService) return configService.getAssetTypes();
     const { data, error } = await supabase.from('asset_types').select('name').order('name');
     if (error) throw error;
     return data.map((t: any) => t.name);
   },
   async createAssetType(name: string): Promise<string> {
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      const list = await this.getAssetTypes();
+      if (!list.includes(name)) {
+        list.push(name);
+        localStorage.setItem('v2_cmms_asset_types', JSON.stringify(list));
+      }
+      return name;
+    }
     const { data, error } = await supabase.from('asset_types').insert({ name }).select('name').single();
     if (error) throw error;
     return data.name;
   },
   async removeAssetType(name: string): Promise<void> {
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      const list = await this.getAssetTypes();
+      const filtered = list.filter(t => t !== name);
+      localStorage.setItem('v2_cmms_asset_types', JSON.stringify(filtered));
+      return;
+    }
     const { error } = await supabase.from('asset_types').delete().eq('name', name);
     if (error) throw error;
   },
 
   // SETTINGS (Metadata)
   async getPlantSettings(): Promise<any> {
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      const stored = localStorage.getItem('coreflow_mock_plant_settings');
+      if (stored) {
+        return JSON.parse(stored);
+      }
+      const defaults = {
+        plantName: 'Planta Principal CoreFlow',
+        rnc: '131-12345-6',
+        timezone: 'America/Santo_Domingo',
+        currency: 'USD',
+        logoUrl: ''
+      };
+      localStorage.setItem('coreflow_mock_plant_settings', JSON.stringify(defaults));
+      return defaults;
+    }
     const { data, error } = await supabase.from('plant_settings').select('*').single();
     if (error) {
-      // If no row exists (e.g. before running script), return null or throw. 
-      // Ideally the script inserts row 1.
       console.warn("Could not fetch plant settings:", error.message);
       return null;
     }
@@ -171,6 +324,10 @@ export const MasterDataService = {
   },
 
   async updatePlantSettings(settings: any): Promise<void> {
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      localStorage.setItem('coreflow_mock_plant_settings', JSON.stringify(settings));
+      return;
+    }
     const { error } = await supabase.from('plant_settings').upsert({
       id: 1, // Force singleton
       plant_name: settings.plantName,
@@ -186,57 +343,129 @@ export const MasterDataService = {
   // SPARE PARTS CONFIGURATION
   // Categories
   async getPartCategories(): Promise<string[]> {
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      const stored = localStorage.getItem('v2_cmms_part_categories');
+      if (stored) return JSON.parse(stored);
+      const defaults = ['Bearings', 'Hydraulics', 'Electronics', 'Transmission', 'Filters'];
+      localStorage.setItem('v2_cmms_part_categories', JSON.stringify(defaults));
+      return defaults;
+    }
     if (configService) return configService.getPartCategories();
     const { data, error } = await supabase.from('spare_part_categories').select('name').order('name');
     if (error) throw error;
     return data.map((c: any) => c.name);
   },
   async createPartCategory(name: string): Promise<string> {
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      const list = await this.getPartCategories();
+      if (!list.includes(name)) {
+        list.push(name);
+        localStorage.setItem('v2_cmms_part_categories', JSON.stringify(list));
+      }
+      return name;
+    }
     const { data, error } = await supabase.from('spare_part_categories').insert({ name }).select('name').single();
     if (error) throw error;
     return data.name;
   },
   async removePartCategory(name: string): Promise<void> {
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      const list = await this.getPartCategories();
+      const filtered = list.filter(c => c !== name);
+      localStorage.setItem('v2_cmms_part_categories', JSON.stringify(filtered));
+      return;
+    }
     const { error } = await supabase.from('spare_part_categories').delete().eq('name', name);
     if (error) throw error;
   },
 
   // Locations
   async getPartLocations(): Promise<string[]> {
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      const stored = localStorage.getItem('v2_cmms_part_locations');
+      if (stored) return JSON.parse(stored);
+      const defaults = ['A-01', 'B-03', 'C-02', 'A-05', 'D-01'];
+      localStorage.setItem('v2_cmms_part_locations', JSON.stringify(defaults));
+      return defaults;
+    }
     if (configService) return configService.getPartLocations();
     const { data, error } = await supabase.from('spare_part_locations').select('name').order('name');
     if (error) throw error;
     return data.map((l: any) => l.name);
   },
   async createPartLocation(name: string): Promise<string> {
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      const list = await this.getPartLocations();
+      if (!list.includes(name)) {
+        list.push(name);
+        localStorage.setItem('v2_cmms_part_locations', JSON.stringify(list));
+      }
+      return name;
+    }
     const { data, error } = await supabase.from('spare_part_locations').insert({ name }).select('name').single();
     if (error) throw error;
     return data.name;
   },
   async removePartLocation(name: string): Promise<void> {
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      const list = await this.getPartLocations();
+      const filtered = list.filter(l => l !== name);
+      localStorage.setItem('v2_cmms_part_locations', JSON.stringify(filtered));
+      return;
+    }
     const { error } = await supabase.from('spare_part_locations').delete().eq('name', name);
     if (error) throw error;
   },
 
   // Units
   async getPartUnits(): Promise<string[]> {
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      const stored = localStorage.getItem('v2_cmms_part_units');
+      if (stored) return JSON.parse(stored);
+      const defaults = ['PCS', 'M', 'KG', 'L'];
+      localStorage.setItem('v2_cmms_part_units', JSON.stringify(defaults));
+      return defaults;
+    }
     if (configService) return configService.getPartUnits();
     const { data, error } = await supabase.from('spare_part_units').select('name').order('name');
     if (error) throw error;
     return data.map((u: any) => u.name);
   },
   async createPartUnit(name: string): Promise<string> {
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      const list = await this.getPartUnits();
+      if (!list.includes(name)) {
+        list.push(name);
+        localStorage.setItem('v2_cmms_part_units', JSON.stringify(list));
+      }
+      return name;
+    }
     const { data, error } = await supabase.from('spare_part_units').insert({ name }).select('name').single();
     if (error) throw error;
     return data.name;
   },
   async removePartUnit(name: string): Promise<void> {
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      const list = await this.getPartUnits();
+      const filtered = list.filter(u => u !== name);
+      localStorage.setItem('v2_cmms_part_units', JSON.stringify(filtered));
+      return;
+    }
     const { error } = await supabase.from('spare_part_units').delete().eq('name', name);
     if (error) throw error;
   },
 
   // Update with Cascade
   async updatePartCategory(oldName: string, newName: string): Promise<void> {
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      const list = await this.getPartCategories();
+      const index = list.indexOf(oldName);
+      if (index !== -1) {
+        list[index] = newName;
+        localStorage.setItem('v2_cmms_part_categories', JSON.stringify(list));
+      }
+      return;
+    }
     // 1. Update config table
     const { error: configError } = await supabase.from('spare_part_categories').update({ name: newName }).eq('name', oldName);
     if (configError) throw configError;
@@ -247,6 +476,15 @@ export const MasterDataService = {
   },
 
   async updatePartLocation(oldName: string, newName: string): Promise<void> {
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      const list = await this.getPartLocations();
+      const index = list.indexOf(oldName);
+      if (index !== -1) {
+        list[index] = newName;
+        localStorage.setItem('v2_cmms_part_locations', JSON.stringify(list));
+      }
+      return;
+    }
     // 1. Update config table
     const { error: configError } = await supabase.from('spare_part_locations').update({ name: newName }).eq('name', oldName);
     if (configError) throw configError;
@@ -257,6 +495,15 @@ export const MasterDataService = {
   },
 
   async updatePartUnit(oldName: string, newName: string): Promise<void> {
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      const list = await this.getPartUnits();
+      const index = list.indexOf(oldName);
+      if (index !== -1) {
+        list[index] = newName;
+        localStorage.setItem('v2_cmms_part_units', JSON.stringify(list));
+      }
+      return;
+    }
     // 1. Update config table
     const { error: configError } = await supabase.from('spare_part_units').update({ name: newName }).eq('name', oldName);
     if (configError) throw configError;

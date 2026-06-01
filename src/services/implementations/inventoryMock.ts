@@ -1,17 +1,18 @@
-import { SparePart, PartsRequest, InventoryTransaction, RequestStatus, TransactionType, PurchaseRequest } from '../../types/inventory';
+import { SparePart, PartsRequest, InventoryTransaction, RequestStatus, TransactionType, PurchaseRequest, ExtendedPurchaseRequest, StockReception } from '../../types/inventory';
 import { saveToStorage, loadFromStorage } from '../../utils/persistence';
 
 const PARTS_KEY = 'v2_inventory_parts';
 const REQUESTS_KEY = 'v2_inventory_requests';
 const TRANSACTIONS_KEY = 'v2_inventory_transactions';
 const RECEPTIONS_KEY = 'v2_inventory_receptions';
+const PURCHASE_REQUESTS_KEY = 'v2_inventory_purchase_requests';
 
 const INITIAL_PARTS: SparePart[] = [
-    { id: 'p1', name: 'Ball Bearing 6204', partNumber: 'BB-6204', description: 'Deep groove ball bearing', category: 'Bearings', unitOfMeasure: 'PCS', currentStock: 15, minStock: 5, location: 'A-01', cost: 5.50, createdAt: new Date().toISOString() },
-    { id: 'p2', name: 'Hydraulic Hose 1/2"', partNumber: 'HH-050', description: 'High pressure hose', category: 'Hydraulics', unitOfMeasure: 'M', currentStock: 2, minStock: 10, location: 'B-03', cost: 12.00, createdAt: new Date().toISOString() },
-    { id: 'p3', name: 'Limit Switch', partNumber: 'LS-001', description: 'Industrial limit switch', category: 'Electronics', unitOfMeasure: 'PCS', currentStock: 8, minStock: 3, location: 'C-02', cost: 45.00, createdAt: new Date().toISOString() },
-    { id: 'p4', name: 'V-Belt A-48', partNumber: 'VB-A48', description: 'Industrial drive belt', category: 'Transmission', unitOfMeasure: 'PCS', currentStock: 12, minStock: 4, location: 'A-05', cost: 8.75, createdAt: new Date().toISOString() },
-    { id: 'p5', name: 'Air Filter Element', partNumber: 'AF-500', description: 'Engine air intake filter', category: 'Filters', unitOfMeasure: 'PCS', currentStock: 20, minStock: 10, location: 'D-01', cost: 15.30, createdAt: new Date().toISOString() },
+    { id: 'p1', name: 'Ball Bearing 6204', partNumber: 'BB-6204', description: 'Deep groove ball bearing', category: 'Bearings', unitOfMeasure: 'PCS', currentStock: 15, minStock: 5, maxStock: 100, location: 'A-01', subLocation: '', cost: 5.50, createdAt: new Date().toISOString(), company: 'Ravi Caribe Inc.' },
+    { id: 'p2', name: 'Hydraulic Hose 1/2"', partNumber: 'HH-050', description: 'High pressure hose', category: 'Hydraulics', unitOfMeasure: 'M', currentStock: 2, minStock: 10, maxStock: 50, location: 'B-03', subLocation: '', cost: 12.00, createdAt: new Date().toISOString(), company: 'Labels Caribe Inc.' },
+    { id: 'p3', name: 'Limit Switch', partNumber: 'LS-001', description: 'Industrial limit switch', category: 'Electronics', unitOfMeasure: 'PCS', currentStock: 8, minStock: 3, maxStock: 20, location: 'C-02', subLocation: '', cost: 45.00, createdAt: new Date().toISOString(), company: 'Ravi Caribe Inc.' },
+    { id: 'p4', name: 'V-Belt A-48', partNumber: 'VB-A48', description: 'Industrial drive belt', category: 'Transmission', unitOfMeasure: 'PCS', currentStock: 12, minStock: 4, maxStock: 40, location: 'A-05', subLocation: '', cost: 8.75, createdAt: new Date().toISOString(), company: 'Labels Caribe Inc.' },
+    { id: 'p5', name: 'Air Filter Element', partNumber: 'AF-500', description: 'Engine air intake filter', category: 'Filters', unitOfMeasure: 'PCS', currentStock: 20, minStock: 10, maxStock: 100, location: 'D-01', subLocation: '', cost: 15.30, createdAt: new Date().toISOString(), company: 'Ravi Caribe Inc.' },
 ];
 
 const INITIAL_REQUESTS: PartsRequest[] = [
@@ -35,6 +36,51 @@ const INITIAL_REQUESTS: PartsRequest[] = [
         createdDate: new Date().toISOString(),
         items: [
             { partId: 'p2', quantityRequested: 10, quantityDelivered: 0 }
+        ]
+    }
+];
+
+const INITIAL_PURCHASE_REQUESTS: PurchaseRequest[] = [
+    {
+        id: 'pr-1',
+        purchaseRequestNumber: 'SC-REQ-SPR-00009-1',
+        requestDate: new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString(),
+        requestedBy: 'current-user',
+        requestId: 'r1',
+        status: 'Pendiente',
+        items: [
+            { partId: 'p1', quantity: 3 }
+        ]
+    },
+    {
+        id: 'pr-2',
+        purchaseRequestNumber: 'SC-DIR-2R7DZ',
+        requestDate: new Date(Date.now() - 5 * 24 * 3600 * 1000).toISOString(),
+        requestedBy: 'current-user',
+        status: 'Recibido',
+        items: [
+            { partId: 'p2', quantity: 10 }
+        ]
+    },
+    {
+        id: 'pr-3',
+        purchaseRequestNumber: 'SC-REQ-SPR-00003-1',
+        requestDate: new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString(),
+        requestedBy: 'current-user',
+        status: 'Pendiente',
+        items: [
+            { partId: 'p3', quantity: 20 }
+        ]
+    },
+    {
+        id: 'pr-4',
+        purchaseRequestNumber: 'SC-DIR-86Z5S',
+        requestDate: new Date(Date.now() - 1 * 24 * 3600 * 1000).toISOString(),
+        requestedBy: 'current-user',
+        status: 'Pendiente',
+        items: [
+            { partId: 'p2', quantity: 10 },
+            { partId: 'p3', quantity: 20 }
         ]
     }
 ];
@@ -70,6 +116,15 @@ export class InventoryMockService implements IInventoryService {
         saveToStorage(TRANSACTIONS_KEY, transactions);
     }
 
+    private getPurchaseRequests(): PurchaseRequest[] {
+        const prs = loadFromStorage(PURCHASE_REQUESTS_KEY, INITIAL_PURCHASE_REQUESTS);
+        return prs.length > 0 ? prs : INITIAL_PURCHASE_REQUESTS;
+    }
+
+    private savePurchaseRequests(prs: PurchaseRequest[]) {
+        saveToStorage(PURCHASE_REQUESTS_KEY, prs);
+    }
+
     // --- Public API ---
 
     async getAllParts(
@@ -80,6 +135,7 @@ export class InventoryMockService implements IInventoryService {
             category?: string;
             location?: string;
             status?: 'all' | 'low' | 'normal';
+            company?: string;
         }
     ): Promise<{ data: SparePart[], total: number }> {
         let parts = this.getParts();
@@ -100,9 +156,12 @@ export class InventoryMockService implements IInventoryService {
             if (filters.location && filters.location !== 'all') {
                 parts = parts.filter(p => p.location === filters.location);
             }
+            if (filters.company && filters.company !== 'all') {
+                parts = parts.filter(p => p.company === filters.company);
+            }
             if (filters.status === 'low') {
                 parts = parts.filter(p => p.currentStock < p.minStock);
-            } else if (filters.status === 'normal' && filters.status !== 'all') {
+            } else if (filters.status === 'normal') {
                 parts = parts.filter(p => p.currentStock >= p.minStock);
             }
         }
@@ -123,6 +182,15 @@ export class InventoryMockService implements IInventoryService {
         const pagedData = parts.slice(from, to);
 
         return { data: pagedData, total };
+    }
+
+    async getPartCompanies(): Promise<string[]> {
+        const parts = this.getParts();
+        const companies = new Set<string>();
+        parts.forEach(p => {
+            if (p.company) companies.add(p.company);
+        });
+        return Array.from(companies).sort();
     }
 
     async getAllRequests(): Promise<PartsRequest[]> {
@@ -247,14 +315,18 @@ export class InventoryMockService implements IInventoryService {
     }
 
     async savePurchaseRequest(requestId: string, purchaseRequest: PurchaseRequest): Promise<PartsRequest> {
+        const prs = this.getPurchaseRequests();
+        prs.unshift({
+            ...purchaseRequest,
+            requestId
+        });
+        this.savePurchaseRequests(prs);
+
+        // Update parts request status to PENDING_STOCK
         const requests = this.getRequests();
         const index = requests.findIndex(r => r.id === requestId);
-
         if (index !== -1) {
-            if (!requests[index].purchaseHistory) {
-                requests[index].purchaseHistory = [];
-            }
-            requests[index].purchaseHistory!.push(purchaseRequest);
+            requests[index].status = 'PENDING_STOCK';
             this.saveRequests(requests);
             return requests[index];
         }
@@ -262,7 +334,51 @@ export class InventoryMockService implements IInventoryService {
     }
 
     async getAllPurchaseRequests(page: number = 1, limit: number = 50, filters?: { searchTerm?: string }): Promise<{ data: ExtendedPurchaseRequest[], total: number }> {
-        return { data: [], total: 0 };
+        let prs = this.getPurchaseRequests();
+        const parts = this.getParts();
+        const partsMap = new Map(parts.map(p => [p.id, p]));
+        const requests = this.getRequests();
+
+        if (filters?.searchTerm) {
+            const s = filters.searchTerm.toLowerCase();
+            prs = prs.filter(p => p.purchaseRequestNumber.toLowerCase().includes(s));
+        }
+
+        const mappedData: ExtendedPurchaseRequest[] = prs.map(record => {
+            const rawItems = record.items || [];
+            const mappedItems = rawItems.map((item: any) => {
+                const partInfo = partsMap.get(item.partId);
+                return {
+                    ...item,
+                    partName: partInfo?.name || 'Repuesto Desconocido',
+                    partNumber: partInfo?.partNumber || 'N/A',
+                    company: partInfo?.company || ''
+                };
+            });
+
+            const firstItem = mappedItems[0] || {};
+            const sourceReq = requests.find(r => r.id === record.requestId);
+
+            return {
+                id: record.id,
+                purchaseRequestNumber: record.purchaseRequestNumber,
+                requestDate: record.requestDate,
+                requestedBy: record.requestedBy,
+                items: mappedItems,
+                requestId: record.requestId,
+                sourceRequestNumber: sourceReq?.requestNumber || (record.purchaseRequestNumber.includes('SC-REQ-SPR-00009') ? 'SPR-00009' : record.purchaseRequestNumber.includes('SC-REQ-SPR-00003') ? 'SPR-00003' : undefined),
+                sparePartName: firstItem.partName || 'N/A',
+                sparePartNumber: firstItem.partNumber || 'N/A',
+                status: record.status || 'Pendiente'
+            } as ExtendedPurchaseRequest;
+        });
+
+        // Pagination
+        const from = (page - 1) * limit;
+        const to = from + limit;
+        const pagedData = mappedData.slice(from, to);
+
+        return { data: pagedData, total: mappedData.length };
     }
 
     async closeRequest(requestId: string): Promise<PartsRequest> {
@@ -461,7 +577,7 @@ export class InventoryMockService implements IInventoryService {
     }
 
     async saveReception(reception: Omit<StockReception, 'id' | 'receptionDate'>): Promise<StockReception> {
-        const receptions = loadFromStorage<StockReception>(RECEPTIONS_KEY, []);
+        const receptions = loadFromStorage<StockReception[]>(RECEPTIONS_KEY, []);
         const newReception: StockReception = {
             id: `REC-${Date.now()}`,
             receptionDate: new Date().toISOString(),
@@ -473,8 +589,59 @@ export class InventoryMockService implements IInventoryService {
         return newReception;
     }
 
-    async getReceptions(filters?: { searchTerm?: string; partId?: string }): Promise<{ data: StockReception[], total: number }> {
-        let receptions = loadFromStorage<StockReception>(RECEPTIONS_KEY, []);
+    private groupReceptions(receptions: StockReception[]): StockReception[] {
+        const grouped = new Map<string, StockReception>();
+        
+        for (const rec of receptions) {
+            const docNum = rec.documentNumber?.trim();
+            if (!docNum) continue;
+
+            const existing = grouped.get(docNum);
+            if (!existing) {
+                grouped.set(docNum, {
+                    ...rec,
+                    items: rec.items.map(i => ({ ...i }))
+                });
+            } else {
+                // Merge items
+                for (const item of rec.items) {
+                    const existingItem = existing.items.find(i => i.partId === item.partId);
+                    if (existingItem) {
+                        existingItem.quantity += item.quantity;
+                    } else {
+                        existing.items.push({ ...item });
+                    }
+                }
+                // Keep the latest receptionDate (since receptions are sorted descending, the first we find is the latest)
+                if (!existing.notes && rec.notes) {
+                    existing.notes = rec.notes;
+                } else if (existing.notes && rec.notes && existing.notes !== rec.notes && !existing.notes.includes(rec.notes)) {
+                    existing.notes = `${existing.notes} | ${rec.notes}`;
+                }
+            }
+        }
+
+        const result: StockReception[] = [];
+        const addedDocs = new Set<string>();
+
+        for (const rec of receptions) {
+            const docNum = rec.documentNumber?.trim();
+            if (!docNum) {
+                result.push(rec);
+            } else if (!addedDocs.has(docNum)) {
+                const merged = grouped.get(docNum);
+                if (merged) {
+                    result.push(merged);
+                    addedDocs.add(docNum);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    async getReceptions(filters?: { searchTerm?: string; partId?: string; startDate?: string; endDate?: string }): Promise<{ data: StockReception[], total: number }> {
+        let receptions = loadFromStorage<StockReception[]>(RECEPTIONS_KEY, []);
 
         if (filters?.searchTerm || filters?.partId) {
             const s = filters.searchTerm?.toLowerCase() || '';
@@ -503,6 +670,141 @@ export class InventoryMockService implements IInventoryService {
             });
         }
 
-        return { data: receptions, total: receptions.length };
+        if (filters?.startDate) {
+            receptions = receptions.filter(r => r.receptionDate >= `${filters.startDate}T00:00:00`);
+        }
+        if (filters?.endDate) {
+            receptions = receptions.filter(r => r.receptionDate <= `${filters.endDate}T23:59:59`);
+        }
+
+        const prs = this.getPurchaseRequests();
+        const prStatusMap = new Map<string, string>();
+        prs.forEach(pr => {
+            if (pr.purchaseRequestNumber) {
+                prStatusMap.set(pr.purchaseRequestNumber.trim().toLowerCase(), pr.status || 'Pendiente');
+            }
+        });
+
+        const mapped = receptions.map(rec => {
+            const docNum = rec.documentNumber?.trim();
+            const status = docNum ? prStatusMap.get(docNum.toLowerCase()) : undefined;
+            return {
+                ...rec,
+                status: status
+            };
+        });
+
+        const grouped = this.groupReceptions(mapped);
+
+        return { data: grouped, total: grouped.length };
+    }
+
+    async createDirectPurchaseRequest(items: { partId: string; quantity: number }[]): Promise<void> {
+        const scNumber = `SC-DIR-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+        const prs = this.getPurchaseRequests();
+        prs.unshift({
+            id: `pr-${Date.now()}`,
+            purchaseRequestNumber: scNumber,
+            requestDate: new Date().toISOString(),
+            requestedBy: 'current-user',
+            items: items,
+            status: 'Pendiente'
+        });
+        this.savePurchaseRequests(prs);
+    }
+
+    async updatePurchaseRequestStatus(requestId: string, status: 'Pendiente' | 'Parcial' | 'Recibido' | 'Cancelado'): Promise<void> {
+        const prs = this.getPurchaseRequests();
+        const index = prs.findIndex(p => p.id === requestId);
+        if (index !== -1) {
+            prs[index].status = status;
+            this.savePurchaseRequests(prs);
+        }
+    }
+
+    async getPurchaseRequestsForReception(): Promise<ExtendedPurchaseRequest[]> {
+        const res = await this.getAllPurchaseRequests(1, 1000);
+        return res.data.filter(pr => 
+            pr.status?.toLowerCase() === 'pendiente' || 
+            pr.status?.toLowerCase() === 'parcial'
+        );
+    }
+
+    async processPurchaseReception(purchaseRequestId: string, itemsReceived: { partId: string; qtyReceived: number }[], notes?: string): Promise<void> {
+        const prs = this.getPurchaseRequests();
+        const parts = this.getParts();
+        const transactions = this.getTransactions();
+
+        const index = prs.findIndex(p => p.id === purchaseRequestId);
+        if (index === -1) throw new Error('Purchase request not found');
+
+        const request = prs[index];
+        const currentItems = request.items || [];
+        let anyItemReceived = false;
+        let allItemsFullyReceived = true;
+
+        const receptionItemsToLog: any[] = [];
+
+        for (const receivedItem of itemsReceived) {
+            if (receivedItem.qtyReceived <= 0) continue;
+
+            const reqItem = currentItems.find(i => i.partId === receivedItem.partId);
+            if (!reqItem) continue;
+
+            // Increment stock
+            const partIndex = parts.findIndex(p => p.id === receivedItem.partId);
+            let partName = 'Repuesto Desconocido';
+            let partNumber = 'N/A';
+            if (partIndex !== -1) {
+                parts[partIndex].currentStock += receivedItem.qtyReceived;
+                partName = parts[partIndex].name;
+                partNumber = parts[partIndex].partNumber || 'N/A';
+            }
+
+            // Create transaction type 'IN'
+            transactions.push({
+                id: `TX-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+                partId: receivedItem.partId,
+                type: 'IN',
+                quantity: receivedItem.qtyReceived,
+                date: new Date().toISOString(),
+                userId: 'current-user',
+                relatedDocumentId: purchaseRequestId,
+                purchaseRequestId: purchaseRequestId
+            });
+
+            // Update quantityReceived
+            reqItem.quantityReceived = (reqItem.quantityReceived || 0) + receivedItem.qtyReceived;
+
+            receptionItemsToLog.push({
+                partId: receivedItem.partId,
+                partName: partName,
+                partNumber: partNumber,
+                quantity: receivedItem.qtyReceived
+            });
+        }
+
+        // Calculate global status
+        for (const item of currentItems) {
+            const received = item.quantityReceived || 0;
+            if (received > 0) anyItemReceived = true;
+            if (received < item.quantity) {
+                allItemsFullyReceived = false;
+            }
+        }
+
+        request.status = allItemsFullyReceived ? 'Recibido' : (anyItemReceived ? 'Parcial' : 'Pendiente');
+        
+        this.saveParts(parts);
+        this.saveTransactions(transactions);
+        this.savePurchaseRequests(prs);
+
+        if (receptionItemsToLog.length > 0) {
+            await this.saveReception({
+                documentNumber: request.purchaseRequestNumber || undefined,
+                notes: notes || `Recepción de compra ${request.purchaseRequestNumber}`,
+                items: receptionItemsToLog
+            });
+        }
     }
 }

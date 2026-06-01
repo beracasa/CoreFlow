@@ -45,6 +45,14 @@ export const SettingsSupabaseService = {
      * Returns default values if no record exists (instead of throwing error)
      */
     async getSettings(): Promise<GeneralSettings> {
+        if (import.meta.env.VITE_USE_MOCK === 'true') {
+            const stored = localStorage.getItem('coreflow_mock_plant_settings');
+            if (stored) {
+                return JSON.parse(stored);
+            }
+            return DEFAULT_SETTINGS;
+        }
+
         // Prefer the newer `general_settings` table; fall back to legacy `plant_settings`
         // so staging environments that only have the old schema still persist settings.
         let source: DbSettingsSource = 'defaults';
@@ -91,6 +99,11 @@ export const SettingsSupabaseService = {
      * Uses upsert to ensure we always update the same record (id = true)
      */
     async updateSettings(settings: GeneralSettings): Promise<void> {
+        if (import.meta.env.VITE_USE_MOCK === 'true') {
+            localStorage.setItem('coreflow_mock_plant_settings', JSON.stringify(settings));
+            return;
+        }
+
         // Try newer schema first
         const general = await supabase.from('general_settings').upsert(
             {

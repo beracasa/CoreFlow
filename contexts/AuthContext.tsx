@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { UserProfile, UserRole } from '../types';
 import { supabase } from '../src/services/supabaseClient';
 import { useUserStore } from '../src/stores/useUserStore';
@@ -16,6 +17,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const navigate = useNavigate();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -66,6 +68,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   useEffect(() => {
     let mounted = true;
+
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      console.log("AuthContext: Mock mode active. Reading session from localStorage...");
+      const checkMockSession = () => {
+        const stored = localStorage.getItem('coreflow_mock_session');
+        if (stored && mounted) {
+          try {
+            setUser(JSON.parse(stored));
+          } catch (e) {
+            console.error("Failed to parse mock session", e);
+          }
+        }
+        if (mounted) {
+          setIsLoading(false);
+        }
+      };
+      checkMockSession();
+      return () => {
+        mounted = false;
+      };
+    }
 
     // 1. Initial Session Check with Timeout Race
     const checkSession = async () => {
@@ -125,6 +148,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // SILENT REFRESH: Do NOT set isLoading(true) for TOKEN_REFRESHED
       // Only set loading for SIGNED_IN if we don't already have a current session (initial login)
       // or for SIGNED_OUT to ensure a clean transition.
+      if (event === 'PASSWORD_RECOVERY') {
+        if (mounted && session?.user) {
+          // Set fallback user immediately to avoid unauthenticated redirect
+          setUser(mapSupabaseUser(session.user));
+          setIsLoading(true);
+        }
+        navigate('/change-password');
+      }
+
       if (event === 'SIGNED_IN' && !session?.user) {
         if (mounted) setIsLoading(true);
       } else if (event === 'SIGNED_OUT') {
@@ -174,6 +206,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const login = async (email: string, password: string) => {
     // Do not set global loading here. Let the UI handle its own loading state.
     // setIsLoading(true); 
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      const mockUser: UserProfile = {
+        id: 'mock-user-id-' + email.replace(/[^a-zA-Z0-9]/g, ''),
+        email: email,
+        full_name: email.split('@')[0].toUpperCase(),
+        role: UserRole.ADMIN_SOLICITANTE, // Default to admin for full functionality
+        tenant_id: 'default-tenant',
+        status: 'ACTIVE',
+        job_title: 'Administrator',
+        specialties: [],
+        company_code: 'COMP-1'
+      };
+      localStorage.setItem('coreflow_mock_session', JSON.stringify(mockUser));
+      setUser(mockUser);
+      return;
+    }
+
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password
@@ -188,6 +237,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const logout = async () => {
     // setIsLoading(true);
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      localStorage.removeItem('coreflow_mock_session');
+      setUser(null);
+      return;
+    }
     await supabase.auth.signOut();
     setUser(null);
     // setIsLoading(false);
@@ -206,8 +260,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Si el rol de DB dice "Admin", "Manager" o "Supervisor" o es de sistema
       // consideramos que es un "ADMIN_SOLICITANTE" lógico para mantener compatibilidad
       if (allowedRoles.includes(UserRole.ADMIN_SOLICITANTE)) {
-        if (userRoleDef.name.toLowerCase().includes('admin') ||
-          userRoleDef.name.toLowerCase().includes('manager') ||
+        if (userRoleDef.name?.toLowerCase().includes('admin') ||
+          userRoleDef.name?.toLowerCase().includes('manager') ||
           userRoleDef.isSystem) {
           return true;
         }
@@ -215,8 +269,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       // Si se requiere tecnico
       if (allowedRoles.includes(UserRole.TECNICO_MANT)) {
-        if (userRoleDef.name.toLowerCase().includes('tecnico') ||
-          userRoleDef.name.toLowerCase().includes('mecanico')) {
+        if (userRoleDef.name?.toLowerCase().includes('tecnico') ||
+          userRoleDef.name?.toLowerCase().includes('mecanico')) {
           return true;
         }
       }
@@ -238,17 +292,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     // 2.5 New System Admin Bypass
     if (userRoleDef.isSystem ||
-      userRoleDef.name.toLowerCase().includes('admin') ||
-      userRoleDef.name.toLowerCase().includes('manager')) {
+      userRoleDef.name?.toLowerCase().includes('admin') ||
+      userRoleDef.name?.toLowerCase().includes('manager')) {
       return true;
     }
 
     // 3. Check specific permission
+    if (!userRoleDef.permissions) return false;
+
     if (Array.isArray(userRoleDef.permissions)) {
       return userRoleDef.permissions.includes(permissionId);
     } else {
       // Object format { [id]: boolean }
-      return !!userRoleDef.permissions[permissionId];
+      return !!(userRoleDef.permissions as Record<string, boolean>)[permissionId];
     }
   };
 

@@ -111,6 +111,9 @@ export interface Machine {
   documents?: MachineDocument[] | string[];   // Documentos adjuntos (soporta ambos formatos)
   maintenancePlans?: MaintenancePlan[]; // R-MANT-02 Protocols inside JSONB
   criticalParts?: string[]; // IDs of critical spare parts for this machine
+  specifications?: any;
+  code?: string;
+  serialNumber?: string;
 }
 
 /**
@@ -184,10 +187,12 @@ export interface MaintenanceTask {
   component: string;         // Columna: Punto de intervencion
   activity: string;          // Columna: Tipo de intervencion
 
-  // Datos Técnicos
+  // Datos Técnicos / Materiales & Repuestos
   referenceCode?: string;    // Columna: Ref de interv.
   lubricantType?: string;    // Columna: Tipo de Lub.
+  lubricantName?: string;    // Columna: Nombre (Nuevo)
   lubricantCode?: string;    // Columna: Codigo
+  lubricantQuantity?: string; // Columna: Cantidad (Nuevo)
   estimatedTime: number;     // Columna: Tiem. Estim min
 
   // Compatibility fields
@@ -198,13 +203,14 @@ export interface MaintenanceTask {
 
   // Matriz de Acciones
   actionFlags: {
+    disassemble: boolean;  // Desmontaje
     clean: boolean;        // Limpieza
     inspect: boolean;      // Controlar/Verificar
     lubricate: boolean;    // Lubricación
-    adjust: boolean;       // Regulación/Ajuste
+    replace: boolean;      // Sustitución/Cambio (Cambio)
+    mount: boolean;        // Desmontaje/Montaje (Montaje)
+    adjust: boolean;       // Regulación/Ajuste (Ajuste-Calibración)
     refill: boolean;       // Llenado/Recarga
-    replace: boolean;      // Sustitución/Cambio
-    mount: boolean;        // Desmontaje/Montaje
   };
 }
 
@@ -285,6 +291,8 @@ export interface WorkOrder {
   signatureExecutorDate?: string;
   signatureSupervisor?: string; // Name of supervisor
   signatureSupervisorDate?: string;
+  tasks?: any[];
+  branch?: string;
 }
 
 export interface MachineHourLog {
@@ -311,6 +319,7 @@ export interface SparePart {
   unitOfMeasure?: string;
   supplier: string;
   leadTimeDays: number;
+  company?: string;
 }
 
 export interface Technician {

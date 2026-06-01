@@ -5,6 +5,7 @@ import { Machine, MachineStatus } from '../../types';
 import { PredictiveAnalysis } from '../../services/geminiService';
 import { useMasterStore } from '../../src/stores/useMasterStore';
 import { useWorkOrderStore } from '../../src/stores/useWorkOrderStore';
+import { useAuth } from '../../contexts/AuthContext';
 import { calculateMachineOEE, calculateMachineMTTR, calculateMachineMTBF } from '../../src/utils/metricsCalculator';
 
 interface AssetDrawerProps {
@@ -19,6 +20,7 @@ interface AssetDrawerProps {
 export const AssetDrawer: React.FC<AssetDrawerProps> = ({ machine, onClose, analysis, onRunAnalysis, isAnalyzing, onCreateWorkOrder }) => {
   const { parts } = useMasterStore();
   const { allOrders, fetchOrders, isInitialized } = useWorkOrderStore();
+  const { hasPermission } = useAuth();
   
   React.useEffect(() => {
     if (!isInitialized || (allOrders && allOrders.length === 0)) {
@@ -139,7 +141,7 @@ export const AssetDrawer: React.FC<AssetDrawerProps> = ({ machine, onClose, anal
           {actualCriticalParts.length > 0 && (
             <div>
               <h3 className="text-sm font-bold text-industrial-400 uppercase mb-3 flex items-center gap-2">
-                <Box size={14} /> Repuestos Críticos (Kardex)
+                <Box size={14} /> Repuestos Asociados (Kardex)
               </h3>
               <div className="space-y-2">
                 {actualCriticalParts.map((part) => {
@@ -150,7 +152,7 @@ export const AssetDrawer: React.FC<AssetDrawerProps> = ({ machine, onClose, anal
                     <div key={part.id} className="flex justify-between items-center p-3 bg-industrial-900 rounded border border-industrial-700">
                       <div>
                         <span className="block text-sm text-gray-300">{part.name}</span>
-                        <span className="block text-[10px] text-industrial-500 font-mono mt-0.5">{part.sku}</span>
+                        <span className="block text-[10px] text-industrial-500 font-mono mt-0.5">{part.partNumber || (part as any).sku}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-mono text-industrial-400 font-bold">Stock: {part.currentStock}</span>
@@ -190,8 +192,13 @@ export const AssetDrawer: React.FC<AssetDrawerProps> = ({ machine, onClose, anal
             Ver Historial
           </button>
           <button
-            onClick={onCreateWorkOrder}
-            className="flex-1 bg-industrial-accent hover:bg-blue-600 text-white py-2 rounded text-sm font-medium shadow-lg shadow-blue-900/20 transition-colors"
+            onClick={() => hasPermission('create_wo') && onCreateWorkOrder()}
+            disabled={!hasPermission('create_wo')}
+            className={`flex-1 py-2 rounded text-sm font-medium shadow-lg transition-colors ${
+              hasPermission('create_wo') 
+              ? 'bg-industrial-accent hover:bg-blue-600 text-white shadow-blue-900/20' 
+              : 'bg-industrial-700 text-industrial-400 cursor-not-allowed opacity-50'
+            }`}
           >
             Crear Orden de Trabajo
           </button>

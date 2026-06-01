@@ -57,16 +57,19 @@ export const ProtocolSupabaseService = {
                 estimatedTime: t.estimated_time,
                 referenceCode: t.reference_code,
                 lubricantType: t.lubricant_type,
+                lubricantName: t.lubricant_name,
                 lubricantCode: t.lubricant_code,
+                lubricantQuantity: t.lubricant_quantity,
                 notes: t.notes, // If stored
                 actionFlags: {
-                    clean: t.action_clean,
-                    inspect: t.action_inspect,
-                    lubricate: t.action_lubricate,
-                    adjust: t.action_adjust,
-                    refill: t.action_refill,
-                    replace: t.action_replace,
-                    mount: t.action_mount
+                    disassemble: t.action_disassemble || false,
+                    clean: t.action_clean || false,
+                    inspect: t.action_inspect || false,
+                    lubricate: t.action_lubricate || false,
+                    adjust: t.action_adjust || false,
+                    refill: t.action_refill || false,
+                    replace: t.action_replace || false,
+                    mount: t.action_mount || false
                 }
             } as MaintenanceTask));
 
@@ -143,8 +146,11 @@ export const ProtocolSupabaseService = {
                 estimated_time: t.estimatedTime,
                 reference_code: t.referenceCode,
                 lubricant_type: t.lubricantType,
+                lubricant_name: t.lubricantName,
                 lubricant_code: t.lubricantCode,
+                lubricant_quantity: t.lubricantQuantity,
                 // notes: t.notes
+                action_disassemble: t.actionFlags.disassemble,
                 action_clean: t.actionFlags.clean,
                 action_inspect: t.actionFlags.inspect,
                 action_lubricate: t.actionFlags.lubricate,

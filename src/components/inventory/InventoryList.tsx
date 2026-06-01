@@ -17,6 +17,7 @@ export const InventoryList: React.FC = () => {
         fetchMasterData,
         partCategories: categories,
         partLocations: locations,
+        partCompanies: companies,
         inventoryPagination: pagination,
         setInventoryPage: setPage,
         inventoryFilters,
@@ -28,6 +29,7 @@ export const InventoryList: React.FC = () => {
     // Filters (Sync with store)
     const searchTerm = inventoryFilters.search || '';
     const categoryFilter = inventoryFilters.category || '';
+    const companyFilter = inventoryFilters.company || '';
     const locationFilter = inventoryFilters.location || '';
     const statusFilter = inventoryFilters.status || 'all';
 
@@ -72,6 +74,7 @@ export const InventoryList: React.FC = () => {
         const filterTexts = [];
         if (searchTerm) filterTexts.push(`Búsqueda: ${searchTerm}`);
         if (categoryFilter) filterTexts.push(`Categoría: ${categoryFilter}`);
+        if (companyFilter) filterTexts.push(`Empresa: ${companyFilter}`);
         if (locationFilter) filterTexts.push(`Tramo: ${locationFilter}`);
         if (statusFilter !== 'all') {
             filterTexts.push(`Estado: ${statusFilter === 'low' ? 'Bajo Stock' : 'Normal'}`);
@@ -87,6 +90,7 @@ export const InventoryList: React.FC = () => {
             return [
                 part.partNumber,
                 part.name,
+                part.company || '-',
                 part.location,
                 part.subLocation || '-',
                 `${part.currentStock} ${part.unitOfMeasure}`,
@@ -97,15 +101,15 @@ export const InventoryList: React.FC = () => {
 
         autoTable(doc, {
             startY: yPos,
-            head: [['Código', 'Nombre', 'Tramo', 'Ubicación', 'Stock', 'Mínimo', 'Estado']],
+            head: [['Código', 'Nombre', 'Empresa', 'Tramo', 'Ubicación', 'Stock', 'Mínimo', 'Estado']],
             body: tableBody,
             theme: 'grid',
             headStyles: { fillColor: [40, 40, 40], textColor: 255, fontStyle: 'bold' },
             styles: { fontSize: 8 },
             columnStyles: {
-                4: { halign: 'right' },
                 5: { halign: 'right' },
-                6: { halign: 'center' }
+                6: { halign: 'right' },
+                7: { halign: 'center' }
             }
         });
 
@@ -135,7 +139,7 @@ export const InventoryList: React.FC = () => {
 
 
             {/* Filters */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
                 <div>
                     <label className="block text-xs font-bold text-industrial-500 uppercase tracking-wider mb-2">Buscar</label>
                     <div className="relative">
@@ -160,6 +164,20 @@ export const InventoryList: React.FC = () => {
                         <option value="">Todas</option>
                         {categories.map(cat => (
                             <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                    </select>
+                </div>
+
+                <div>
+                    <label className="block text-xs font-bold text-industrial-500 uppercase tracking-wider mb-2">Empresa</label>
+                    <select
+                        className="w-full px-4 py-2 bg-industrial-900 border border-industrial-600 rounded-lg focus:ring-2 focus:ring-industrial-accent focus:border-transparent outline-none text-white appearance-none cursor-pointer"
+                        value={companyFilter}
+                        onChange={(e) => setInventoryFilters({ company: e.target.value })}
+                    >
+                        <option value="">Todas</option>
+                        {companies.map(comp => (
+                            <option key={comp} value={comp}>{comp}</option>
                         ))}
                     </select>
                 </div>
@@ -203,6 +221,7 @@ export const InventoryList: React.FC = () => {
                                     <th className="px-6 py-3 text-left text-xs font-bold text-industrial-500 uppercase tracking-wider">Código</th>
                                     <th className="px-6 py-3 text-left text-xs font-bold text-industrial-500 uppercase tracking-wider">Nombre</th>
                                     <th className="px-6 py-3 text-left text-xs font-bold text-industrial-500 uppercase tracking-wider">Categoría</th>
+                                    <th className="px-6 py-3 text-left text-xs font-bold text-industrial-500 uppercase tracking-wider">Empresa</th>
                                     <th className="px-6 py-3 text-left text-xs font-bold text-industrial-500 uppercase tracking-wider">Tramo</th>
                                     <th className="px-6 py-3 text-left text-xs font-bold text-industrial-500 uppercase tracking-wider">Ubicación</th>
                                     <th className="px-6 py-3 text-right text-xs font-bold text-industrial-500 uppercase tracking-wider">Stock</th>
@@ -222,6 +241,7 @@ export const InventoryList: React.FC = () => {
                                             <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-industrial-300 font-medium">{part.partNumber}</td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-white font-medium">{part.name}</td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-industrial-400">{part.category}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-industrial-400">{part.company || '-'}</td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-industrial-400">{part.location}</td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-industrial-400 italic">{part.subLocation || '-'}</td>
                                             <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-bold ${isLowStock ? 'text-red-400' : 'text-emerald-400'}`}>

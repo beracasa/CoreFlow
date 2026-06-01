@@ -18,7 +18,7 @@ export const AssetSelectionModal: React.FC<AssetSelectionModalProps> = ({ isOpen
 
     const filteredItems = items.filter(item =>
         item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (type === 'MACHINE' && (item as Machine).code?.toLowerCase().includes(searchTerm.toLowerCase()))
+        (type === 'MACHINE' && (item as Machine).id?.toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
     return (
@@ -69,7 +69,7 @@ export const AssetSelectionModal: React.FC<AssetSelectionModalProps> = ({ isOpen
                                     </div>
                                     {type === 'MACHINE' && (
                                         <div className="text-xs text-industrial-400">
-                                            Código: {(item as Machine).code || 'N/A'} • Placa: {(item as Machine).plate || 'N/A'}
+                                            Código: {(item as Machine).id || 'N/A'} • Placa: {(item as Machine).plate || 'N/A'}
                                         </div>
                                     )}
                                     {type === 'ZONE' && (

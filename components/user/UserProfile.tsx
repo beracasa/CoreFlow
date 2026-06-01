@@ -63,7 +63,7 @@ export const UserProfileView: React.FC<UserProfileProps> = ({ user }) => {
 
                <div className="flex items-start gap-6 relative z-10">
                   <div className="w-24 h-24 rounded-full bg-industrial-700 border-4 border-industrial-600 flex items-center justify-center text-3xl font-bold text-white shadow-lg">
-                     {user.full_name.substring(0, 2).toUpperCase()}
+                     {(user.full_name || user.email || 'US').substring(0, 2).toUpperCase()}
                   </div>
                   <div>
                      <h3 className="text-2xl font-bold text-white">{user.full_name}</h3>

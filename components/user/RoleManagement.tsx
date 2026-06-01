@@ -2,34 +2,35 @@
 import React, { useState } from 'react';
 import { RoleDefinition, Permission } from '../../types';
 import { Shield, Lock, CheckSquare, Square, Save, Plus, Trash2, ChevronDown, ChevronRight, Users, AlertCircle } from 'lucide-react';
+import { useUserStore } from '../../src/stores/useUserStore';
+import { useAuth } from '../../contexts/AuthContext';
 
 // --- DEFINICIÓN DE PERMISOS DEL SISTEMA ---
 const SYSTEM_PERMISSIONS: Permission[] = [
     // Operativos
-    { id: 'view_dashboard', category: 'OPERATIONAL', label: 'Ver Dashboard y Mapa', description: 'Acceso a Planta Visual y monitoreo.' },
-    { id: 'edit_dashboard_map', category: 'OPERATIONAL', label: 'Editar Dashboard y Mapa', description: 'Permiso de Edición a Planta Visual y Monitoreo.' },
-    { id: 'view_kanban', category: 'OPERATIONAL', label: 'Ver Tablero Kanban', description: 'Ver estado de tickets de mantenimiento.' },
-    { id: 'edit_kanban', category: 'OPERATIONAL', label: 'Editar Tablero Kanban', description: 'Permiso de Edición de la Tabla Kanban.' },
-    { id: 'create_wo', category: 'OPERATIONAL', label: 'Crear Órdenes de Trabajo', description: 'Generar nuevos tickets R-MANT-02/05.' },
-    { id: 'execute_wo', category: 'OPERATIONAL', label: 'Ejecutar Órdenes', description: 'Llenar checklists y consumir repuestos.' },
-    { id: 'supervise_order', category: 'OPERATIONAL', label: 'Supervisar y Recibir Ordenes', description: 'Llenar checklists y recepción de una orden.' },
-    { id: 'log_hours', category: 'OPERATIONAL', label: 'Registrar Horas', description: 'Actualizar contadores de horas de máquinas.' },
+    { id: 'view_dashboard', category: 'OPERATIONAL', label: 'Ver Planta Visual y Mapa', description: 'Ver información en la planta visual. No puede editar el diseño del mapa.' },
+    { id: 'edit_dashboard_map', category: 'OPERATIONAL', label: 'Editar Planta Visual y Mapa', description: 'Editar información en la planta visual. Puede editar el diseño del mapa.' },
+    { id: 'create_wo', category: 'OPERATIONAL', label: 'Crear Órdenes de Mantenimiento', description: 'Generar nuevos tickets R-MANT-02/05.' },
+    { id: 'execute_wo', category: 'OPERATIONAL', label: 'Ejecutar Órdenes de Mantenimiento', description: 'Llenar checklists y consumir repuestos.' },
+    { id: 'supervise_order', category: 'OPERATIONAL', label: 'Supervisar y Recibir Órdenes', description: 'Llenar checklists y recepción de una orden.' },
+    { id: 'edit_wo', category: 'OPERATIONAL', label: 'Editar Órdenes de Mantenimiento', description: 'Editar información de la orden.' },
+    { id: 'log_hours', category: 'OPERATIONAL', label: 'Registrar Uso del Equipo', description: 'Actualizar contadores de horas de máquinas.' },
     
     // Administrativos
-    { id: 'approve_wo', category: 'ADMINISTRATIVE', label: 'Aprobar/Cerrar Tickets', description: 'Firma final y cierre de órdenes.' },
+    { id: 'manage_assets', category: 'ADMINISTRATIVE', label: 'Gestionar Activos', description: 'Agregar/Editar Equipos y Máquinas' },
     { id: 'manage_inventory', category: 'ADMINISTRATIVE', label: 'Gestionar Inventario', description: 'Agregar/Editar repuestos y stock.' },
-    { id: 'manage_assets', category: 'ADMINISTRATIVE', label: 'Gestionar Activos', description: 'Agregar/Editar máquinas y gateways.' },
+    { id: 'view_part_requests', category: 'ADMINISTRATIVE', label: 'Ver Solicitudes de Repuestos', description: 'Visualizar listado y detalle de solicitudes de repuestos.' },
+    { id: 'view_purchase_requests', category: 'ADMINISTRATIVE', label: 'Ver Solicitudes a Compras', description: 'Visualizar listado y detalle de solicitudes de compras.' },
     
-    // Financieros
-    { id: 'view_costs', category: 'FINANCIAL', label: 'Ver Datos Financieros', description: 'Ver costos de repuestos y mantenimiento.' },
-    { id: 'view_analytics', category: 'FINANCIAL', label: 'Ver Analíticas BI', description: 'Acceso completo a dashboard de reportes.' },
+    // Analíticas
+    { id: 'view_kanban', category: 'FINANCIAL', label: 'Ver Tablero Kanban', description: 'Ver estado de tickets de mantenimiento.' },
+    { id: 'edit_kanban', category: 'FINANCIAL', label: 'Editar Tablero Kanban', description: 'Permiso de Edición de la Tabla Kanban.' },
+    { id: 'view_analytics', category: 'FINANCIAL', label: 'Ver Analíticas y BI', description: 'Acceso completo a dashboard de reportes.' },
     
     // Sistema
     { id: 'manage_users', category: 'SYSTEM', label: 'Gestionar Usuarios', description: 'Invitar usuarios y asignar roles.' },
-    { id: 'manage_roles', category: 'SYSTEM', label: 'Gestionar Roles', description: 'Configurar este módulo RBAC.' },
+    { id: 'manage_roles', category: 'SYSTEM', label: 'Gestionar Roles y Permisos', description: 'Configurar este módulo RBAC.' },
 ];
-
-import { useUserStore } from '../../src/stores/useUserStore';
 
 // Componente recursivo para mostrar árbol de roles
 interface RoleTreeItemProps {
@@ -77,7 +78,7 @@ const RoleTreeItem: React.FC<RoleTreeItemProps> = ({ role, selectedId, onSelect,
         </span>
         
         {/* System Lock Icon */}
-        {role.isSystem && <Lock size={12} className="text-industrial-500" />}
+        {(role.isSystem || role.name.includes('Admin')) && <Lock size={12} className="text-industrial-500" />}
         
         {/* Users Count */}
         <span className="text-[10px] bg-industrial-900 text-industrial-400 px-1.5 py-0.5 rounded flex items-center gap-1">
@@ -106,6 +107,8 @@ const RoleTreeItem: React.FC<RoleTreeItemProps> = ({ role, selectedId, onSelect,
 
 export const RoleManagement: React.FC = () => {
     const { roles, roleTree, fetchRoles, addRole, updateRole, deleteRole } = useUserStore();
+    const { hasPermission } = useAuth();
+    const canManage = hasPermission('manage_roles');
     const [selectedRole, setSelectedRole] = useState<RoleDefinition | null>(null);
     const [isEditing, setIsEditing] = useState(false);
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -140,6 +143,7 @@ export const RoleManagement: React.FC = () => {
     };
 
     const handleCreateRole = () => {
+        if (!canManage) return;
         const newRoleData: Partial<RoleDefinition> = {
             name: 'Nuevo Rol',
             description: 'Descripción del rol...',
@@ -166,6 +170,7 @@ export const RoleManagement: React.FC = () => {
     };
 
     const togglePermission = (permId: string) => {
+        if (!canManage) return;
         const currentPerms = formData.permissions as Record<string, boolean> || {};
         const newPerms = {
             ...currentPerms,
@@ -176,6 +181,7 @@ export const RoleManagement: React.FC = () => {
     };
 
     const handleSave = async () => {
+        if (!canManage) return;
         if (!selectedRole) {
             // Modo creación
             await handleSaveNewRole();
@@ -192,10 +198,12 @@ export const RoleManagement: React.FC = () => {
     };
 
     const handleDelete = async () => {
-        if (!selectedRole) return;
+        if (!canManage || !selectedRole) return;
         
-        if (selectedRole.isSystem) {
-            alert("No se pueden eliminar roles del sistema.");
+        const isProtected = selectedRole.isSystem || selectedRole.name.includes('Admin');
+        
+        if (isProtected) {
+            alert("No se pueden eliminar roles del sistema o de administración.");
             return;
         }
         
@@ -239,7 +247,7 @@ export const RoleManagement: React.FC = () => {
     const categoryLabels: Record<string, string> = {
         'OPERATIONAL': 'Acceso Operativo',
         'ADMINISTRATIVE': 'Acceso Administrativo',
-        'FINANCIAL': 'Acceso Financiero',
+        'FINANCIAL': 'Acceso Analíticas',
         'SYSTEM': 'Acceso al Sistema'
     };
 
@@ -251,13 +259,15 @@ export const RoleManagement: React.FC = () => {
                     <h3 className="text-white font-bold flex items-center gap-2">
                         <Shield size={18} className="text-industrial-accent"/> Roles del Sistema
                     </h3>
-                    <button 
-                        onClick={handleCreateRole}
-                        className="p-1.5 bg-industrial-700 hover:bg-industrial-600 rounded text-white transition-colors"
-                        title="Crear Nuevo Rol"
-                    >
-                        <Plus size={16} />
-                    </button>
+                    {canManage && (
+                        <button 
+                            onClick={handleCreateRole}
+                            className="p-1.5 bg-industrial-700 hover:bg-industrial-600 rounded text-white transition-colors"
+                            title="Crear Nuevo Rol"
+                        >
+                            <Plus size={16} />
+                        </button>
+                    )}
                 </div>
                 
                 <div className="flex-1 overflow-y-auto p-2">
@@ -338,7 +348,7 @@ export const RoleManagement: React.FC = () => {
                                 
                                 {/* Botones de Acción */}
                                 <div className="flex gap-2 pt-2">
-                                    {isEditing && (
+                                    {isEditing && canManage && (
                                         <button 
                                             onClick={handleSave}
                                             className="px-4 py-2 bg-industrial-accent hover:bg-blue-600 text-white text-sm font-bold rounded shadow-lg flex items-center gap-2"
@@ -346,7 +356,7 @@ export const RoleManagement: React.FC = () => {
                                             <Save size={14} /> Guardar Cambios
                                         </button>
                                     )}
-                                    {selectedRole && !selectedRole.isSystem && (
+                                    {selectedRole && canManage && !(selectedRole.isSystem || selectedRole.name.includes('Admin')) && (
                                         <button 
                                             onClick={handleDelete}
                                             className="px-4 py-2 bg-red-900/30 hover:bg-red-900/50 text-red-400 border border-red-900/50 text-sm font-bold rounded flex items-center gap-2"
@@ -414,12 +424,14 @@ export const RoleManagement: React.FC = () => {
                     <div className="flex-1 flex flex-col items-center justify-center text-industrial-500 gap-4">
                         <Shield size={64} className="opacity-20" />
                         <p className="text-lg">Seleccione un rol para configurar</p>
-                        <button 
-                            onClick={handleCreateRole}
-                            className="px-4 py-2 bg-industrial-accent hover:bg-blue-600 text-white text-sm font-bold rounded flex items-center gap-2"
-                        >
-                            <Plus size={16} /> Crear Nuevo Rol
-                        </button>
+                        {canManage && (
+                            <button 
+                                onClick={handleCreateRole}
+                                className="px-4 py-2 bg-industrial-accent hover:bg-blue-600 text-white text-sm font-bold rounded flex items-center gap-2"
+                            >
+                                <Plus size={16} /> Crear Nuevo Rol
+                            </button>
+                        )}
                     </div>
                 )}
             </div>

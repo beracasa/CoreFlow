@@ -32,15 +32,17 @@ import { useUserStore } from './src/stores/useUserStore';
 import { SERVICE_MODE, SERVICE_WARNINGS } from './src/services';
 
 // --- SIDEBAR ITEM ---
-const SidebarItem = ({ icon, label, active, onClick, restricted = false }: { icon: React.ReactNode, label: string, active: boolean, onClick: () => void, restricted?: boolean }) => {
-  if (restricted) return null;
+const SidebarItem = ({ icon, label, active, onClick, disabled = false }: { icon: React.ReactNode, label: string, active: boolean, onClick: () => void, disabled?: boolean }) => {
   return (
     <button
-      onClick={onClick}
-      className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors text-left ${active
-        ? 'text-white bg-industrial-800 border-r-2 border-industrial-accent'
-        : 'text-industrial-500 hover:text-industrial-300 hover:bg-industrial-800/50'
-        }`}
+      onClick={disabled ? undefined : onClick}
+      className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors text-left ${
+        disabled 
+          ? 'opacity-40 cursor-not-allowed text-industrial-600'
+          : active
+            ? 'text-white bg-industrial-800 border-r-2 border-industrial-accent'
+            : 'text-industrial-500 hover:text-industrial-300 hover:bg-industrial-800/50'
+      }`}
     >
       <div className="shrink-0">{icon}</div>
       <span className="leading-tight">{label}</span>
@@ -56,10 +58,11 @@ interface ErrorBoundaryState {
 interface ErrorBoundaryProps {
   children?: React.ReactNode;
 }
-class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  constructor(props: ErrorBoundaryProps) {
+class ErrorBoundary extends React.Component<any, any> {
+  props: any;
+  state: any = { hasError: false, error: null };
+  constructor(props: any) {
     super(props);
-    this.state = { hasError: false, error: null };
   }
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { hasError: true, error };
@@ -99,7 +102,7 @@ const MachineHoursPage = () => {
 };
 
 const ConfigurationPage = () => {
-  const { technicians, plantSettings, addTechnician, updateSettings, zones, addZone, updateZone, removeZone } = useMasterStore();
+  const { technicians, plantSettings, addTechnician, updateSettings, zones, addZone, updateZone, deleteZone } = useMasterStore();
   const { hasRole } = useAuth();
 
   if (!hasRole([UserRole.ADMIN_SOLICITANTE])) {
@@ -114,15 +117,15 @@ const ConfigurationPage = () => {
       zoneStructures={zones} // Pass store 'zones' to prop 'zoneStructures'
       onAddZone={addZone}
       onUpdateZone={updateZone}
-      onRemoveZone={removeZone}
+      onRemoveZone={deleteZone}
     />
   );
 };
 
 const AnalyticsPage = () => {
-  const { hasRole } = useAuth();
-  if (!hasRole([UserRole.ADMIN_SOLICITANTE])) {
-    return <div className="h-full flex items-center justify-center bg-industrial-900 text-industrial-500 flex-col gap-4"><Shield className="w-12 h-12 text-red-900" /><span>Access Restricted: Analytics requires Admin privileges.</span></div>;
+  const { hasPermission } = useAuth();
+  if (!hasPermission('view_analytics')) {
+    return <div className="h-full flex items-center justify-center bg-industrial-900 text-industrial-500 flex-col gap-4"><Shield className="w-12 h-12 text-red-900" /><span>Acceso Restringido: Se requiere el permiso de Analíticas.</span></div>;
   }
   return <Analytics />;
 };
@@ -199,7 +202,7 @@ const MaintenanceFormPage = () => {
 
 // --- LAYOUT ---
 const AppLayout = () => {
-  const { user, logout, hasRole } = useAuth();
+  const { user, logout, hasRole, hasPermission } = useAuth();
   const { plantSettings } = useMasterStore();
   const { roles } = useUserStore(); // Get roles for lookup
   const { language, setLanguage, t } = useLanguage();
@@ -250,7 +253,7 @@ const AppLayout = () => {
               active={path === '/kanban'} onClick={() => navigate('/kanban')} />
 
             <SidebarItem label={t('sidebar.biAnalytics')} icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>}
-              active={path === '/stats'} onClick={() => navigate('/stats')} restricted={!hasRole([UserRole.ADMIN_SOLICITANTE])} />
+              active={path === '/stats'} onClick={() => navigate('/stats')} disabled={!hasPermission('view_analytics')} />
 
             <div className="my-2 border-t border-industrial-800 mx-4"></div>
 
@@ -273,14 +276,14 @@ const AppLayout = () => {
 
             <div className="pt-4 mt-4 border-t border-industrial-800">
               <SidebarItem label={t('sidebar.masterData')} icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} /><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} /></svg>}
-                active={path === '/settings'} onClick={() => navigate('/settings')} restricted={!hasRole([UserRole.ADMIN_SOLICITANTE])} />
+                active={path === '/settings'} onClick={() => navigate('/settings')} disabled={!hasRole([UserRole.ADMIN_SOLICITANTE])} />
             </div>
           </nav>
 
           <div className="p-4 border-t border-industrial-800 bg-industrial-900/50">
             <div className="flex items-center gap-3 mb-3 cursor-pointer hover:bg-industrial-800 rounded p-1 transition-colors" onClick={() => navigate('/profile')}>
               <div className="w-8 h-8 rounded-full bg-industrial-700 flex items-center justify-center font-bold text-xs text-white border border-industrial-600">
-                {user?.full_name.substring(0, 2).toUpperCase()}
+                {(user?.full_name || user?.email || 'U').substring(0, 2).toUpperCase()}
               </div>
               <div className="overflow-hidden">
                 <p className="text-sm font-medium text-white truncate w-32">{user?.full_name}</p>
@@ -312,7 +315,7 @@ const AppLayout = () => {
 
 // --- AUTH GUARD ---
 // --- AUTH GUARD ---
-const RequireAuth = ({ children }: { children: JSX.Element }) => {
+const RequireAuth = ({ children }: { children: React.ReactElement }) => {
   const { isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
 
@@ -387,6 +390,17 @@ const AppRoutes = () => {
   }
 
   if (!isAuthenticated) {
+    // Prevent wiping the hash if Supabase is still processing a magic link or recovery link
+    if (window.location.hash.includes('access_token')) {
+      return (
+        <div className="h-screen w-screen bg-industrial-900 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+            <p className="text-industrial-400 text-sm animate-pulse">Processing secure link...</p>
+          </div>
+        </div>
+      );
+    }
     return (
       <Routes>
         <Route path="/login" element={<Login />} />
@@ -408,6 +422,7 @@ const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/login" element={<Navigate to="/" replace />} />
+      <Route path="/change-password" element={<ChangePasswordView />} />
       <Route path="/" element={<AppLayout />}>
         <Route index element={<Dashboard />} />
         <Route path="kanban" element={<MaintenanceKanban />} />
@@ -423,7 +438,6 @@ const AppRoutes = () => {
         <Route path="settings" element={<ConfigurationPage />} />
 
         <Route path="profile" element={<ProfilePage />} />
-        <Route path="change-password" element={<ChangePasswordView />} />
       </Route>
     </Routes>
   );

@@ -1,4 +1,4 @@
-import { SparePart, PartsRequest, InventoryTransaction, PurchaseRequest, StockReception, StockReceptionItem } from '../types/inventory';
+import { SparePart, PartsRequest, InventoryTransaction, PurchaseRequest, StockReception, StockReceptionItem, ExtendedPurchaseRequest } from '../types/inventory';
 
 export interface IInventoryService {
     getAllParts(page?: number, limit?: number, filters?: {
@@ -6,7 +6,9 @@ export interface IInventoryService {
         category?: string;
         location?: string;
         status?: 'all' | 'low' | 'normal';
+        company?: string;
     }): Promise<{ data: SparePart[], total: number }>;
+    getPartCompanies(): Promise<string[]>;
     getAllRequests(): Promise<PartsRequest[]>;
     createRequest(requestData: Omit<PartsRequest, 'id' | 'createdDate' | 'status' | 'requestNumber' | 'items'> & { items: { partId: string; quantity: number }[] }): Promise<PartsRequest>;
     deliverParts(requestId: string, itemsToDeliver: { partId: string; quantity: number }[], receiverId?: string): Promise<PartsRequest>;
@@ -25,8 +27,10 @@ export interface IInventoryService {
     getAllPurchaseRequests(page?: number, limit?: number, filters?: { searchTerm?: string }): Promise<{ data: ExtendedPurchaseRequest[], total: number }>;
     createDirectPurchaseRequest(items: { partId: string; quantity: number }[]): Promise<void>;
     updatePurchaseRequestStatus(requestId: string, status: 'Pendiente' | 'Parcial' | 'Recibido' | 'Cancelado'): Promise<void>;
+    processPurchaseReception(purchaseRequestId: string, itemsReceived: { partId: string; qtyReceived: number }[], notes?: string): Promise<void>;
+    getPurchaseRequestsForReception(): Promise<ExtendedPurchaseRequest[]>;
 
     // Reception History
     saveReception(reception: Omit<StockReception, 'id' | 'receptionDate'>): Promise<StockReception>;
-    getReceptions(filters?: { searchTerm?: string; partId?: string }): Promise<{ data: StockReception[], total: number }>;
+    getReceptions(filters?: { searchTerm?: string; partId?: string; startDate?: string; endDate?: string }): Promise<{ data: StockReception[], total: number }>;
 }

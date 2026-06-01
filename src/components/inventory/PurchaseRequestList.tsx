@@ -5,7 +5,11 @@ import { Search, FileText, Clock, ChevronDown, ChevronRight, Plus, Download, Eye
 import { exportPurchaseRequestPDF } from '../../utils/pdfExport';
 import { TablePagination } from '../shared/TablePagination';
 
+import { useAuth } from '../../../contexts/AuthContext';
+
 export const PurchaseRequestList: React.FC = () => {
+    const { hasPermission } = useAuth();
+    const canManage = hasPermission('manage_inventory');
     const [requests, setRequests] = useState<ExtendedPurchaseRequest[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -25,6 +29,9 @@ export const PurchaseRequestList: React.FC = () => {
     const [selectedRequest, setSelectedRequest] = useState<ExtendedPurchaseRequest | null>(null);
     const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
     const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+    const [receivingItemId, setReceivingItemId] = useState<string | null>(null);
+    const [receivingQty, setReceivingQty] = useState<number>(0);
+    const [isReceivingItem, setIsReceivingItem] = useState(false);
 
     const handleStatusChange = async (newStatus: 'Pendiente' | 'Parcial' | 'Recibido' | 'Cancelado') => {
         if (!selectedRequest) return;
@@ -39,6 +46,42 @@ export const PurchaseRequestList: React.FC = () => {
             alert('Asegúrate de haber ejecutado la migración de la base de datos para habilitar los nuevos estados.');
         } finally {
             setIsUpdatingStatus(false);
+        }
+    };
+
+    const handleReceiveItem = async (partId: string) => {
+        if (!selectedRequest || receivingQty <= 0) return;
+        
+        const item = selectedRequest.items.find(i => i.partId === partId);
+        if (!item) return;
+        
+        const remaining = item.quantity - (item.quantityReceived || 0);
+        if (receivingQty > remaining) {
+            alert('La cantidad no puede ser mayor a la cantidad pendiente por recibir.');
+            return;
+        }
+
+        setIsReceivingItem(true);
+        try {
+            await inventoryService.processPurchaseReception(selectedRequest.id, [{ partId, qtyReceived: receivingQty }]);
+            
+            // Reload requests to get updated status and quantities
+            const res = await inventoryService.getAllPurchaseRequests(currentPage, 50, { searchTerm });
+            setRequests(res.data);
+            
+            // Update selected request
+            const updatedReq = res.data.find(r => r.id === selectedRequest.id);
+            if (updatedReq) {
+                setSelectedRequest(updatedReq);
+            }
+            
+            setReceivingItemId(null);
+            setReceivingQty(0);
+        } catch (error) {
+            console.error('Error receiving item:', error);
+            alert('Error al recibir el ítem.');
+        } finally {
+            setIsReceivingItem(false);
         }
     };
 
@@ -122,6 +165,25 @@ export const PurchaseRequestList: React.FC = () => {
         )
     );
 
+    const getRequestStatus = (req: ExtendedPurchaseRequest) => {
+        if (req.status === 'Cancelado') return 'Cancelado';
+        if (!req.items || req.items.length === 0) return req.status || 'Pendiente';
+
+        const allPending = req.items.every(i => (i.quantityReceived || 0) === 0);
+        const allReceived = req.items.every(i => (i.quantityReceived || 0) >= i.quantity);
+
+        if (allReceived) return 'Recibido';
+        if (allPending) return 'Pendiente';
+        return 'Parcial';
+    };
+
+    const getGroupStatus = (reqs: ExtendedPurchaseRequest[]) => {
+        if (reqs.every(r => getRequestStatus(r) === 'Recibido')) return 'Recibido';
+        if (reqs.every(r => getRequestStatus(r) === 'Cancelado')) return 'Cancelado';
+        if (reqs.some(r => getRequestStatus(r) === 'Parcial' || getRequestStatus(r) === 'Recibido')) return 'Parcial';
+        return 'Pendiente';
+    };
+
     return (
         <div className="space-y-4">
             <div className="flex justify-between items-center mb-6">
@@ -135,13 +197,15 @@ export const PurchaseRequestList: React.FC = () => {
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
-                <button
-                    onClick={() => { setShowDirectModal(true); setSelectedItems([{ partId: '', quantity: 1, partName: '' }]); }}
-                    className="px-4 py-2 bg-industrial-accent hover:bg-industrial-accent/90 text-white text-sm font-bold rounded-lg shadow-lg flex items-center gap-2 transition-all"
-                >
-                    <Plus className="w-4 h-4" />
-                    Nueva Solicitud Directa
-                </button>
+                {canManage && (
+                    <button
+                        onClick={() => { setShowDirectModal(true); setSelectedItems([{ partId: '', quantity: 1, partName: '' }]); }}
+                        className="px-4 py-2 bg-industrial-accent hover:bg-industrial-accent/90 text-white text-sm font-bold rounded-lg shadow-lg flex items-center gap-2 transition-all"
+                    >
+                        <Plus className="w-4 h-4" />
+                        Nueva Solicitud Directa
+                    </button>
+                )}
             </div>
 
             {isLoading ? (
@@ -163,8 +227,18 @@ export const PurchaseRequestList: React.FC = () => {
                                     <div className="text-left">
                                         <h3 className="text-white font-bold flex items-center gap-2">
                                             Origen: <span className={key.startsWith('DIRECTO') ? 'text-yellow-400' : 'text-blue-400'}>{key}</span>
-                                            <span className="text-[10px] bg-industrial-700 px-2 py-0.5 rounded text-industrial-300 ml-2">
+                                            <span className="text-[10px] bg-industrial-700 px-2 py-0.5 rounded text-industrial-300 ml-2 mr-2">
                                                 {groupedRequests[key].reduce((sum, req) => sum + req.items.length, 0)} Solicitud(es)
+                                            </span>
+                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${getGroupStatus(groupedRequests[key]) === 'Recibido'
+                                                    ? 'bg-emerald-900/30 text-emerald-400 border border-emerald-800'
+                                                    : getGroupStatus(groupedRequests[key]) === 'Cancelado'
+                                                        ? 'bg-red-900/30 text-red-400 border border-red-800'
+                                                        : getGroupStatus(groupedRequests[key]) === 'Parcial'
+                                                            ? 'bg-blue-900/30 text-blue-400 border border-blue-800'
+                                                            : 'bg-yellow-900/30 text-yellow-500 border border-yellow-800'
+                                                }`}>
+                                                {getGroupStatus(groupedRequests[key])}
                                             </span>
                                         </h3>
                                         <p className="text-[10px] text-industrial-500 font-medium">Última actualización: {new Date(groupedRequests[key][0].requestDate).toLocaleDateString()}</p>
@@ -177,8 +251,9 @@ export const PurchaseRequestList: React.FC = () => {
                                     <table className="w-full text-left text-sm">
                                         <thead className="bg-industrial-900/30 text-[10px] uppercase text-industrial-500 font-bold">
                                             <tr>
-                                                <th className="px-6 py-3">Código</th>
+                                                <th className="px-6 py-3">Solicitud</th>
                                                 <th className="px-6 py-3">Repuesto</th>
+                                                <th className="px-6 py-3">Empresa</th>
                                                 <th className="px-6 py-3 text-center">Cant.</th>
                                                 <th className="px-6 py-3">Fecha</th>
                                                 <th className="px-6 py-3 text-center">Estado</th>
@@ -188,30 +263,52 @@ export const PurchaseRequestList: React.FC = () => {
                                         <tbody className="divide-y divide-industrial-700">
                                             {groupedRequests[key].map(req => (
                                                 <tr key={req.id} className="hover:bg-industrial-700/20 transition-colors">
-                                                    <td className="px-6 py-4">
+                                                    <td className="px-6 py-4 align-middle">
                                                         <span className="text-white font-medium">{req.purchaseRequestNumber}</span>
                                                     </td>
-                                                    <td className="px-6 py-4">
-                                                        <span className="text-industrial-200">
-                                                            {req.items.length === 1 ? req.items[0].partName : req.items.length > 1 ? `Varios Repuestos (${req.items.length})` : 'N/A'}
-                                                        </span>
+                                                    <td className="px-6 py-4 align-middle">
+                                                        <div className="flex flex-col gap-1.5">
+                                                            {req.items.map((item, idx) => (
+                                                                <div key={idx} className="text-industrial-200 text-xs">
+                                                                    <span className="text-blue-400 font-mono font-bold mr-2">
+                                                                        [{item.partNumber || 'N/A'}]
+                                                                    </span>
+                                                                    <span>{item.partName || 'N/A'}</span>
+                                                                </div>
+                                                            ))}
+                                                        </div>
                                                     </td>
-                                                    <td className="px-6 py-4 text-center font-mono text-white text-xs">
-                                                        {req.items.reduce((acc, i) => acc + i.quantity, 0)}
+                                                    <td className="px-6 py-4 align-middle">
+                                                        <div className="flex flex-col gap-1.5">
+                                                            {req.items.map((item, idx) => (
+                                                                <div key={idx} className="text-industrial-300 text-xs font-semibold">
+                                                                    {item.company || 'N/A'}
+                                                                </div>
+                                                            ))}
+                                                        </div>
                                                     </td>
-                                                    <td className="px-6 py-4 text-industrial-400 text-xs">
+                                                    <td className="px-6 py-4 align-middle text-center">
+                                                        <div className="flex flex-col gap-1.5">
+                                                            {req.items.map((item, idx) => (
+                                                                <div key={idx} className="font-mono text-white text-xs">
+                                                                    {item.quantity}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-industrial-400 text-xs align-middle">
                                                         {new Date(req.requestDate).toLocaleDateString()}
                                                     </td>
-                                                    <td className="px-6 py-4 text-center">
-                                                        <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider ${req.status === 'Recibido'
+                                                    <td className="px-6 py-4 text-center align-middle">
+                                                        <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider ${getRequestStatus(req) === 'Recibido'
                                                             ? 'bg-emerald-900/30 text-emerald-400 border border-emerald-800'
-                                                            : req.status === 'Cancelado'
+                                                            : getRequestStatus(req) === 'Cancelado'
                                                                 ? 'bg-red-900/30 text-red-400 border border-red-800'
-                                                                : req.status === 'Parcial'
+                                                                : getRequestStatus(req) === 'Parcial'
                                                                     ? 'bg-blue-900/30 text-blue-400 border border-blue-800'
                                                                     : 'bg-yellow-900/30 text-yellow-500 border border-yellow-800'
                                                             }`}>
-                                                            {req.status || 'Pendiente'}
+                                                            {getRequestStatus(req)}
                                                         </span>
                                                     </td>
                                                     <td className="px-6 py-4 text-right">
@@ -223,13 +320,15 @@ export const PurchaseRequestList: React.FC = () => {
                                                             >
                                                                 <Eye className="w-4 h-4" />
                                                             </button>
-                                                            <button
-                                                                onClick={() => exportPurchaseRequestPDF(req)}
-                                                                className="p-1.5 bg-industrial-700 hover:bg-blue-600 rounded-lg text-industrial-300 hover:text-white transition-all"
-                                                                title="Exportar PDF"
-                                                            >
-                                                                <Download className="w-4 h-4" />
-                                                            </button>
+                                                            {canManage && (
+                                                                <button
+                                                                    onClick={() => exportPurchaseRequestPDF(req)}
+                                                                    className="p-1.5 bg-industrial-700 hover:bg-blue-600 rounded-lg text-industrial-300 hover:text-white transition-all"
+                                                                    title="Exportar PDF"
+                                                                >
+                                                                    <Download className="w-4 h-4" />
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -391,7 +490,7 @@ export const PurchaseRequestList: React.FC = () => {
             {/* Modal: Detalle de Solicitud */}
             {selectedRequest && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-fade-in">
-                    <div className="bg-industrial-800 rounded-xl shadow-2xl border border-industrial-600 w-full max-w-xl overflow-hidden animate-slide-up">
+                    <div className="bg-industrial-800 rounded-xl shadow-2xl border border-industrial-600 w-full max-w-4xl overflow-hidden animate-slide-up">
                         <div className="bg-industrial-900 p-6 border-b border-industrial-700 flex justify-between items-center text-white">
                             <div>
                                 <h3 className="text-xl font-bold flex items-center gap-2">
@@ -422,41 +521,20 @@ export const PurchaseRequestList: React.FC = () => {
                                     </p>
                                 </div>
                                 <div className="space-y-1 relative">
-                                    <span className="text-[10px] text-industrial-500 uppercase font-black tracking-widest">Resumen General</span>
+                                    <span className="text-[10px] text-industrial-500 uppercase font-black tracking-widest">Estado Solicitud</span>
                                     <div>
-                                        <button
-                                            onClick={() => setShowStatusDropdown(!showStatusDropdown)}
-                                            disabled={isUpdatingStatus}
-                                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/50 ${isUpdatingStatus ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 active:scale-95'
-                                                } ${selectedRequest.status === 'Recibido'
+                                        <div
+                                            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border shadow-sm ${getRequestStatus(selectedRequest) === 'Recibido'
                                                     ? 'bg-emerald-900/30 text-emerald-400 border-emerald-800'
-                                                    : selectedRequest.status === 'Cancelado'
+                                                    : getRequestStatus(selectedRequest) === 'Cancelado'
                                                         ? 'bg-red-900/30 text-red-400 border-red-800'
-                                                        : selectedRequest.status === 'Parcial'
+                                                        : getRequestStatus(selectedRequest) === 'Parcial'
                                                             ? 'bg-blue-900/30 text-blue-400 border-blue-800'
                                                             : 'bg-yellow-900/30 text-yellow-500 border-yellow-800'
                                                 }`}
                                         >
-                                            <span className="text-xs font-black uppercase tracking-wider">{selectedRequest.status || 'Pendiente'}</span>
-                                            <ChevronDown className="w-3 h-3" />
-                                        </button>
-
-                                        {showStatusDropdown && (
-                                            <div className="absolute top-full mt-2 left-0 w-40 bg-industrial-800 rounded-lg shadow-xl border border-industrial-700 overflow-hidden z-[60]">
-                                                {['Pendiente', 'Parcial', 'Recibido', 'Cancelado'].map((statusOption) => (
-                                                    <button
-                                                        key={statusOption}
-                                                        onClick={() => handleStatusChange(statusOption as any)}
-                                                        className={`w-full text-left px-4 py-3 text-sm font-bold transition-colors ${selectedRequest.status === statusOption
-                                                            ? 'bg-industrial-700/50 text-white'
-                                                            : 'text-industrial-400 hover:bg-industrial-700 hover:text-white'
-                                                            }`}
-                                                    >
-                                                        {statusOption}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        )}
+                                            <span className="text-xs font-black uppercase tracking-wider">{getRequestStatus(selectedRequest)}</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -472,32 +550,90 @@ export const PurchaseRequestList: React.FC = () => {
                                                 </div>
                                                 <div>
                                                     <p className="text-white font-bold">{item.partName || selectedRequest.sparePartName}</p>
-                                                    <p className="text-[10px] text-industrial-500 font-mono">{item.partNumber || selectedRequest.sparePartNumber}</p>
+                                                    <div className="flex gap-2 items-center text-xs text-industrial-400 font-mono mt-1">
+                                                        <span>Código: {item.partNumber || selectedRequest.sparePartNumber}</span>
+                                                        {item.company && (
+                                                            <>
+                                                                <span className="text-industrial-600 font-bold">•</span>
+                                                                <span className="text-industrial-400">Empresa: <strong className="text-industrial-300">{item.company}</strong></span>
+                                                            </>
+                                                        )}
+                                                        <span className="text-industrial-600 font-bold">•</span>
+                                                        <span className="text-emerald-400">Recibido: {item.quantityReceived || 0} / {item.quantity}</span>
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <span className="text-[10px] bg-yellow-900/30 text-yellow-500 font-black px-3 py-1 rounded-full border border-yellow-800 shadow-sm shadow-black">
-                                                PENDIENTE
-                                            </span>
+                                            <div className="flex items-center gap-3">
+                                                <span className={`text-[10px] font-black px-3 py-1 rounded-full border shadow-sm shadow-black ${
+                                                    (item.quantityReceived || 0) >= item.quantity
+                                                        ? 'bg-emerald-900/30 text-emerald-400 border-emerald-800'
+                                                        : (item.quantityReceived || 0) > 0
+                                                            ? 'bg-blue-900/30 text-blue-400 border-blue-800'
+                                                            : 'bg-yellow-900/30 text-yellow-500 border-yellow-800'
+                                                }`}>
+                                                    {(item.quantityReceived || 0) >= item.quantity ? 'RECIBIDO' : (item.quantityReceived || 0) > 0 ? 'PARCIAL' : 'PENDIENTE'}
+                                                </span>
+                                                {(item.quantityReceived || 0) < item.quantity && canManage && (
+                                                    receivingItemId === item.partId ? (
+                                                        <div className="flex items-center gap-2">
+                                                            <input
+                                                                type="number"
+                                                                min="1"
+                                                                max={item.quantity - (item.quantityReceived || 0)}
+                                                                className="w-16 bg-industrial-800 border border-industrial-600 text-white rounded px-2 py-1 text-sm outline-none focus:border-emerald-500"
+                                                                value={receivingQty}
+                                                                onChange={(e) => setReceivingQty(parseInt(e.target.value) || 0)}
+                                                                autoFocus
+                                                            />
+                                                            <button
+                                                                onClick={() => handleReceiveItem(item.partId)}
+                                                                disabled={isReceivingItem || receivingQty <= 0}
+                                                                className="bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-1 rounded text-xs font-bold transition-colors disabled:opacity-50"
+                                                            >
+                                                                OK
+                                                            </button>
+                                                            <button
+                                                                onClick={() => setReceivingItemId(null)}
+                                                                className="text-industrial-400 hover:text-white"
+                                                            >
+                                                                <X className="w-4 h-4" />
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => {
+                                                                setReceivingItemId(item.partId);
+                                                                setReceivingQty(item.quantity - (item.quantityReceived || 0));
+                                                            }}
+                                                            className="bg-industrial-700 hover:bg-industrial-600 text-industrial-300 hover:text-white px-3 py-1 rounded-lg text-xs font-bold transition-colors border border-industrial-600"
+                                                        >
+                                                            Recibir
+                                                        </button>
+                                                    )
+                                                )}
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
                             </div>
                         </div>
                         <div className="p-6 bg-industrial-900/80 border-t border-industrial-700 flex gap-4">
-                            <button
-                                onClick={() => setSelectedRequest(null)}
-                                className="px-6 py-3 text-industrial-400 font-bold hover:text-white transition-colors"
-                            >
-                                Cerrar
-                            </button>
-                            <button
-                                onClick={() => exportPurchaseRequestPDF(selectedRequest)}
-                                className="flex-1 py-3 bg-white text-industrial-900 font-black hover:bg-industrial-100 rounded-lg transition-all flex items-center justify-center gap-3 shadow-xl"
-                            >
-                                <Download className="w-5 h-5" />
-                                EXPORTAR REQUISICIÓN (PDF)
-                            </button>
-                        </div>
+                                <button
+                                    onClick={() => setSelectedRequest(null)}
+                                    className={`px-6 py-3 text-industrial-400 font-bold hover:text-white transition-colors ${!canManage ? 'flex-1 border border-industrial-700 rounded-lg bg-industrial-900/50' : ''}`}
+                                >
+                                    Cerrar
+                                </button>
+                                {canManage && (
+                                    <button
+                                        onClick={() => exportPurchaseRequestPDF(selectedRequest)}
+                                        className="flex-1 py-3 bg-white text-industrial-900 font-black hover:bg-industrial-100 rounded-lg transition-all flex items-center justify-center gap-3 shadow-xl"
+                                    >
+                                        <Download className="w-5 h-5" />
+                                        EXPORTAR REQUISICIÓN (PDF)
+                                    </button>
+                                )}
+                            </div>
                     </div>
                 </div>
             )}

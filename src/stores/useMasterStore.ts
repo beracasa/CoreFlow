@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { Machine, Technician, SparePart, ZoneStructure, MaintenancePlan, PlanTier } from '../../types';
+import { Machine, Technician, ZoneStructure, MaintenancePlan, PlanTier } from '../../types';
+import { SparePart } from '../types/inventory';
 import { MasterDataService } from '../services/masterDataService';
 import { inventoryService } from '../services'; // For parts
 import { SettingsSupabaseService, GeneralSettings } from '../services/implementations/SettingsSupabase';
@@ -11,6 +12,7 @@ interface MasterState {
     machines: Machine[];
     technicians: Technician[];
     parts: SparePart[];
+    selectedPart: SparePart | null;
     zones: ZoneStructure[];
     plantSettings: PlantSettings;
     currentPlan: PlanTier;
@@ -21,6 +23,7 @@ interface MasterState {
     partCategories: string[];
     partLocations: string[];
     partUnits: string[];
+    partCompanies: string[];
 
     // Maintenance Plans Actions
     addMaintenancePlan: (plan: MaintenancePlan) => void;
@@ -56,6 +59,7 @@ interface MasterState {
         category?: string;
         location?: string;
         status?: 'all' | 'low' | 'normal';
+        company?: string;
     };
 
     // Actions
@@ -76,6 +80,7 @@ interface MasterState {
     updateZone: (zone: ZoneStructure) => Promise<void>;
     reorderZones: (sourceIndex: number, destinationIndex: number) => Promise<void>;
     removeZone: (id: string) => Promise<void>;
+    deleteZone: (id: string) => Promise<void>;
 
     removeMachine: (id: string) => Promise<void>;
 
@@ -112,6 +117,7 @@ export const useMasterStore = create<MasterState>((set, get) => ({
     machines: [],
     technicians: [],
     parts: [],
+    selectedPart: null,
     zones: [],
 
     // Default Settings
@@ -182,6 +188,7 @@ export const useMasterStore = create<MasterState>((set, get) => ({
     partCategories: [],
     partLocations: [],
     partUnits: [],
+    partCompanies: [],
 
     setMachinePage: async (page: number) => {
         set((state) => ({ 
@@ -256,7 +263,8 @@ export const useMasterStore = create<MasterState>((set, get) => ({
                     plantSettings,
                     partCategories,
                     partLocations,
-                    partUnits
+                    partUnits,
+                    partCompanies
                 ] = await Promise.all([
                     safeFetch(MasterDataService.getMachines(machinePage, machineLimit, machineFilters), { data: [], total: 0 }, 'machines'),
                     safeFetch(MasterDataService.getTechnicians(), [], 'technicians'),
@@ -268,7 +276,8 @@ export const useMasterStore = create<MasterState>((set, get) => ({
                     safeFetch(SettingsSupabaseService.getSettings(), get().plantSettings, 'plantSettings'),
                     safeFetch(MasterDataService.getPartCategories(), [], 'partCategories'),
                     safeFetch(MasterDataService.getPartLocations(), [], 'partLocations'),
-                    safeFetch(MasterDataService.getPartUnits(), [], 'partUnits')
+                    safeFetch(MasterDataService.getPartUnits(), [], 'partUnits'),
+                    safeFetch(inventoryService.getPartCompanies(), [], 'partCompanies')
                 ]);
 
                 const currentState = get();
@@ -293,6 +302,7 @@ export const useMasterStore = create<MasterState>((set, get) => ({
                     partCategories: partCategories.length > 0 ? partCategories : currentState.partCategories,
                     partLocations: partLocations.length > 0 ? partLocations : currentState.partLocations,
                     partUnits: partUnits.length > 0 ? partUnits : currentState.partUnits,
+                    partCompanies: partCompanies.length > 0 ? partCompanies : currentState.partCompanies,
                     plantSettings: plantSettings,
                     maintenancePlans: extractedMaintenancePlans,
                     isLoading: false,
@@ -361,7 +371,7 @@ export const useMasterStore = create<MasterState>((set, get) => ({
 
     addPart: async (part) => {
         try {
-            const newPart = await inventoryService.createPart(part);
+            const newPart = await inventoryService.createPart(part as any);
             set((state) => ({
                 parts: [newPart, ...state.parts]
             }));
@@ -381,6 +391,10 @@ export const useMasterStore = create<MasterState>((set, get) => ({
             set({ error: error.message });
             throw error;
         }
+    },
+
+    setSelectedPart: (part) => {
+        set({ selectedPart: part });
     },
 
     addZone: async (zone) => {
@@ -465,6 +479,18 @@ export const useMasterStore = create<MasterState>((set, get) => ({
             }
         } catch (error: any) {
             set({ error: error.message });
+        }
+    },
+
+    deleteZone: async (id) => {
+        try {
+            await MasterDataService.removeZone(id);
+            set((state) => ({
+                zones: state.zones.filter(z => z.id !== id)
+            }));
+        } catch (error: any) {
+            set({ error: error.message });
+            throw error;
         }
     },
 

@@ -1,6 +1,6 @@
 import { supabase, getPaginationRange } from '../supabaseClient';
 import { IInventoryService } from '../inventoryService';
-import { SparePart, PartsRequest } from '../../types/inventory';
+import { SparePart, PartsRequest, ExtendedPurchaseRequest, StockReception } from '../../types/inventory';
 
 export class InventorySupabaseService implements IInventoryService {
     private mapDBToPart(record: any): SparePart {
@@ -19,7 +19,8 @@ export class InventorySupabaseService implements IInventoryService {
             subLocation: record.sub_location || '',
             cost: Number(record.unit_cost || 0),
             photoUrl: record.image_url || null,
-            createdAt: record.created_at
+            createdAt: record.created_at,
+            company: record.company || ''
         };
     }
 
@@ -36,7 +37,8 @@ export class InventorySupabaseService implements IInventoryService {
             location_code: part.location,
             sub_location: part.subLocation,
             unit_cost: part.cost,
-            image_url: part.photoUrl
+            image_url: part.photoUrl,
+            company: part.company
         };
     }
 
@@ -48,6 +50,7 @@ export class InventorySupabaseService implements IInventoryService {
             category?: string;
             location?: string;
             status?: 'all' | 'low' | 'normal';
+            company?: string;
         }
     ): Promise<{ data: SparePart[], total: number }> {
         const { from, to } = getPaginationRange(page, limit);
@@ -65,6 +68,9 @@ export class InventorySupabaseService implements IInventoryService {
             }
             if (filters.location && filters.location !== 'all') {
                 query = query.eq('location_code', filters.location);
+            }
+            if (filters.company && filters.company !== 'all') {
+                query = query.eq('company', filters.company);
             }
             if (filters.status === 'low') {
                 query = query.eq('is_low_stock', true);
@@ -84,6 +90,24 @@ export class InventorySupabaseService implements IInventoryService {
         };
     }
 
+    async getPartCompanies(): Promise<string[]> {
+        const { data, error } = await supabase
+            .from('spare_parts')
+            .select('company');
+
+        if (error) throw error;
+
+        const companies = new Set<string>();
+        if (data) {
+            data.forEach((record: any) => {
+                if (record.company) {
+                    companies.add(record.company.trim());
+                }
+            });
+        }
+        return Array.from(companies).sort();
+    }
+
     async createPart(partData: Omit<SparePart, 'id' | 'currentStock'> & { initialStock?: number }): Promise<SparePart> {
         const id = crypto.randomUUID();
         const { data, error } = await supabase.rpc('upsert_spare_part', {
@@ -100,7 +124,8 @@ export class InventorySupabaseService implements IInventoryService {
             p_sub_location:     partData.subLocation || null,
             p_unit_cost:        partData.cost || 0,
             p_image_url:        partData.photoUrl || null,
-            p_created_at:       partData.createdAt || null
+            p_created_at:       partData.createdAt || null,
+            p_company:          partData.company || null
         });
         if (error) throw error;
         return this.mapDBToPart(Array.isArray(data) ? data[0] : data);
@@ -121,7 +146,8 @@ export class InventorySupabaseService implements IInventoryService {
             p_sub_location:     updatedPart.subLocation || null,
             p_unit_cost:        updatedPart.cost || 0,
             p_image_url:        updatedPart.photoUrl || null,
-            p_created_at:       updatedPart.createdAt || null
+            p_created_at:       updatedPart.createdAt || null,
+            p_company:          updatedPart.company || null
         });
         if (error) throw error;
         return this.mapDBToPart(Array.isArray(data) ? data[0] : data);
@@ -250,6 +276,20 @@ export class InventorySupabaseService implements IInventoryService {
     }
 
     async deliverParts(requestId: string, itemsToDeliver: { partId: string; quantity: number }[], receiverId?: string): Promise<PartsRequest> {
+        // 0. Pre-validate stock for all items
+        for (const item of itemsToDeliver) {
+            const { data: part, error: partError } = await supabase
+                .from('spare_parts')
+                .select('current_stock, name')
+                .eq('id', item.partId)
+                .single();
+                
+            if (partError || !part) throw new Error('Repuesto no encontrado');
+            if ((part.current_stock || 0) < item.quantity) {
+                throw new Error(`Stock insuficiente para ${part.name}. Disponible: ${part.current_stock || 0}, Solicitado: ${item.quantity}`);
+            }
+        }
+
         // 1. Process each item delivery
         for (const item of itemsToDeliver) {
             // Update quantity_delivered in request_items
@@ -298,10 +338,20 @@ export class InventorySupabaseService implements IInventoryService {
 
                     if (!getError && part) {
                         const newStock = (part.current_stock || 0) - item.quantity;
-                        await supabase
+                        if (newStock < 0) {
+                            throw new Error(`Stock insuficiente durante el procesamiento para el ID ${item.partId}`);
+                        }
+                        const { error: updateError } = await supabase
                             .from('spare_parts')
                             .update({ current_stock: newStock })
                             .eq('id', item.partId);
+                            
+                        if (updateError) {
+                            console.error('Error in fallback update:', updateError);
+                            throw updateError;
+                        }
+                    } else if (getError) {
+                        throw getError;
                     }
                 }
 
@@ -447,7 +497,58 @@ export class InventorySupabaseService implements IInventoryService {
         };
     }
 
-    async getReceptions(filters?: { searchTerm?: string; partId?: string }): Promise<{ data: StockReception[], total: number }> {
+    private groupReceptions(receptions: StockReception[]): StockReception[] {
+        const grouped = new Map<string, StockReception>();
+        
+        for (const rec of receptions) {
+            const docNum = rec.documentNumber?.trim();
+            if (!docNum) continue;
+
+            const existing = grouped.get(docNum);
+            if (!existing) {
+                grouped.set(docNum, {
+                    ...rec,
+                    items: rec.items.map(i => ({ ...i }))
+                });
+            } else {
+                // Merge items
+                for (const item of rec.items) {
+                    const existingItem = existing.items.find(i => i.partId === item.partId);
+                    if (existingItem) {
+                        existingItem.quantity += item.quantity;
+                    } else {
+                        existing.items.push({ ...item });
+                    }
+                }
+                // Keep the latest receptionDate (since receptions are sorted descending, the first we find is the latest)
+                if (!existing.notes && rec.notes) {
+                    existing.notes = rec.notes;
+                } else if (existing.notes && rec.notes && existing.notes !== rec.notes && !existing.notes.includes(rec.notes)) {
+                    existing.notes = `${existing.notes} | ${rec.notes}`;
+                }
+            }
+        }
+
+        const result: StockReception[] = [];
+        const addedDocs = new Set<string>();
+
+        for (const rec of receptions) {
+            const docNum = rec.documentNumber?.trim();
+            if (!docNum) {
+                result.push(rec);
+            } else if (!addedDocs.has(docNum)) {
+                const merged = grouped.get(docNum);
+                if (merged) {
+                    result.push(merged);
+                    addedDocs.add(docNum);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    async getReceptions(filters?: { searchTerm?: string; partId?: string; startDate?: string; endDate?: string }): Promise<{ data: StockReception[], total: number }> {
         let query = supabase
             .from('stock_receptions')
             .select('*', { count: 'exact' })
@@ -460,23 +561,52 @@ export class InventorySupabaseService implements IInventoryService {
             query = query.or(`document_number.ilike.%${filters.searchTerm}%,notes.ilike.%${filters.searchTerm}%`);
         }
 
-        const { data, error, count } = await query;
+        if (filters?.startDate) {
+            query = query.gte('reception_date', `${filters.startDate}T00:00:00`);
+        }
+        if (filters?.endDate) {
+            query = query.lte('reception_date', `${filters.endDate}T23:59:59`);
+        }
+
+        const { data, error } = await query;
 
         if (error) {
             console.error('Error fetching receptions:', error);
             throw error;
         }
 
-        return { 
-            data: (data || []).map(record => ({
+        const { data: prsData } = await supabase
+            .from('purchase_requests')
+            .select('purchase_request_number, status');
+        
+        const prStatusMap = new Map<string, string>();
+        if (prsData) {
+            prsData.forEach((pr: any) => {
+                if (pr.purchase_request_number) {
+                    prStatusMap.set(pr.purchase_request_number.trim().toLowerCase(), pr.status || 'Pendiente');
+                }
+            });
+        }
+
+        const mapped = (data || []).map(record => {
+            const docNum = record.document_number?.trim();
+            const status = docNum ? prStatusMap.get(docNum.toLowerCase()) : undefined;
+            return {
                 id: record.id,
                 receptionDate: record.reception_date,
                 documentNumber: record.document_number,
                 receivedBy: record.received_by,
                 items: record.items || [],
-                notes: record.notes
-            })), 
-            total: count || 0 
+                notes: record.notes,
+                status: status
+            };
+        });
+
+        const grouped = this.groupReceptions(mapped);
+
+        return { 
+            data: grouped, 
+            total: grouped.length 
         };
     }
 
@@ -506,7 +636,7 @@ export class InventorySupabaseService implements IInventoryService {
             throw error;
         }
 
-        const { data: parts } = await supabase.from('spare_parts').select('id, name, sku');
+        const { data: parts } = await supabase.from('spare_parts').select('id, name, sku, company');
         const partsMap = new Map((parts || []).map(p => [p.id, p]));
 
         const mappedData = (data || []).map(record => {
@@ -517,7 +647,8 @@ export class InventorySupabaseService implements IInventoryService {
                 return {
                     ...item,
                     partName: partInfo?.name || 'Repuesto Desconocido',
-                    partNumber: partInfo?.sku || 'N/A'
+                    partNumber: partInfo?.sku || 'N/A',
+                    company: partInfo?.company || ''
                 };
             });
 
@@ -575,6 +706,117 @@ export class InventorySupabaseService implements IInventoryService {
         if (error) {
             console.error('Error updating purchase request status:', error);
             throw error;
+        }
+    }
+
+    async getPurchaseRequestsForReception(): Promise<ExtendedPurchaseRequest[]> {
+        // Fetch all purchase requests, we will filter for Pending/Partial since there could be differences in casing
+        const res = await this.getAllPurchaseRequests(1, 1000);
+        return res.data.filter(pr => 
+            pr.status?.toLowerCase() === 'pendiente' || 
+            pr.status?.toLowerCase() === 'parcial'
+        );
+    }
+
+    async processPurchaseReception(purchaseRequestId: string, itemsReceived: { partId: string; qtyReceived: number }[], notes?: string): Promise<void> {
+        // 1. Fetch the original purchase request
+        const { data: request, error: reqError } = await supabase
+            .from('purchase_requests')
+            .select('*')
+            .eq('id', purchaseRequestId)
+            .single();
+
+        if (reqError) throw reqError;
+
+        const currentItems = request.items || [];
+        let anyItemReceived = false;
+        let allItemsFullyReceived = true;
+
+        // Fetch received parts details for reception log
+        const partIdsToFetch = itemsReceived.filter(i => i.qtyReceived > 0).map(i => i.partId);
+        let partsMap = new Map<string, { name: string; sku: string }>();
+        if (partIdsToFetch.length > 0) {
+            const { data: partsData } = await supabase
+                .from('spare_parts')
+                .select('id, name, sku')
+                .in('id', partIdsToFetch);
+            if (partsData) {
+                partsMap = new Map(partsData.map(p => [p.id, { name: p.name, sku: p.sku || 'N/A' }]));
+            }
+        }
+
+        const receptionItemsToLog: any[] = [];
+
+        // 2. Process each received item
+        for (const receivedItem of itemsReceived) {
+            if (receivedItem.qtyReceived <= 0) continue;
+
+            const reqItem = currentItems.find((i: any) => i.partId === receivedItem.partId);
+            if (!reqItem) continue;
+
+            // Increment stock
+            const { error: stockError } = await supabase.rpc('increment_part_stock', {
+                p_part_id: receivedItem.partId,
+                p_quantity: receivedItem.qtyReceived
+            });
+            if (stockError) {
+                // Fallback for missing RPC
+                const { data: part } = await supabase.from('spare_parts').select('current_stock').eq('id', receivedItem.partId).single();
+                if (part) {
+                    await supabase.from('spare_parts').update({ current_stock: (part.current_stock || 0) + receivedItem.qtyReceived }).eq('id', receivedItem.partId);
+                }
+            }
+
+            // Create inventory transaction type 'IN'
+            await supabase.from('inventory_transactions').insert({
+                part_id: receivedItem.partId,
+                transaction_type: 'INBOUND', // using INBOUND or IN, depends on the DB ENUM/VARCHAR, fallback to 'INBOUND'
+                quantity: receivedItem.qtyReceived,
+                purchase_request_id: purchaseRequestId,
+                reference_id: purchaseRequestId, // Also saving reference_id for backward compatibility
+                notes: notes || `Recepción de compra ${request.purchase_request_number}`
+            });
+
+            // Update item quantityReceived
+            reqItem.quantityReceived = (reqItem.quantityReceived || 0) + receivedItem.qtyReceived;
+
+            const partInfo = partsMap.get(receivedItem.partId);
+            receptionItemsToLog.push({
+                partId: receivedItem.partId,
+                partName: partInfo?.name || 'Repuesto Desconocido',
+                partNumber: partInfo?.sku || 'N/A',
+                quantity: receivedItem.qtyReceived
+            });
+        }
+
+        // 3. Update the items JSONB and recalculate global status
+        for (const item of currentItems) {
+            const received = item.quantityReceived || 0;
+            if (received > 0) anyItemReceived = true;
+            if (received < item.quantity) {
+                allItemsFullyReceived = false;
+            }
+        }
+
+        const newStatus = allItemsFullyReceived ? 'Recibido' : (anyItemReceived ? 'Parcial' : 'Pendiente');
+
+        const { error: updateError } = await supabase
+            .from('purchase_requests')
+            .update({
+                items: currentItems,
+                status: newStatus
+            })
+            .eq('id', purchaseRequestId);
+
+        if (updateError) throw updateError;
+
+        // 4. Save consolidated reception history record
+        if (receptionItemsToLog.length > 0) {
+            await this.saveReception({
+                documentNumber: request.purchase_request_number || undefined,
+                notes: notes || `Recepción de compra ${request.purchase_request_number}`,
+                items: receptionItemsToLog
+            });
         }
     }
 }
