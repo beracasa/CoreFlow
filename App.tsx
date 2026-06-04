@@ -24,12 +24,15 @@ import { useLanguage } from './contexts/LanguageContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { Login } from './components/Login';
 import { ChangePasswordView } from './components/auth/ChangePasswordView';
-import { Clock, LogOut, Shield, User, Hexagon, Server } from 'lucide-react';
+import { Clock, LogOut, Shield, User, Hexagon, Server, HelpCircle, CheckCircle2 } from 'lucide-react';
 import { MachinesList } from './components/MachinesList';
 import { useWorkOrderStore } from './src/stores/useWorkOrderStore';
 import { useMasterStore } from './src/stores/useMasterStore';
 import { useUserStore } from './src/stores/useUserStore';
 import { SERVICE_MODE, SERVICE_WARNINGS } from './src/services';
+
+import { FloatingHelpDesk } from './src/components/HelpDesk/FloatingHelpDesk';
+
 
 // --- SIDEBAR ITEM ---
 const SidebarItem = ({ icon, label, active, onClick, disabled = false }: { icon: React.ReactNode, label: string, active: boolean, onClick: () => void, disabled?: boolean }) => {
@@ -277,6 +280,7 @@ const AppLayout = () => {
             <div className="pt-4 mt-4 border-t border-industrial-800">
               <SidebarItem label={t('sidebar.masterData')} icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} /><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} /></svg>}
                 active={path === '/settings'} onClick={() => navigate('/settings')} disabled={!hasRole([UserRole.ADMIN_SOLICITANTE])} />
+
             </div>
           </nav>
 
@@ -309,6 +313,7 @@ const AppLayout = () => {
           <AppInitializer />
       <Outlet />
     </main>
+    <FloatingHelpDesk />
   </div>
 );
 };
@@ -436,6 +441,7 @@ const AppRoutes = () => {
         <Route path="inventory" element={<InventoryPage />} />
         <Route path="stats" element={<AnalyticsPage />} />
         <Route path="settings" element={<ConfigurationPage />} />
+
 
         <Route path="profile" element={<ProfilePage />} />
       </Route>
