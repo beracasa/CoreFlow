@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../services/supabaseClient';
 import html2canvas from 'html2canvas';
-import { HelpCircle, Headphones, X, Camera, Send, Ticket, PlusCircle, Trash2, RefreshCw } from 'lucide-react';
+import { HelpCircle, Headphones, X, Camera, Send, Ticket, PlusCircle, Trash2, RefreshCw, Check, Maximize, Crop } from 'lucide-react';
 import { HelpDeskTicket } from '../../types/helpdesk';
 import { useAuth } from '../../../contexts/AuthContext';
 
@@ -21,6 +21,19 @@ export const FloatingHelpDesk: React.FC = () => {
   // Context & Screenshot
   const [screenshotData, setScreenshotData] = useState<string | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
+  
+  // Selection / Cropping States
+  const [originalCanvas, setOriginalCanvas] = useState<HTMLCanvasElement | null>(null);
+  const [screenshotUrl, setScreenshotUrl] = useState<string | null>(null);
+  const [isSelectingArea, setIsSelectingArea] = useState(false);
+  const [area, setArea] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [interaction, setInteraction] = useState<{
+    type: 'move' | 'resize' | 'draw';
+    handle?: string;
+    startX: number;
+    startY: number;
+    startArea: { x: number; y: number; width: number; height: number };
+  } | null>(null);
   
   // Tickets State
   const [tickets, setTickets] = useState<HelpDeskTicket[]>([]);
@@ -99,26 +112,271 @@ export const FloatingHelpDesk: React.FC = () => {
     fetchTicketMessages(ticket.id);
   };
 
-  const captureScreen = async () => {
+  const captureScreen = async (crop: boolean = false) => {
     setIsCapturing(true);
     try {
       // Hide the entire modal overlay temporarily while capturing
       const overlay = document.getElementById('helpdesk-modal-overlay');
       if (overlay) overlay.style.display = 'none';
       
+      // Wait a tiny bit to make sure layout updates
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      
       const canvas = await html2canvas(document.body, {
         useCORS: true,
         logging: false,
+        width: window.innerWidth,
+        height: window.innerHeight,
+        windowWidth: window.innerWidth,
+        windowHeight: window.innerHeight,
+        scrollX: window.scrollX,
+        scrollY: window.scrollY,
       });
       
-      if (overlay) overlay.style.display = 'flex';
-      
-      const imgData = canvas.toDataURL('image/jpeg', 0.8);
-      setScreenshotData(imgData);
+      if (crop) {
+        setOriginalCanvas(canvas);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+        setScreenshotUrl(dataUrl);
+        
+        const initWidth = Math.min(320, window.innerWidth - 40);
+        const initHeight = Math.min(220, window.innerHeight - 40);
+        
+        setArea({
+          x: Math.round((window.innerWidth - initWidth) / 2),
+          y: Math.round((window.innerHeight - initHeight) / 2),
+          width: initWidth,
+          height: initHeight
+        });
+        setIsSelectingArea(true);
+      } else {
+        if (overlay) overlay.style.display = 'flex';
+        const imgData = canvas.toDataURL('image/jpeg', 0.85);
+        setScreenshotData(imgData);
+      }
     } catch (err) {
       console.error('Error capturing screen:', err);
+      const overlay = document.getElementById('helpdesk-modal-overlay');
+      if (overlay) overlay.style.display = 'flex';
     } finally {
       setIsCapturing(false);
+    }
+  };
+
+  const getEventCoords = (e: MouseEvent | TouchEvent | React.MouseEvent | React.TouchEvent) => {
+    if ('touches' in e && e.touches.length > 0) {
+      return { clientX: e.touches[0].clientX, clientY: e.touches[0].clientY };
+    } else if ('changedTouches' in e && e.changedTouches.length > 0) {
+      return { clientX: e.changedTouches[0].clientX, clientY: e.changedTouches[0].clientY };
+    }
+    const mouseEvent = e as any;
+    return { clientX: mouseEvent.clientX, clientY: mouseEvent.clientY };
+  };
+
+  const handleSelectionStart = (e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation();
+    if (!area) return;
+    const { clientX, clientY } = getEventCoords(e);
+    setInteraction({
+      type: 'move',
+      startX: clientX,
+      startY: clientY,
+      startArea: { ...area }
+    });
+  };
+
+  const handleHandleStart = (e: React.MouseEvent | React.TouchEvent, handle: string) => {
+    e.stopPropagation();
+    if (!area) return;
+    const { clientX, clientY } = getEventCoords(e);
+    setInteraction({
+      type: 'resize',
+      handle,
+      startX: clientX,
+      startY: clientY,
+      startArea: { ...area }
+    });
+  };
+
+  const handleOutsideStart = (e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation();
+    const { clientX, clientY } = getEventCoords(e);
+    const initialArea = { x: clientX, y: clientY, width: 0, height: 0 };
+    setArea(initialArea);
+    setInteraction({
+      type: 'draw',
+      startX: clientX,
+      startY: clientY,
+      startArea: initialArea
+    });
+  };
+
+  const handleMove = (e: MouseEvent | TouchEvent) => {
+    if (!interaction || !area) return;
+    const { clientX, clientY } = getEventCoords(e);
+    const dx = clientX - interaction.startX;
+    const dy = clientY - interaction.startY;
+    const start = interaction.startArea;
+
+    if (interaction.type === 'move') {
+      let newX = start.x + dx;
+      let newY = start.y + dy;
+
+      newX = Math.max(0, Math.min(newX, window.innerWidth - start.width));
+      newY = Math.max(0, Math.min(newY, window.innerHeight - start.height));
+
+      setArea({
+        ...start,
+        x: newX,
+        y: newY
+      });
+    } else if (interaction.type === 'draw') {
+      const x = Math.max(0, Math.min(interaction.startX, clientX));
+      const y = Math.max(0, Math.min(interaction.startY, clientY));
+      const width = Math.min(window.innerWidth - x, Math.abs(clientX - interaction.startX));
+      const height = Math.min(window.innerHeight - y, Math.abs(clientY - interaction.startY));
+
+      setArea({ x, y, width, height });
+    } else if (interaction.type === 'resize' && interaction.handle) {
+      let x = start.x;
+      let y = start.y;
+      let w = start.width;
+      let h = start.height;
+      const handle = interaction.handle;
+
+      if (handle.includes('l')) {
+        const newX = Math.max(0, Math.min(start.x + dx, start.x + start.width - 20));
+        w = start.width + (start.x - newX);
+        x = newX;
+      } else if (handle.includes('r')) {
+        w = Math.max(20, Math.min(start.width + dx, window.innerWidth - start.x));
+      }
+
+      if (handle.includes('t')) {
+        const newY = Math.max(0, Math.min(start.y + dy, start.y + start.height - 20));
+        h = start.height + (start.y - newY);
+        y = newY;
+      } else if (handle.includes('b')) {
+        h = Math.max(20, Math.min(start.height + dy, window.innerHeight - start.y));
+      }
+
+      setArea({ x, y, width: w, height: h });
+    }
+  };
+
+  const handleEnd = () => {
+    if (interaction) {
+      if (area && (area.width < 5 || area.height < 5)) {
+        const initWidth = Math.min(320, window.innerWidth - 40);
+        const initHeight = Math.min(220, window.innerHeight - 40);
+        setArea({
+          x: Math.round((window.innerWidth - initWidth) / 2),
+          y: Math.round((window.innerHeight - initHeight) / 2),
+          width: initWidth,
+          height: initHeight
+        });
+      }
+      setInteraction(null);
+    }
+  };
+
+  useEffect(() => {
+    if (!interaction) return;
+
+    const handleWindowMouseMove = (e: MouseEvent) => {
+      handleMove(e);
+    };
+
+    const handleWindowMouseUp = () => {
+      handleEnd();
+    };
+
+    const handleWindowTouchMove = (e: TouchEvent) => {
+      if (e.cancelable) e.preventDefault();
+      handleMove(e);
+    };
+
+    const handleWindowTouchEnd = () => {
+      handleEnd();
+    };
+
+    window.addEventListener('mousemove', handleWindowMouseMove);
+    window.addEventListener('mouseup', handleWindowMouseUp);
+    window.addEventListener('touchmove', handleWindowTouchMove, { passive: false });
+    window.addEventListener('touchend', handleWindowTouchEnd);
+
+    return () => {
+      window.removeEventListener('mousemove', handleWindowMouseMove);
+      window.removeEventListener('mouseup', handleWindowMouseUp);
+      window.removeEventListener('touchmove', handleWindowTouchMove);
+      window.removeEventListener('touchend', handleWindowTouchEnd);
+    };
+  }, [interaction, area]);
+
+  const handleCropConfirm = () => {
+    if (originalCanvas && area) {
+      const scaleX = originalCanvas.width / window.innerWidth;
+      const scaleY = originalCanvas.height / window.innerHeight;
+
+      const cropCanvas = document.createElement('canvas');
+      cropCanvas.width = area.width * scaleX;
+      cropCanvas.height = area.height * scaleY;
+      const ctx = cropCanvas.getContext('2d');
+
+      if (ctx) {
+        ctx.drawImage(
+          originalCanvas,
+          area.x * scaleX,
+          area.y * scaleY,
+          area.width * scaleX,
+          area.height * scaleY,
+          0,
+          0,
+          area.width * scaleX,
+          area.height * scaleY
+        );
+        const croppedDataUrl = cropCanvas.toDataURL('image/jpeg', 0.85);
+        setScreenshotData(croppedDataUrl);
+      }
+    }
+
+    setIsSelectingArea(false);
+    setOriginalCanvas(null);
+    setScreenshotUrl(null);
+    const overlay = document.getElementById('helpdesk-modal-overlay');
+    if (overlay) overlay.style.display = 'flex';
+  };
+
+  const handleCropCancel = () => {
+    setIsSelectingArea(false);
+    setOriginalCanvas(null);
+    setScreenshotUrl(null);
+    const overlay = document.getElementById('helpdesk-modal-overlay');
+    if (overlay) overlay.style.display = 'flex';
+  };
+
+  const handleCropFull = () => {
+    if (originalCanvas) {
+      const imgData = originalCanvas.toDataURL('image/jpeg', 0.85);
+      setScreenshotData(imgData);
+    }
+    setIsSelectingArea(false);
+    setOriginalCanvas(null);
+    setScreenshotUrl(null);
+    const overlay = document.getElementById('helpdesk-modal-overlay');
+    if (overlay) overlay.style.display = 'flex';
+  };
+
+  const getHandleClass = (handle: string) => {
+    switch (handle) {
+      case 'tl': return 'top-0 left-0 -translate-x-1/2 -translate-y-1/2 cursor-nwse-resize';
+      case 'tr': return 'top-0 right-0 translate-x-1/2 -translate-y-1/2 cursor-nesw-resize';
+      case 'bl': return 'bottom-0 left-0 -translate-x-1/2 translate-y-1/2 cursor-nesw-resize';
+      case 'br': return 'bottom-0 right-0 translate-x-1/2 translate-y-1/2 cursor-nwse-resize';
+      case 't': return 'top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 cursor-ns-resize';
+      case 'b': return 'bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 cursor-ns-resize';
+      case 'l': return 'left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize';
+      case 'r': return 'right-0 top-1/2 translate-x-1/2 -translate-y-1/2 cursor-ew-resize';
+      default: return '';
     }
   };
 
@@ -748,17 +1006,30 @@ export const FloatingHelpDesk: React.FC = () => {
                               </button>
                             </div>
                           ) : (
-                            <button 
-                              type="button" 
-                              onClick={captureScreen}
-                              disabled={isCapturing}
-                              className="w-full flex flex-col items-center justify-center gap-1.5 text-xs text-slate-300 bg-slate-950/40 border border-dashed border-slate-850 p-5 rounded-xl hover:bg-slate-900/40 hover:border-blue-500/50 hover:text-blue-400 transition-all group"
-                            >
-                              <Camera size={20} className="text-slate-500 group-hover:text-blue-400 transition-colors" />
-                              <span className="font-medium">
-                                {isCapturing ? 'Capturando pantalla...' : 'Hacer captura de pantalla'}
-                              </span>
-                            </button>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <button 
+                                type="button" 
+                                onClick={() => captureScreen(false)}
+                                disabled={isCapturing}
+                                className="flex flex-col items-center justify-center gap-1.5 text-xs text-slate-300 bg-slate-950/40 border border-dashed border-slate-850 p-4 rounded-xl hover:bg-slate-900/40 hover:border-blue-500/50 hover:text-blue-400 transition-all group"
+                              >
+                                <Camera size={18} className="text-slate-500 group-hover:text-blue-400 transition-colors" />
+                                <span className="font-medium">
+                                  {isCapturing ? 'Capturando...' : 'Pantalla Completa'}
+                                </span>
+                              </button>
+                              <button 
+                                type="button" 
+                                onClick={() => captureScreen(true)}
+                                disabled={isCapturing}
+                                className="flex flex-col items-center justify-center gap-1.5 text-xs text-slate-300 bg-slate-950/40 border border-dashed border-slate-850 p-4 rounded-xl hover:bg-slate-900/40 hover:border-blue-500/50 hover:text-blue-400 transition-all group"
+                              >
+                                <Crop size={18} className="text-slate-500 group-hover:text-blue-400 transition-colors" />
+                                <span className="font-medium">
+                                  {isCapturing ? 'Capturando...' : 'Seleccionar Área'}
+                                </span>
+                              </button>
+                            </div>
                           )}
                         </div>
 
@@ -789,6 +1060,99 @@ export const FloatingHelpDesk: React.FC = () => {
                 )}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Crop Selector Overlay */}
+      {isSelectingArea && screenshotUrl && area && (
+        <div 
+          className="fixed inset-0 z-[9999] select-none cursor-crosshair overflow-hidden w-screen h-screen font-sans"
+          onMouseDown={handleOutsideStart}
+          onTouchStart={handleOutsideStart}
+        >
+          {/* Captured Screen Background */}
+          <img 
+            src={screenshotUrl} 
+            className="absolute inset-0 w-full h-full pointer-events-none object-fill" 
+            alt="Capture background" 
+          />
+
+          {/* Dark overlay with hole via Box Shadow */}
+          <div 
+            style={{
+              position: 'absolute',
+              left: `${area.x}px`,
+              top: `${area.y}px`,
+              width: `${area.width}px`,
+              height: `${area.height}px`,
+              boxShadow: '0 0 0 9999px rgba(15, 23, 42, 0.75)',
+              border: '2px solid #3b82f6',
+            }}
+            className="z-10 shadow-indigo-500/20"
+            onMouseDown={handleSelectionStart}
+            onTouchStart={handleSelectionStart}
+          >
+            {/* Resize Handles */}
+            {['tl', 'tr', 'bl', 'br', 't', 'b', 'l', 'r'].map((handle) => {
+              const handleClass = getHandleClass(handle);
+              return (
+                <div
+                  key={handle}
+                  className={`w-3.5 h-3.5 bg-blue-500 hover:bg-blue-400 border-2 border-white rounded-full absolute z-20 ${handleClass}`}
+                  onMouseDown={(e) => handleHandleStart(e, handle)}
+                  onTouchStart={(e) => handleHandleStart(e, handle)}
+                />
+              );
+            })}
+
+            {/* Selection Size Badge */}
+            <div className="absolute -top-7 left-0 bg-blue-600 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow flex items-center gap-1 font-mono">
+              <span>{Math.round(area.width)}</span>
+              <span className="text-blue-300">px</span>
+              <span>x</span>
+              <span>{Math.round(area.height)}</span>
+              <span className="text-blue-300">px</span>
+            </div>
+          </div>
+
+          {/* Floating Actions Toolbar */}
+          <div 
+            style={{
+              position: 'absolute',
+              left: `${Math.max(16, Math.min(area.x + area.width / 2 - 160, window.innerWidth - 320 - 16))}px`,
+              top: `${area.y + area.height + 12 + 45 > window.innerHeight 
+                ? Math.max(16, area.y - 45 - 12) 
+                : area.y + area.height + 12}px`,
+            }}
+            className="z-30 bg-slate-900/95 backdrop-blur-md px-4 py-2 rounded-xl border border-slate-700 shadow-2xl flex items-center gap-3 w-[320px] transition-all"
+            onMouseDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={handleCropConfirm}
+              className="flex-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold py-1.5 px-3 rounded-lg flex items-center justify-center gap-1 transition-all border border-blue-500"
+            >
+              <Check size={14} />
+              Confirmar
+            </button>
+            <button
+              type="button"
+              onClick={handleCropFull}
+              className="bg-slate-800 hover:bg-slate-750 text-slate-200 hover:text-white text-xs font-bold py-1.5 px-3 rounded-lg flex items-center justify-center gap-1 transition-all border border-slate-700"
+            >
+              <Maximize size={14} />
+              Completa
+            </button>
+            <button
+              type="button"
+              onClick={handleCropCancel}
+              className="bg-red-950/40 hover:bg-red-900/60 text-red-400 hover:text-red-300 text-xs font-bold py-1.5 px-3 rounded-lg flex items-center justify-center gap-1 transition-all border border-red-900/20"
+            >
+              <X size={14} />
+              Cancelar
+            </button>
           </div>
         </div>
       )}
