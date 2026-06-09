@@ -5,6 +5,81 @@ import { HelpCircle, Headphones, X, Camera, Send, Ticket, PlusCircle, Trash2, Re
 import { HelpDeskTicket } from '../../types/helpdesk';
 import { useAuth } from '../../../contexts/AuthContext';
 
+let audioCtx: AudioContext | null = null;
+
+const getAudioContext = () => {
+  if (!audioCtx) {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (AudioContextClass) {
+      audioCtx = new AudioContextClass();
+    }
+  }
+  return audioCtx;
+};
+
+// Resume audio context on user gesture
+if (typeof window !== 'undefined') {
+  const resumeAudio = () => {
+    const ctx = getAudioContext();
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume().then(() => {
+        console.log('[Notification Sound] AudioContext resumed successfully');
+        window.removeEventListener('click', resumeAudio);
+        window.removeEventListener('keydown', resumeAudio);
+        window.removeEventListener('touchstart', resumeAudio);
+      });
+    }
+  };
+  window.addEventListener('click', resumeAudio, { passive: true });
+  window.addEventListener('keydown', resumeAudio, { passive: true });
+  window.addEventListener('touchstart', resumeAudio, { passive: true });
+}
+
+const playNotificationSound = () => {
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    
+    if (ctx.state === 'suspended') {
+      ctx.resume();
+    }
+    
+    const now = ctx.currentTime;
+    
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(880, now);
+    osc1.frequency.exponentialRampToValueAtTime(880, now + 1.2);
+    
+    gain1.gain.setValueAtTime(0.2, now);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
+    
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(1318.51, now);
+    osc2.frequency.exponentialRampToValueAtTime(1318.51, now + 1.2);
+    
+    gain2.gain.setValueAtTime(0.1, now);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.7);
+    
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    
+    osc1.start(now);
+    osc2.start(now);
+    
+    osc1.stop(now + 1.2);
+    osc2.stop(now + 1.2);
+  } catch (err) {
+    console.error('Failed to play notification sound:', err);
+  }
+};
+
 export const FloatingHelpDesk: React.FC = () => {
   const { user } = useAuth();
   
@@ -51,11 +126,162 @@ export const FloatingHelpDesk: React.FC = () => {
 
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  // Notification States & Refs
+  const [hasUnread, setHasUnread] = useState(false);
+  const [unreadTickets, setUnreadTickets] = useState<Record<string, boolean>>({});
+  const ticketsRef = useRef<HelpDeskTicket[]>([]);
+  const selectedTicketRef = useRef<HelpDeskTicket | null>(null);
+
   useEffect(() => {
-    if (isOpen && user) {
+    ticketsRef.current = tickets;
+  }, [tickets]);
+
+  useEffect(() => {
+    selectedTicketRef.current = selectedTicket;
+  }, [selectedTicket]);
+
+  const checkUnreadMessages = async (ticketList: HelpDeskTicket[]) => {
+    if (!user || ticketList.length === 0) return;
+    try {
+      const ticketIds = ticketList.map(t => t.id);
+      
+      // Fetch public messages (do not filter out 'usuario' on postgres side to preserve nulls!)
+      const { data: messagesData, error } = await supabase
+        .from('helpdesk_messages')
+        .select('ticket_id, created_at, author_type, sender_type, visibility')
+        .in('ticket_id', ticketIds)
+        .eq('visibility', 'publico')
+        .order('created_at', { ascending: false });
+        
+      if (error) throw error;
+
+      // Group messages by ticket_id to find the latest public message for each ticket
+      const latestMessageMap: Record<string, any> = {};
+      if (messagesData) {
+        messagesData.forEach(msg => {
+          if (!latestMessageMap[msg.ticket_id]) {
+            latestMessageMap[msg.ticket_id] = msg;
+          }
+        });
+      }
+
+      const unreadMap: Record<string, boolean> = {};
+      let globalUnread = false;
+
+      ticketList.forEach(ticket => {
+        const lastViewedStr = localStorage.getItem(`helpdesk_viewed_${ticket.id}`);
+        const latestMsg = latestMessageMap[ticket.id];
+
+        // 1. If never viewed, check if there's any public reply not from the user
+        if (!lastViewedStr) {
+          if (latestMsg) {
+            const isFromUser = latestMsg.author_type === 'usuario' || latestMsg.sender_type === 'usuario';
+            if (!isFromUser && latestMsg.visibility === 'publico') {
+              unreadMap[ticket.id] = true;
+              globalUnread = true;
+            }
+          }
+          return;
+        }
+
+        // 2. If viewed, check if the latest public message is from agent/admin and newer than last viewed
+        const lastViewed = new Date(lastViewedStr);
+        if (latestMsg) {
+          const isFromUser = latestMsg.author_type === 'usuario' || latestMsg.sender_type === 'usuario';
+          if (!isFromUser && latestMsg.visibility === 'publico' && new Date(latestMsg.created_at) > lastViewed) {
+            unreadMap[ticket.id] = true;
+            globalUnread = true;
+          }
+        }
+      });
+
+      console.log('[Client HelpDesk] Calculated unread tickets:', unreadMap);
+      setUnreadTickets(unreadMap);
+      setHasUnread(globalUnread);
+    } catch (err) {
+      console.error('Error checking unread messages:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
       fetchTickets();
     }
-  }, [isOpen, user]);
+  }, [user, isOpen]);
+
+  useEffect(() => {
+    if (tickets.length > 0) {
+      checkUnreadMessages(tickets);
+    } else {
+      setHasUnread(false);
+      setUnreadTickets({});
+    }
+  }, [tickets]);
+
+  // Realtime subscription for messages
+  useEffect(() => {
+    if (!user) return;
+
+    console.log('[Client HelpDesk] Subscribing to realtime messages...');
+    const channel = supabase
+      .channel('helpdesk-client-messages')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'helpdesk_messages'
+        },
+        async (payload) => {
+          console.log('[Client HelpDesk] Realtime INSERT received:', payload);
+          const newMsg = payload.new as any;
+          if (!newMsg) return;
+
+          // Notify user if it's a public message not from 'usuario'
+          const isPublic = newMsg.visibility === 'publico';
+          const isFromUser = newMsg.author_type === 'usuario' || newMsg.sender_type === 'usuario';
+          
+          if (isPublic && !isFromUser) {
+            const currentTickets = ticketsRef.current;
+            const belongsToUser = currentTickets.some(t => t.id === newMsg.ticket_id);
+            console.log('[Client HelpDesk] Belongs to user:', belongsToUser);
+            
+            if (belongsToUser) {
+              playNotificationSound();
+              
+              // If viewing this ticket, append message
+              if (selectedTicketRef.current && selectedTicketRef.current.id === newMsg.ticket_id) {
+                console.log('[Client HelpDesk] Ticket is currently open. Appending message.');
+                setMessages(prev => {
+                  if (prev.some(m => m.id === newMsg.id)) return prev;
+                  return [...prev, { ...newMsg, attachments: [] }];
+                });
+                localStorage.setItem(`helpdesk_viewed_${newMsg.ticket_id}`, new Date().toISOString());
+              } else {
+                console.log('[Client HelpDesk] Ticket is closed. Setting unread status.');
+                setUnreadTickets(prev => ({
+                  ...prev,
+                  [newMsg.ticket_id]: true
+                }));
+                setHasUnread(true);
+              }
+              
+              // Refresh tickets to update sorting/dates
+              fetchTickets();
+            }
+          }
+        }
+      );
+
+    channel.subscribe((status, err) => {
+      console.log('[Client HelpDesk] Subscription status:', status, err);
+    });
+
+    return () => {
+      console.log('[Client HelpDesk] Cleaning up realtime channel.');
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
 
   const fetchTickets = async () => {
     if (!user) return;
@@ -109,6 +335,16 @@ export const FloatingHelpDesk: React.FC = () => {
   const handleSelectTicket = (ticket: HelpDeskTicket) => {
     setSelectedTicket(ticket);
     setView('tickets');
+    
+    // Mark as read
+    localStorage.setItem(`helpdesk_viewed_${ticket.id}`, new Date().toISOString());
+    setUnreadTickets(prev => {
+      const copy = { ...prev };
+      delete copy[ticket.id];
+      setHasUnread(Object.keys(copy).length > 0);
+      return copy;
+    });
+    
     fetchTicketMessages(ticket.id);
   };
 
@@ -502,6 +738,9 @@ export const FloatingHelpDesk: React.FC = () => {
       setMessages(prev => [...prev, { ...messageData, attachments: [] }]);
       setReplyText('');
       
+      // Mark as read
+      localStorage.setItem(`helpdesk_viewed_${selectedTicket.id}`, new Date().toISOString());
+      
       // Refresh tickets list to update dates/ordering
       fetchTickets();
     } catch (err: any) {
@@ -571,10 +810,16 @@ export const FloatingHelpDesk: React.FC = () => {
               setIsOpen(true);
               fetchTickets();
             }}
-            className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-full p-4 shadow-[0_8px_24px_rgba(37,99,235,0.4)] transition-all transform hover:scale-110 flex items-center justify-center group border border-blue-400/20"
+            className="relative bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white rounded-full p-4 shadow-[0_8px_24px_rgba(37,99,235,0.4)] transition-all transform hover:scale-110 flex items-center justify-center group border border-blue-400/20"
             aria-label="Abrir Help Desk"
           >
             <Headphones size={32} className="group-hover:rotate-12 transition-transform" />
+            {hasUnread && (
+              <span className="absolute -top-1 -right-1 flex h-4 w-4">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500 border border-slate-900 shadow-md"></span>
+              </span>
+            )}
           </button>
         </div>
       )}
@@ -713,7 +958,10 @@ export const FloatingHelpDesk: React.FC = () => {
                           }`}
                         >
                           <div className="flex justify-between items-center w-full gap-2">
-                            <span className="font-bold text-[10px] text-slate-400 font-mono truncate">
+                            <span className="font-bold text-[10px] text-slate-400 font-mono truncate flex items-center gap-1.5">
+                              {unreadTickets[ticket.id] && (
+                                <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0 inline-block animate-pulse" />
+                              )}
                               {ticket.public_code || ticket.id.substring(0, 8)}
                             </span>
                             <span className={`text-[9px] uppercase tracking-wider font-extrabold px-2 py-0.5 rounded-full border shrink-0 ${
