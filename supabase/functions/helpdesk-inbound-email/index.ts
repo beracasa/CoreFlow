@@ -6,6 +6,20 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+function htmlToText(html: string): string {
+  let text = html.replace(/<br\s*\/?>/gi, '\n');
+  text = text.replace(/<\/p>/gi, '\n');
+  text = text.replace(/<\/div>/gi, '\n');
+  text = text.replace(/<[^>]*>/g, '');
+  text = text
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"');
+  return text.trim();
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -13,15 +27,61 @@ serve(async (req) => {
 
   try {
     const payload = await req.json();
-    console.log("Inbound Email Payload received:", JSON.stringify({
-      subject: payload.subject,
-      from: payload.from,
-      hasText: !!payload.text
-    }));
+    console.log("Inbound Email Payload received:", JSON.stringify(payload));
 
-    const subject = payload.subject || '';
-    const from = payload.from || '';
-    const textBody = payload.text || payload.html || 'Mensaje sin texto';
+    let subject = '';
+    let from = '';
+    let textBody = '';
+    let emailId = '';
+
+    // Soporte para formato de webhook de Resend (email.received)
+    if (payload.type === 'email.received' && payload.data) {
+      emailId = payload.data.email_id;
+      subject = payload.data.subject || '';
+      from = payload.data.from || '';
+    } else {
+      // Formato directo / manual
+      subject = payload.subject || '';
+      from = payload.from || '';
+      textBody = payload.text || payload.html || '';
+      emailId = payload.email_id || '';
+    }
+
+    // Si tenemos emailId y no tenemos cuerpo, consultamos la API de Resend
+    if (emailId && !textBody) {
+      console.log(`Fetching email body for email ID: ${emailId}`);
+      const resendApiKey = Deno.env.get('RESEND_API_KEY');
+      if (resendApiKey) {
+        try {
+          const resendRes = await fetch(`https://api.resend.com/emails/receiving/${emailId}`, {
+            headers: {
+              'Authorization': `Bearer ${resendApiKey}`
+            }
+          });
+          if (resendRes.ok) {
+            const emailData = await resendRes.json();
+            if (emailData) {
+              console.log("Successfully retrieved email data from Resend API");
+              if (emailData.text) {
+                textBody = emailData.text;
+              } else if (emailData.html) {
+                textBody = htmlToText(emailData.html);
+              }
+            }
+          } else {
+            console.error(`Resend API returned status ${resendRes.status}: ${await resendRes.text()}`);
+          }
+        } catch (fetchErr: any) {
+          console.error("Failed to fetch email from Resend API:", fetchErr.message);
+        }
+      } else {
+        console.warn("RESEND_API_KEY is not configured.");
+      }
+    }
+
+    if (!textBody) {
+      textBody = payload.text || payload.html || 'Mensaje sin texto';
+    }
 
     // Buscar ID del ticket en el asunto. Formato esperado: [TKT-uuid]
     const uuidRegex = /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/;

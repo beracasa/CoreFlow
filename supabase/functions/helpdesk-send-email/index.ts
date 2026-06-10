@@ -84,7 +84,7 @@ serve(async (req) => {
     `;
 
     const { data: emailData, error: emailError } = await resend.emails.send({
-      from: 'CoreFlow Help Desk <onboarding@resend.dev>',
+      from: 'CoreFlow Help Desk <soporte@soporte.ravicaribe.com>',
       to: [recipientEmail],
       subject,
       html,
