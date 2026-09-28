@@ -113,6 +113,7 @@ export const MasterDataService = {
     if (error) throw error;
     return data.map((z: any) => ({
       ...z,
+      lines: z.lines || [],
       orderIndex: z.order_index
     })) as ZoneStructure[];
   },
@@ -125,20 +126,24 @@ export const MasterDataService = {
       localStorage.setItem('v2_cmms_zones', JSON.stringify(zones));
       return newZone;
     }
-    const { data, error } = await supabase.from('zones').insert({
-      id: zone.id,
+    const isUuid = zone.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(zone.id);
+    const insertPayload: any = {
       name: zone.name,
-      lines: zone.lines,
+      lines: zone.lines || [],
       x: zone.x,
       y: zone.y,
       width: zone.width,
       height: zone.height,
       color: zone.color,
       order_index: zone.orderIndex || 0
-    }).select().single();
+    };
+    if (isUuid) {
+      insertPayload.id = zone.id;
+    }
+    const { data, error } = await supabase.from('zones').insert(insertPayload).select().single();
     if (error) throw error;
     // Map back to camelCase
-    return { ...data, orderIndex: data.order_index } as ZoneStructure;
+    return { ...data, lines: data.lines || [], orderIndex: data.order_index } as ZoneStructure;
   },
 
   async updateZone(zone: ZoneStructure): Promise<void> {
@@ -153,7 +158,7 @@ export const MasterDataService = {
     }
     const { error } = await supabase.from('zones').update({
       name: zone.name,
-      lines: zone.lines,
+      lines: zone.lines || [],
       x: zone.x,
       y: zone.y,
       width: zone.width,

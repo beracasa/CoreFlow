@@ -10,6 +10,7 @@ export interface IInventoryService {
         company?: string;
         supplier?: string;
     }): Promise<{ data: SparePart[], total: number }>;
+    getPartById(id: string): Promise<SparePart | null>;
     getPartCompanies(): Promise<string[]>;
     getAllRequests(params?: PaginationParams, filters?: { searchTerm?: string; status?: string; priority?: string; startDate?: string; endDate?: string }): Promise<PaginatedResult<PartsRequest>>;
     getRequestById(id: string): Promise<PartsRequest>;

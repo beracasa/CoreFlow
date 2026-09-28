@@ -15,13 +15,16 @@ interface PartRequestFormProps {
 
 export const PartRequestForm: React.FC<PartRequestFormProps> = ({ initialData, onCancel, onSuccess }) => {
     const [parts, setParts] = useState<SparePart[]>([]);
+    const [isSearchingParts, setIsSearchingParts] = useState(false);
     const [technicianId, setTechnicianId] = useState(initialData?.technicianId || '');
     const [priority, setPriority] = useState<RequestPriority>(initialData?.priority || 'NORMAL');
 
     // Form Item State
     const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [selectedPartId, setSelectedPartId] = useState('');
+    const [selectedPart, setSelectedPart] = useState<SparePart | null>(null);
     const [quantity, setQuantity] = useState(1);
     const [usageLocation, setUsageLocation] = useState('');
     const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
@@ -44,21 +47,100 @@ export const PartRequestForm: React.FC<PartRequestFormProps> = ({ initialData, o
 
     const [feedback, setFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
+    // Load initial parts on mount
     useEffect(() => {
-        inventoryService.getAllParts(1, 1000).then(res => {
-            const data = res.data;
-            setParts(data);
-            // Update part names if editing
-            if (initialData) {
-                setRequestItems(prev => prev.map(item => ({
-                    ...item,
-                    partName: data.find(p => p.id === item.partId)?.name || item.partId
-                })));
+        let isMounted = true;
+        setIsSearchingParts(true);
+        inventoryService.getAllParts(1, 50)
+            .then(res => {
+                if (!isMounted) return;
+                setParts(res.data);
+                setIsSearchingParts(false);
+            })
+            .catch(err => {
+                console.error('Error fetching initial parts:', err);
+                if (isMounted) setIsSearchingParts(false);
+            });
+
+        return () => {
+            isMounted = false;
+        };
+    }, []);
+
+    // Resolve part names for initial data in edit mode
+    useEffect(() => {
+        if (!initialData || !initialData.items || initialData.items.length === 0) return;
+
+        let isMounted = true;
+        const resolveNames = async () => {
+            const resolved = await Promise.all(
+                initialData.items.map(async item => {
+                    try {
+                        const part = await inventoryService.getPartById(item.partId);
+                        return {
+                            partId: item.partId,
+                            quantity: item.quantityRequested,
+                            partName: part ? `${part.partNumber} - ${part.name}` : item.partId,
+                            usageLocation: item.usageLocation,
+                            quantityDelivered: item.quantityDelivered
+                        };
+                    } catch {
+                        return {
+                            partId: item.partId,
+                            quantity: item.quantityRequested,
+                            partName: item.partId,
+                            usageLocation: item.usageLocation,
+                            quantityDelivered: item.quantityDelivered
+                        };
+                    }
+                })
+            );
+            if (isMounted) {
+                setRequestItems(resolved);
             }
-        });
+        };
+
+        resolveNames();
+        return () => {
+            isMounted = false;
+        };
     }, [initialData]);
 
-    const selectedPart = parts.find(p => p.id === selectedPartId);
+    // Debounce search input
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchTerm);
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
+    // Dynamic backend search when user types
+    useEffect(() => {
+        if (selectedPart && searchTerm === `${selectedPart.partNumber} - ${selectedPart.name}`) {
+            setIsSearchingParts(false);
+            return;
+        }
+
+        let isMounted = true;
+        setIsSearchingParts(true);
+
+        const trimmed = debouncedSearch.trim();
+        inventoryService.getAllParts(1, 50, trimmed ? { search: trimmed } : undefined)
+            .then(res => {
+                if (!isMounted) return;
+                setParts(res.data);
+                setIsSearchingParts(false);
+            })
+            .catch(err => {
+                console.error('Error searching parts:', err);
+                if (isMounted) setIsSearchingParts(false);
+            });
+
+        return () => {
+            isMounted = false;
+        };
+    }, [debouncedSearch]);
+
     const isStockInsufficient = selectedPart && quantity > selectedPart.currentStock;
 
     const addItem = () => {
@@ -69,27 +151,36 @@ export const PartRequestForm: React.FC<PartRequestFormProps> = ({ initialData, o
             {
                 partId: selectedPart.id,
                 quantity: quantity,
-                partName: selectedPart.name,
+                partName: `${selectedPart.partNumber} - ${selectedPart.name}`,
                 usageLocation: usageLocation.trim() || undefined
             }
         ]);
 
         // Reset item fields
+        setSelectedPart(null);
         setSelectedPartId('');
         setSearchTerm('');
         setQuantity(1);
         setUsageLocation('');
     };
 
-    const startEditing = (index: number) => {
+    const startEditing = async (index: number) => {
         const item = requestItems[index];
         setEditingItemIndex(index);
         setSelectedPartId(item.partId);
         setSearchTerm(item.partName);
         setQuantity(item.quantity);
         setUsageLocation(item.usageLocation || '');
-        // Note: We don't block changing the part, similar to how we don't block adding a new one.
-        // But users should be careful.
+
+        const found = parts.find(p => p.id === item.partId);
+        if (found) {
+            setSelectedPart(found);
+        } else {
+            const fetched = await inventoryService.getPartById(item.partId);
+            if (fetched) {
+                setSelectedPart(fetched);
+            }
+        }
     };
 
     const updateItem = () => {
@@ -108,7 +199,7 @@ export const PartRequestForm: React.FC<PartRequestFormProps> = ({ initialData, o
             ...currentItem,
             partId: selectedPart.id,
             quantity: quantity,
-            partName: selectedPart.name,
+            partName: `${selectedPart.partNumber} - ${selectedPart.name}`,
             usageLocation: usageLocation.trim() || undefined
         };
 
@@ -118,6 +209,7 @@ export const PartRequestForm: React.FC<PartRequestFormProps> = ({ initialData, o
 
     const cancelEdit = () => {
         setEditingItemIndex(null);
+        setSelectedPart(null);
         setSelectedPartId('');
         setSearchTerm('');
         setQuantity(1);
@@ -233,9 +325,14 @@ export const PartRequestForm: React.FC<PartRequestFormProps> = ({ initialData, o
                                     // Delay hiding to allow click event on option to fire
                                     onBlur={() => setTimeout(() => setIsDropdownOpen(false), 200)}
                                     onChange={e => {
-                                        setSearchTerm(e.target.value);
+                                        const val = e.target.value;
+                                        setSearchTerm(val);
                                         setIsDropdownOpen(true);
-                                        if (selectedPartId) setSelectedPartId(''); // Clear selection if user types
+                                        if (selectedPart) {
+                                            setSelectedPart(null);
+                                            setSelectedPartId('');
+                                        }
+                                        setIsSearchingParts(true);
                                     }}
                                 />
                             </div>
@@ -243,41 +340,37 @@ export const PartRequestForm: React.FC<PartRequestFormProps> = ({ initialData, o
                             {/* Floating Dropdown */}
                             {isDropdownOpen && (
                                 <div className="absolute z-50 w-full mt-1 bg-industrial-800 border border-industrial-600 rounded-lg shadow-xl max-h-60 overflow-y-auto">
-                                    {parts.filter(p =>
-                                        !searchTerm ||
-                                        p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                        p.partNumber.toLowerCase().includes(searchTerm.toLowerCase())
-                                    ).length > 0 ? (
+                                    {isSearchingParts ? (
+                                        <div className="px-4 py-3 text-industrial-400 text-sm flex items-center justify-center gap-2">
+                                            <Loader2 className="w-4 h-4 animate-spin text-industrial-accent" />
+                                            <span>Buscando repuestos...</span>
+                                        </div>
+                                    ) : parts.length > 0 ? (
                                         <ul className="py-1">
-                                            {parts
-                                                .filter(p =>
-                                                    !searchTerm ||
-                                                    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                                    p.partNumber.toLowerCase().includes(searchTerm.toLowerCase())
-                                                )
-                                                .map(p => (
-                                                    <li
-                                                        key={p.id}
-                                                        className="px-4 py-3 hover:bg-industrial-700 cursor-pointer text-white flex justify-between items-center border-b border-industrial-700/50 last:border-0"
-                                                        onMouseDown={(e) => {
-                                                            e.preventDefault(); // Prevent input blur
-                                                            setSelectedPartId(p.id);
-                                                            setSearchTerm(`${p.partNumber} - ${p.name}`);
-                                                            setIsDropdownOpen(false);
-                                                        }}
-                                                    >
-                                                        <div>
-                                                            <span className="font-mono text-industrial-400 font-bold mr-2">{p.partNumber}</span>
-                                                            <span className="font-medium">{p.name}</span>
-                                                        </div>
-                                                        <span className={`text-xs px-2 py-1 rounded-full font-bold ${p.currentStock > 0 ? 'bg-emerald-900/30 text-emerald-400' : 'bg-red-900/30 text-red-400'}`}>
-                                                            Stock: {p.currentStock}
-                                                        </span>
-                                                    </li>
-                                                ))}
+                                            {parts.map(p => (
+                                                <li
+                                                    key={p.id}
+                                                    className="px-4 py-3 hover:bg-industrial-700 cursor-pointer text-white flex justify-between items-center border-b border-industrial-700/50 last:border-0"
+                                                    onMouseDown={(e) => {
+                                                        e.preventDefault(); // Prevent input blur
+                                                        setSelectedPart(p);
+                                                        setSelectedPartId(p.id);
+                                                        setSearchTerm(`${p.partNumber} - ${p.name}`);
+                                                        setIsDropdownOpen(false);
+                                                    }}
+                                                >
+                                                    <div>
+                                                        <span className="font-mono text-industrial-400 font-bold mr-2">{p.partNumber}</span>
+                                                        <span className="font-medium">{p.name}</span>
+                                                    </div>
+                                                    <span className={`text-xs px-2 py-1 rounded-full font-bold ${p.currentStock > 0 ? 'bg-emerald-900/30 text-emerald-400' : 'bg-red-900/30 text-red-400'}`}>
+                                                        Stock: {p.currentStock}
+                                                    </span>
+                                                </li>
+                                            ))}
                                         </ul>
                                     ) : (
-                                        <div className="px-4 py-3 text-industrial-500 text-sm italic">
+                                        <div className="px-4 py-3 text-industrial-500 text-sm italic text-center">
                                             No se encontraron repuestos.
                                         </div>
                                     )}

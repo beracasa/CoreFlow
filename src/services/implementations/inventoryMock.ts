@@ -189,6 +189,11 @@ export class InventoryMockService implements IInventoryService {
         return { data: pagedData, total };
     }
 
+    async getPartById(id: string): Promise<SparePart | null> {
+        const parts = this.getParts();
+        return parts.find(p => p.id === id) || null;
+    }
+
     async getPartCompanies(): Promise<string[]> {
         const parts = this.getParts();
         const companies = new Set<string>();
