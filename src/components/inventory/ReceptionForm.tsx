@@ -18,6 +18,8 @@ export const ReceptionForm: React.FC = () => {
     const [notes, setNotes] = useState('');
     const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+    const [isSearchingParts, setIsSearchingParts] = useState(false);
     const [showDropdown, setShowDropdown] = useState(false);
     const [itemsToReceive, setItemsToReceive] = useState<{ partId: string; partName: string; partNumber: string; quantity: number }[]>([]);
     
@@ -40,9 +42,28 @@ export const ReceptionForm: React.FC = () => {
     const [endDate, setEndDate] = useState('');
 
     useEffect(() => {
-        inventoryService.getAllParts(1, 1000).then(res => setParts(res.data));
+        inventoryService.getAllParts(1, 50).then(res => setParts(res.data));
         inventoryService.getPurchaseRequestsForReception().then(res => setPurchaseRequests(res));
     }, []);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchTerm);
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
+    useEffect(() => {
+        if (!showDropdown) return;
+        const trimmed = debouncedSearch.trim();
+        setIsSearchingParts(true);
+        inventoryService.getAllParts(1, 50, trimmed ? { search: trimmed } : undefined)
+            .then(res => {
+                setParts(res.data);
+                setIsSearchingParts(false);
+            })
+            .catch(() => setIsSearchingParts(false));
+    }, [debouncedSearch, showDropdown]);
 
     const loadHistory = () => {
         setLoadingHistory(true);
@@ -390,16 +411,26 @@ export const ReceptionForm: React.FC = () => {
                                 />
                                 {showDropdown && (
                                     <div className="absolute z-10 w-full mt-1 bg-industrial-800 border border-industrial-600 rounded-lg shadow-xl max-h-60 overflow-y-auto">
-                                        {filteredParts.length > 0 ? filteredParts.map(p => (
+                                        {isSearchingParts ? (
+                                            <div className="px-4 py-3 text-industrial-400 text-sm flex items-center justify-center gap-2">
+                                                <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
+                                                <span>Buscando repuestos...</span>
+                                            </div>
+                                        ) : parts.length > 0 ? parts.map(p => (
                                             <div
                                                 key={p.id}
-                                                className="px-4 py-2 hover:bg-industrial-700 cursor-pointer text-white text-sm border-b border-industrial-700/50 last:border-0"
+                                                className="px-4 py-2 hover:bg-industrial-700 cursor-pointer text-white text-sm border-b border-industrial-700/50 last:border-0 flex justify-between items-center"
                                                 onClick={() => { setSelectedPartId(p.id); setSearchTerm(`${p.partNumber} - ${p.name}`); setShowDropdown(false); }}
                                             >
-                                                <span className="font-bold text-emerald-400">{p.partNumber}</span> - {p.name}
+                                                <div>
+                                                    <span className="font-bold text-emerald-400">{p.partNumber}</span> - {p.name}
+                                                </div>
+                                                <span className={`text-xs px-2 py-0.5 rounded font-bold ${p.currentStock > 0 ? 'bg-emerald-900/30 text-emerald-400' : 'bg-red-900/30 text-red-400'}`}>
+                                                    Stock: {p.currentStock}
+                                                </span>
                                             </div>
                                         )) : (
-                                            <div className="px-4 py-2 text-industrial-400 text-sm">No se encontraron resultados</div>
+                                            <div className="px-4 py-2 text-industrial-400 text-sm text-center">No se encontraron resultados</div>
                                         )}
                                     </div>
                                 )}

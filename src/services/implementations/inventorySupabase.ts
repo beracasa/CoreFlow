@@ -117,6 +117,17 @@ export class InventorySupabaseService implements IInventoryService {
         };
     }
 
+    async getPartById(id: string): Promise<SparePart | null> {
+        const { data, error } = await supabase
+            .from('spare_parts')
+            .select('*')
+            .eq('id', id)
+            .maybeSingle();
+
+        if (error || !data) return null;
+        return this.mapDBToPart(data);
+    }
+
     async getPartCompanies(): Promise<string[]> {
         const { data, error } = await supabase
             .from('v_unique_part_companies')

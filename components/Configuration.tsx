@@ -338,21 +338,33 @@ export const Configuration: React.FC<ConfigurationProps> = ({
     }
   };
 
-  const handleAddLine = (zoneId: string) => {
+  const handleAddLine = async (zoneId: string) => {
     const lineName = newLineInputs[zoneId];
     if (lineName && lineName.trim()) {
       const zone = zoneStructures.find(z => z.id === zoneId);
       if (zone) {
-        onUpdateZone({ ...zone, lines: [...zone.lines, lineName.trim()] });
+        const currentLines = Array.isArray(zone.lines) ? zone.lines : [];
+        try {
+          await onUpdateZone({ ...zone, lines: [...currentLines, lineName.trim()] });
+          setNewLineInputs({ ...newLineInputs, [zoneId]: '' });
+        } catch (err: any) {
+          console.error("Error adding line:", err);
+          alert('Error al agregar línea: ' + (err?.message || err));
+        }
       }
-      setNewLineInputs({ ...newLineInputs, [zoneId]: '' });
     }
   };
 
-  const handleDeleteLine = (zoneId: string, lineToRemove: string) => {
+  const handleDeleteLine = async (zoneId: string, lineToRemove: string) => {
     const zone = zoneStructures.find(z => z.id === zoneId);
     if (zone) {
-      onUpdateZone({ ...zone, lines: zone.lines.filter(l => l !== lineToRemove) });
+      const currentLines = Array.isArray(zone.lines) ? zone.lines : [];
+      try {
+        await onUpdateZone({ ...zone, lines: currentLines.filter(l => l !== lineToRemove) });
+      } catch (err: any) {
+        console.error("Error deleting line:", err);
+        alert('Error al eliminar línea: ' + (err?.message || err));
+      }
     }
   };
 
@@ -1236,7 +1248,7 @@ export const Configuration: React.FC<ConfigurationProps> = ({
                     </div>
 
                     <div className="space-y-2 pl-4 border-l-2 border-industrial-800 ml-1">
-                      {zone.lines.map((line, idx) => (
+                      {(zone.lines || []).map((line, idx) => (
                         <div key={idx} className="flex justify-between items-center group py-1">
                           <span className="text-industrial-300 text-sm font-mono flex items-center gap-2">
                             <CornerDownRight size={12} className="text-industrial-600" />
@@ -1251,7 +1263,7 @@ export const Configuration: React.FC<ConfigurationProps> = ({
                           </button>
                         </div>
                       ))}
-                      {zone.lines.length === 0 && (
+                      {(!zone.lines || zone.lines.length === 0) && (
                         <p className="text-xs text-industrial-600 italic py-1">No hay líneas registradas</p>
                       )}
                     </div>
