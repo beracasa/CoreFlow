@@ -405,15 +405,138 @@ export class InventorySupabaseService implements IInventoryService {
     }
 
     async deliverParts(requestId: string, itemsToDeliver: { partId: string; quantity: number }[], receiverId?: string): Promise<PartsRequest> {
-        const { error } = await supabase.rpc('deliver_parts_bulk', {
-            p_request_id: requestId,
-            p_items: itemsToDeliver,
-            p_delivered_by: receiverId || null
-        });
+        const validItems = itemsToDeliver.filter(item => Number(item.quantity) > 0);
+        if (validItems.length === 0) {
+            throw new Error('No hay ítems con cantidad válida para entregar.');
+        }
 
-        if (error) {
-            console.error('Error in deliverPartsBulk:', error);
-            throw error;
+        // 1. Fetch request and its items
+        const { data: request, error: reqError } = await supabase
+            .from('spare_part_requests')
+            .select('*, spare_part_request_items(*)')
+            .eq('id', requestId)
+            .single();
+
+        if (reqError || !request) {
+            console.error('Error fetching request for delivery:', reqError);
+            throw new Error(`Solicitud no encontrada (${requestId})`);
+        }
+
+        // 2. Fetch parts data to validate stock
+        const partIds = validItems.map(i => i.partId);
+        const { data: partsData, error: partsError } = await supabase
+            .from('spare_parts')
+            .select('id, name, current_stock')
+            .in('id', partIds);
+
+        if (partsError) {
+            console.error('Error fetching parts for stock verification:', partsError);
+            throw partsError;
+        }
+
+        const partsMap = new Map<string, any>((partsData || []).map((p: any) => [String(p.id), p]));
+
+        // Validate stock sufficiency for all parts before performing any updates
+        for (const item of validItems) {
+            const part = partsMap.get(String(item.partId));
+            if (!part) {
+                throw new Error(`Repuesto no encontrado (ID: ${item.partId})`);
+            }
+            const currentStock = Number(part.current_stock || 0);
+            if (currentStock < item.quantity) {
+                throw new Error(`Stock insuficiente para ${part.name}. Disponible: ${currentStock}, Solicitado a entregar: ${item.quantity}`);
+            }
+        }
+
+        // 3. Update stock for each part and update delivered quantity in request items
+        for (const item of validItems) {
+            const part = partsMap.get(String(item.partId));
+            if (!part) continue;
+
+            const currentStock = Number(part.current_stock || 0);
+            const newStock = Math.max(0, currentStock - item.quantity);
+
+            // Update spare_parts current_stock
+            const { error: updateStockErr } = await supabase
+                .from('spare_parts')
+                .update({ current_stock: newStock })
+                .eq('id', item.partId);
+
+            if (updateStockErr) {
+                console.error(`Error updating stock for part ${item.partId}:`, updateStockErr);
+                throw updateStockErr;
+            }
+
+            // Update map in case the same partId appears multiple times
+            part.current_stock = newStock;
+
+            // Update quantity_delivered in spare_part_request_items
+            const reqItem = (request.spare_part_request_items || []).find(
+                (ri: any) => String(ri.part_id) === String(item.partId)
+            );
+
+            if (reqItem) {
+                const currentDelivered = Number(reqItem.quantity_delivered || 0);
+                const newDelivered = currentDelivered + item.quantity;
+                const { error: updateItemErr } = await supabase
+                    .from('spare_part_request_items')
+                    .update({ quantity_delivered: newDelivered })
+                    .eq('id', reqItem.id);
+
+                if (updateItemErr) {
+                    console.error(`Error updating quantity_delivered for item ${reqItem.id}:`, updateItemErr);
+                    throw updateItemErr;
+                }
+
+                reqItem.quantity_delivered = newDelivered;
+            }
+
+            // Optional: Log inventory transaction if table exists
+            try {
+                await supabase.from('inventory_transactions').insert({
+                    part_id: item.partId,
+                    transaction_type: 'OUTBOUND',
+                    quantity: item.quantity,
+                    reference_id: requestId,
+                    notes: `Entrega para solicitud ${request.request_number || requestId}`,
+                    delivered_to: receiverId || null
+                });
+            } catch (_) {
+                // Silently ignore if table doesn't exist
+            }
+        }
+
+        // 4. Update request status & delivered_to
+        const allItems = request.spare_part_request_items || [];
+        const allDelivered = allItems.length > 0 && allItems.every(
+            (i: any) => Number(i.quantity_delivered || 0) >= Number(i.quantity_requested || 0)
+        );
+        const anyDelivered = allItems.some(
+            (i: any) => Number(i.quantity_delivered || 0) > 0
+        );
+
+        let newStatus = request.status;
+        if (allDelivered) {
+            newStatus = 'CLOSED';
+        } else if (anyDelivered) {
+            newStatus = 'PARTIAL';
+        }
+
+        const requestUpdates: any = {
+            status: newStatus
+        };
+        if (receiverId) {
+            requestUpdates.delivered_to = receiverId;
+        }
+
+        const { error: updateReqErr } = await supabase
+            .from('spare_part_requests')
+            .update(requestUpdates)
+            .eq('id', requestId);
+
+        if (updateReqErr) {
+            console.error('Error updating request status:', updateReqErr);
+            throw updateReqErr;
         }
 
         // Return updated request

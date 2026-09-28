@@ -18,15 +18,22 @@ serve(async (req) => {
     const payload = await req.json();
     const { table, record } = payload;
 
-    // 1. Activation Filter: Only for R-MANT-05
-    if (record.form_type !== 'R-MANT-05') {
-      return new Response(JSON.stringify({ message: "Skipping: Not a R-MANT-05 form" }), {
+    // 1. Activation Filter: Only for R-MANT-05 or R-MANT-02
+    const isRMant02 = record.form_type === 'R-MANT-02' || record.type === 'PREVENTIVE';
+    const isRMant05 = record.form_type === 'R-MANT-05' || record.type === 'CORRECTIVE' || !isRMant02;
+
+    if (record.form_type && record.form_type !== 'R-MANT-05' && record.form_type !== 'R-MANT-02') {
+      return new Response(JSON.stringify({ message: "Skipping: Not a R-MANT-05 or R-MANT-02 form" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
       });
     }
 
-    console.log(`--- PROCESANDO NOTIFICACIÓN R-MANT-05: ${record.display_id} ---`);
+    const formCode = isRMant02 ? 'R-MANT-02' : 'R-MANT-05';
+    const formTitle = isRMant02 ? 'Mantenimiento Preventivo (R-MANT-02)' : 'Solicitud de Mantenimiento Correctivo (R-MANT-05)';
+    const prefKey = isRMant02 ? 'alerts_rmant02' : 'alerts_rmant05';
+
+    console.log(`--- PROCESANDO NOTIFICACIÓN ${formCode}: ${record.display_id} ---`);
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -37,15 +44,34 @@ serve(async (req) => {
     const { data: subscribers, error: subscriberError } = await supabaseAdmin
       .from('profiles')
       .select('email')
-      .filter('notification_preferences->>alerts_rmant05', 'eq', 'true');
+      .filter(`notification_preferences->>${prefKey}`, 'eq', 'true');
 
     if (subscriberError) throw subscriberError;
 
-    const recipientEmails = subscribers?.map(s => s.email).filter(Boolean) || [];
+    const recipientEmails: string[] = subscribers?.map(s => s.email).filter(Boolean) || [];
+
+    // Also include assigned mechanic / technician if specified
+    let assignedMechanicName = 'No asignado';
+    if (record.assigned_mechanic) {
+      const { data: mechanic } = await supabaseAdmin
+        .from('profiles')
+        .select('email, full_name')
+        .or(`id.eq.${record.assigned_mechanic},full_name.eq.${record.assigned_mechanic}`)
+        .maybeSingle();
+
+      if (mechanic) {
+        assignedMechanicName = mechanic.full_name || record.assigned_mechanic;
+        if (mechanic.email && !recipientEmails.includes(mechanic.email)) {
+          recipientEmails.push(mechanic.email);
+        }
+      } else {
+        assignedMechanicName = record.assigned_mechanic;
+      }
+    }
 
     if (recipientEmails.length === 0) {
-      console.log("No hay usuarios suscritos para alertas R-MANT-05.");
-      return new Response(JSON.stringify({ message: "No subscribers found" }), {
+      console.log(`No hay usuarios suscritos ni personal asignado para alertas ${formCode}.`);
+      return new Response(JSON.stringify({ message: `No subscribers or assigned mechanic found for ${formCode}` }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200,
       });
@@ -53,7 +79,9 @@ serve(async (req) => {
 
     // 3. Professional HTML Design (Industrial)
     const appUrl = 'http://localhost:3000'; // Base URL for local testing
-    const subject = `🚨 Nueva Solicitud de Mantenimiento R-MANT-05 ${record.display_id} - ${record.branch}`;
+    const subject = isRMant02
+      ? `🛠️ Nuevo Mantenimiento Preventivo ${record.display_id} - ${record.branch || ''}`
+      : `🚨 Nueva Solicitud de Mantenimiento Correctivo ${record.display_id} - ${record.branch || ''}`;
     
     const html = `
       <!DOCTYPE html>
@@ -63,15 +91,15 @@ serve(async (req) => {
         <style>
           body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8fafc; margin: 0; padding: 20px; color: #1e293b; }
           .container { max-width: 600px; background-color: #ffffff; margin: 0 auto; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); border: 1px solid #e2e8f0; }
-          .header { background-color: #1d4ed8; padding: 24px; text-align: center; }
+          .header { background-color: ${isRMant02 ? '#059669' : '#1d4ed8'}; padding: 24px; text-align: center; }
           .header h1 { color: #ffffff; margin: 0; font-size: 20px; letter-spacing: 1px; }
           .content { padding: 32px; }
-          .alert-title { color: #1d4ed8; font-size: 18px; font-weight: bold; margin-bottom: 24px; border-bottom: 2px solid #f1f5f9; padding-bottom: 12px; }
+          .alert-title { color: ${isRMant02 ? '#059669' : '#1d4ed8'}; font-size: 18px; font-weight: bold; margin-bottom: 24px; border-bottom: 2px solid #f1f5f9; padding-bottom: 12px; }
           table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
           th { text-align: left; padding: 12px; background-color: #f8fafc; border-bottom: 1px solid #e2e8f0; font-size: 13px; color: #64748b; text-transform: uppercase; width: 35%; }
           td { padding: 12px; border-bottom: 1px solid #e2e8f0; font-size: 14px; color: #334155; }
           .button-container { text-align: center; margin-top: 32px; }
-          .button { background-color: #1d4ed8; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px; display: inline-block; transition: background-color 0.2s; }
+          .button { background-color: ${isRMant02 ? '#059669' : '#1d4ed8'}; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 14px; display: inline-block; transition: background-color 0.2s; }
           .footer { background-color: #f8fafc; padding: 20px; text-align: center; font-size: 12px; color: #94a3b8; border-top: 1px solid #e2e8f0; }
         </style>
       </head>
@@ -81,13 +109,14 @@ serve(async (req) => {
             <h1>COREFLOW MAINTENANCE</h1>
           </div>
           <div class="content">
-            <div class="alert-title">Nueva Solicitud de Mantenimiento</div>
+            <div class="alert-title">${formTitle}</div>
             <table>
               <tr><th>ID de Orden</th><td>${record.display_id}</td></tr>
-              <tr><th>Equipo</th><td>${record.title}</td></tr>
-              <tr><th>Prioridad</th><td>${record.priority}</td></tr>
-              <tr><th>Tipo de Falla</th><td>${record.failure_type}</td></tr>
-              <tr><th>Descripción</th><td>${record.request_description || 'Sin descripción detallada'}</td></tr>
+              <tr><th>Equipo</th><td>${record.title || record.machine_name || 'N/A'}</td></tr>
+              <tr><th>Prioridad / Condición</th><td>${record.condition || record.priority || 'Normal'}</td></tr>
+              <tr><th>Tipo</th><td>${isRMant02 ? 'Preventivo' : (record.failure_type || 'Correctivo')}</td></tr>
+              <tr><th>Personal Asignado / Ejecutante</th><td><strong>${assignedMechanicName}</strong></td></tr>
+              <tr><th>Descripción</th><td>${record.request_description || record.description || 'Sin descripción detallada'}</td></tr>
             </table>
             <div class="button-container">
               <a href="${appUrl}" class="button">Ver en CoreFlow</a>

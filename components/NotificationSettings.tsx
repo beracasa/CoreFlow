@@ -10,10 +10,11 @@ import {
   Loader2, 
   Search,
   User as UserIcon,
-  Check
+  Check,
+  Wrench
 } from 'lucide-react';
 
-type AlertType = 'alerts_rmant05' | 'low_stock' | 'pending_approvals';
+type AlertType = 'alerts_rmant02' | 'alerts_rmant05' | 'low_stock' | 'pending_approvals';
 
 interface AlertSectionProps {
   title: string;
@@ -44,73 +45,101 @@ const AlertSection = ({
     const term = searchTerm.toLowerCase();
     return users.filter(u => 
       u.full_name.toLowerCase().includes(term) || 
-      u.email.toLowerCase().includes(term)
+      u.email.toLowerCase().includes(term) ||
+      (u.roleName && u.roleName.toLowerCase().includes(term))
     );
   }, [users, searchTerm]);
 
   return (
-    <div className="bg-industrial-900/50 border border-industrial-700/50 rounded-xl overflow-hidden shadow-lg transition-all hover:border-industrial-600">
+    <div className="bg-industrial-900/60 border border-industrial-700/60 rounded-2xl overflow-hidden shadow-xl transition-all duration-200 hover:border-industrial-600 flex flex-col">
+      {/* Header */}
       <div className="p-5 border-b border-industrial-700/50 flex items-start gap-4">
-        <div className={`p-3 ${iconBg} ${iconColor} rounded-lg shadow-inner`}>
+        <div className={`p-3.5 ${iconBg} ${iconColor} rounded-xl shadow-inner shrink-0`}>
           {icon}
         </div>
-        <div className="flex-1">
-          <h4 className="text-white font-bold text-lg">{title}</h4>
-          <p className="text-sm text-industrial-400 mt-1">{description}</p>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-3">
+            <h4 className="text-white font-bold text-lg tracking-tight truncate">{title}</h4>
+            <span className={`text-xs px-2.5 py-1 rounded-full font-semibold shrink-0 transition-colors ${
+              selectedIds.size > 0 
+                ? 'bg-industrial-accent/20 text-industrial-accent border border-industrial-accent/30' 
+                : 'bg-industrial-800 text-industrial-400 border border-industrial-700'
+            }`}>
+              {selectedIds.size} {selectedIds.size === 1 ? 'destinatario' : 'destinatarios'}
+            </span>
+          </div>
+          <p className="text-sm text-industrial-400 mt-1.5 leading-relaxed">{description}</p>
         </div>
       </div>
       
-      <div className="p-4 bg-industrial-950/30">
-        <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-industrial-500" size={16} />
+      {/* Search & List */}
+      <div className="p-5 bg-industrial-950/40 flex-1 flex flex-col justify-between">
+        <div className="relative mb-3.5">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-industrial-500" size={16} />
           <input
             type="text"
-            placeholder="Buscar usuario por nombre o correo..."
+            placeholder="Buscar por nombre, correo o cargo..."
             value={searchTerm}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full bg-industrial-900 border border-industrial-700 rounded-lg py-2 pl-10 pr-4 text-sm text-white focus:border-industrial-accent outline-none transition-all"
+            className="w-full bg-industrial-900 border border-industrial-700 rounded-xl py-2.5 pl-10 pr-9 text-sm text-white placeholder-industrial-500 focus:border-industrial-accent focus:ring-1 focus:ring-industrial-accent outline-none transition-all"
           />
+          {searchTerm && (
+            <button
+              onClick={() => onSearchChange('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-industrial-500 hover:text-white text-xs p-1"
+            >
+              ✕
+            </button>
+          )}
         </div>
 
-        <div className="max-h-60 overflow-y-auto custom-scrollbar space-y-1 pr-1">
+        <div className="max-h-64 overflow-y-auto custom-scrollbar space-y-1.5 pr-1 flex-1">
           {filteredUsers.length > 0 ? (
-            filteredUsers.map(user => (
-              <div 
-                key={user.id}
-                onClick={() => onToggleUser(user.id)}
-                className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors ${
-                  selectedIds.has(user.id) 
-                    ? 'bg-industrial-accent/10 border border-industrial-accent/30' 
-                    : 'hover:bg-industrial-800 border border-transparent'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-industrial-800 flex items-center justify-center text-industrial-400 border border-industrial-700">
-                    <UserIcon size={14} />
+            filteredUsers.map(user => {
+              const isSelected = selectedIds.has(user.id);
+              return (
+                <div 
+                  key={user.id}
+                  onClick={() => onToggleUser(user.id)}
+                  className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all duration-150 ${
+                    isSelected 
+                      ? 'bg-industrial-accent/15 border border-industrial-accent/40 shadow-sm' 
+                      : 'hover:bg-industrial-800/80 border border-transparent'
+                  }`}
+                >
+                  <div className="flex items-center gap-3.5 min-w-0 flex-1 mr-3">
+                    <div className="w-9 h-9 rounded-full bg-industrial-800/90 flex items-center justify-center text-industrial-400 border border-industrial-700/80 shrink-0">
+                      <UserIcon size={16} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-semibold text-white truncate">{user.full_name}</div>
+                      <div className="text-xs text-industrial-400 truncate">
+                        {user.email}
+                        {user.roleName ? ` • ${user.roleName}` : ''}
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="text-sm font-medium text-white">{user.full_name}</div>
-                    <div className="text-xs text-industrial-500">{user.email}</div>
+                  <div className={`w-5 h-5 rounded-md border flex items-center justify-center shrink-0 transition-all ${
+                    isSelected
+                      ? 'bg-industrial-accent border-industrial-accent text-white scale-105'
+                      : 'border-industrial-600 bg-industrial-900'
+                  }`}>
+                    {isSelected && <Check size={14} strokeWidth={3} />}
                   </div>
                 </div>
-                <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all ${
-                  selectedIds.has(user.id)
-                    ? 'bg-industrial-accent border-industrial-accent text-white scale-110'
-                    : 'border-industrial-600 bg-industrial-900'
-                }`}>
-                  {selectedIds.has(user.id) && <Check size={14} strokeWidth={3} />}
-                </div>
-              </div>
-            ))
+              );
+            })
           ) : (
-            <div className="text-center py-8 text-industrial-500 italic text-sm">
-              No se encontraron usuarios.
+            <div className="text-center py-10 text-industrial-500 italic text-sm">
+              No se encontraron usuarios coincidentes.
             </div>
           )}
         </div>
-        <div className="mt-3 text-right pr-2">
-          <span className="text-xs font-mono text-industrial-500">
-            {selectedIds.size} usuarios seleccionados
+
+        <div className="mt-3.5 pt-3 border-t border-industrial-800/60 flex items-center justify-between text-xs text-industrial-400">
+          <span>{filteredUsers.length} de {users.length} usuarios</span>
+          <span className="font-medium text-industrial-300">
+            {selectedIds.size} activo{selectedIds.size === 1 ? '' : 's'}
           </span>
         </div>
       </div>
@@ -125,12 +154,14 @@ export const NotificationSettings = () => {
   const [isSaving, setIsSaving] = useState(false);
   
   const [selections, setSelections] = useState<Record<AlertType, Set<string>>>({
+    alerts_rmant02: new Set(),
     alerts_rmant05: new Set(),
     low_stock: new Set(),
     pending_approvals: new Set(),
   });
 
   const [searchTerms, setSearchTerms] = useState<Record<AlertType, string>>({
+    alerts_rmant02: '',
     alerts_rmant05: '',
     low_stock: '',
     pending_approvals: '',
@@ -140,17 +171,24 @@ export const NotificationSettings = () => {
     const loadData = async () => {
       try {
         const allUsers = await UserSupabaseService.getUsersWithPreferences();
-        setUsers(allUsers);
-        setInitialData(JSON.parse(JSON.stringify(allUsers))); // Clone for comparison
+        // Ocultar al usuario administrador principal (Admin CoreFlow / beracasa@gmail.com)
+        const visibleUsers = allUsers.filter(u => 
+          u.email?.toLowerCase().trim() !== 'beracasa@gmail.com' &&
+          u.full_name?.toLowerCase().trim() !== 'admin coreflow'
+        );
+        setUsers(visibleUsers);
+        setInitialData(JSON.parse(JSON.stringify(visibleUsers))); // Clone for comparison
 
         // Initialize selections from DB
         const newSelections = {
+          alerts_rmant02: new Set<string>(),
           alerts_rmant05: new Set<string>(),
           low_stock: new Set<string>(),
           pending_approvals: new Set<string>(),
         };
 
-        allUsers.forEach(u => {
+        visibleUsers.forEach(u => {
+          if (u.notification_preferences?.alerts_rmant02) newSelections.alerts_rmant02.add(u.id);
           if (u.notification_preferences?.alerts_rmant05) newSelections.alerts_rmant05.add(u.id);
           if (u.notification_preferences?.low_stock) newSelections.low_stock.add(u.id);
           if (u.notification_preferences?.pending_approvals) newSelections.pending_approvals.add(u.id);
@@ -184,18 +222,21 @@ export const NotificationSettings = () => {
       // For every user, check if their consolidated preferences changed
       users.forEach(user => {
         const newPrefs = {
+          alerts_rmant02: selections.alerts_rmant02.has(user.id),
           alerts_rmant05: selections.alerts_rmant05.has(user.id),
           low_stock: selections.low_stock.has(user.id),
           pending_approvals: selections.pending_approvals.has(user.id)
         };
 
         const oldPrefs = initialData.find(u => u.id === user.id)?.notification_preferences || {
+          alerts_rmant02: false,
           alerts_rmant05: false,
           low_stock: false,
           pending_approvals: false
         };
 
         const changed = 
+          newPrefs.alerts_rmant02 !== oldPrefs.alerts_rmant02 ||
           newPrefs.alerts_rmant05 !== oldPrefs.alerts_rmant05 ||
           newPrefs.low_stock !== oldPrefs.low_stock ||
           newPrefs.pending_approvals !== oldPrefs.pending_approvals;
@@ -211,6 +252,7 @@ export const NotificationSettings = () => {
         setInitialData(JSON.parse(JSON.stringify(users.map(u => ({
           ...u,
           notification_preferences: {
+            alerts_rmant02: selections.alerts_rmant02.has(u.id),
             alerts_rmant05: selections.alerts_rmant05.has(u.id),
             low_stock: selections.low_stock.has(u.id),
             pending_approvals: selections.pending_approvals.has(u.id)
@@ -238,7 +280,7 @@ export const NotificationSettings = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto mt-6 animate-fadeIn pb-20">
+    <div className="max-w-7xl mx-auto mt-6 animate-fadeIn pb-20">
       <div className="bg-industrial-800 border border-industrial-700 rounded-2xl p-8 shadow-2xl relative">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 pb-6 border-b border-industrial-700">
           <div className="flex items-center gap-4">
@@ -261,10 +303,23 @@ export const NotificationSettings = () => {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <AlertSection
-            title="Averías (R-MANT-05)"
-            description="Reciben una alerta cuando se reporta una falla correctiva urgente."
+            title="Preventivo (R-MANT-02)"
+            description="Reciben una alerta cuando se programa o genera un mantenimiento preventivo. El personal asignado como ejecutante también recibirá la notificación."
+            icon={<Wrench size={24} />}
+            iconBg="bg-emerald-900/40"
+            iconColor="text-emerald-400"
+            users={users}
+            selectedIds={selections.alerts_rmant02}
+            searchTerm={searchTerms.alerts_rmant02}
+            onSearchChange={(val) => setSearchTerms(s => ({ ...s, alerts_rmant02: val }))}
+            onToggleUser={(id) => handleToggleUser('alerts_rmant02', id)}
+          />
+
+          <AlertSection
+            title="Correctivo (R-MANT-05)"
+            description="Reciben una alerta cuando se genera una solicitud de un mantenimiento correctivo. El personal asignado como ejecutante también recibirá la notificación."
             icon={<AlertTriangle size={24} />}
             iconBg="bg-red-900/40"
             iconColor="text-red-400"

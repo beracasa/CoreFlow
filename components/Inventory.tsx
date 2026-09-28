@@ -21,7 +21,7 @@ export const Inventory: React.FC<any> = () => {
   // Fetch parts when showing details, as we need them for names
   useEffect(() => {
     if (activeTab === 'requests_list' && selectedRequest) {
-      inventoryService.getAllParts().then(res => setParts(res.data));
+      inventoryService.getAllParts(1, 1000).then(res => setParts(res.data));
     }
   }, [activeTab, selectedRequest]);
 

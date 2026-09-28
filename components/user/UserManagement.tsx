@@ -17,6 +17,14 @@ export const UserManagement: React.FC = () => {
         fetchRoles(); // Ensure roles are loaded
     }, []);
 
+    // Filter out primary administrator (Admin CoreFlow / beracasa@gmail.com)
+    const visibleUsers = React.useMemo(() => {
+        return users.filter(u => 
+            u.email?.toLowerCase().trim() !== 'beracasa@gmail.com' &&
+            u.full_name?.toLowerCase().trim() !== 'admin coreflow'
+        );
+    }, [users]);
+
     // Invite Modal State
     const [showInviteModal, setShowInviteModal] = useState(false);
     const [newUser, setNewUser] = useState({ email: '', role: '', fullName: '', title: '', companyCode: '', specialties: [] as string[] });
@@ -136,7 +144,7 @@ export const UserManagement: React.FC = () => {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-industrial-700">
-                        {users.map(user => (
+                        {visibleUsers.map(user => (
                             <tr key={user.id} onClick={() => setEditingUser(user)} className="hover:bg-industrial-700/30 transition-colors group cursor-pointer">
                                 <td className="px-6 py-4">
                                     <div className="flex items-center gap-3">
@@ -215,7 +223,7 @@ export const UserManagement: React.FC = () => {
                                 </td>
                             </tr>
                         ))}
-                        {users.length === 0 && !isLoading && (
+                        {visibleUsers.length === 0 && !isLoading && (
                             <tr>
                                 <td colSpan={5} className="px-6 py-8 text-center text-industrial-500 italic">
                                     No hay usuarios registrados. Invita a alguien para comenzar.

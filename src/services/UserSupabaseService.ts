@@ -41,6 +41,7 @@ export const UserSupabaseService = {
       tenant_id: p.tenant_id,
       status: p.status,
       notification_preferences: p.notification_preferences || {
+        alerts_rmant02: false,
         alerts_rmant05: false,
         low_stock: false,
         pending_approvals: false

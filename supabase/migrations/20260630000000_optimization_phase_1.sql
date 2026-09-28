@@ -12,7 +12,7 @@ SECURITY DEFINER
 AS $$
 DECLARE
     item jsonb;
-    v_part_id uuid;
+    v_part_id text;
     v_quantity numeric;
     v_current_stock numeric;
     v_part_name text;
@@ -25,7 +25,7 @@ BEGIN
     -- Iterar sobre cada ítem a entregar
     FOR item IN SELECT * FROM jsonb_array_elements(p_items)
     LOOP
-        v_part_id := (item->>'partId')::uuid;
+        v_part_id := item->>'partId';
         v_quantity := (item->>'quantity')::numeric;
 
         -- 1. Validar y bloquear el repuesto
@@ -61,12 +61,16 @@ BEGIN
             WHERE id = v_request_item.id;
         END IF;
 
-        -- 4. Insertar transacción de inventario
-        INSERT INTO public.inventory_transactions (
-            part_id, transaction_type, quantity, reference_id, notes, delivered_to
-        ) VALUES (
-            v_part_id, 'OUTBOUND', v_quantity, p_request_id::text, 'Entrega para solicitud ' || p_request_id::text, p_delivered_by::text
-        );
+        -- 4. Insertar transacción de inventario si la tabla existe
+        BEGIN
+            INSERT INTO public.inventory_transactions (
+                part_id, transaction_type, quantity, reference_id, notes, delivered_to
+            ) VALUES (
+                v_part_id, 'OUTBOUND', v_quantity, p_request_id::text, 'Entrega para solicitud ' || p_request_id::text, p_delivered_by::text
+            );
+        EXCEPTION WHEN undefined_table THEN
+            NULL;
+        END;
 
         v_processed_count := v_processed_count + 1;
     END LOOP;
