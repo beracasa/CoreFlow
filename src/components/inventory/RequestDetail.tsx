@@ -96,7 +96,14 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
             const part = activeParts.find(p => p.id === partId);
             const item = localRequest.items.find(i => i.partId === partId);
 
-            if (!part || !item) return;
+            if (!part) {
+                errors.push(`Información de repuesto no disponible para ID: ${partId}`);
+                return;
+            }
+            if (!item) {
+                errors.push(`Ítem no encontrado en la solicitud para ID: ${partId}`);
+                return;
+            }
 
             const pending = item.quantityRequested - item.quantityDelivered;
             
@@ -134,9 +141,10 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
             setLocalRequest(updatedRequest);
             setIsProcessing(false);
             setSelectedReceiver(''); // Reset
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error delivering parts:', error);
-            alert('Error al procesar la entrega. Verifique el stock.');
+            const msg = error?.message || 'Error al procesar la entrega.';
+            alert(`Error al procesar la entrega: ${msg}`);
         }
     };
 

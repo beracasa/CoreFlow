@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { z } from 'zod';
 import { WorkOrder, Machine, Technician, Priority, WorkOrderStatus, SparePart, WorkOrderStage, MaintenanceTask, UserRole } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -45,6 +45,7 @@ const SchemaStage1_RMANT05 = z.object({
    frequency: z.string().min(1, "required"),
    consequence: z.string().min(1, "required"),
    actionTaken: z.string().min(1, "required"),
+   assignedMechanic: z.string().optional(),
 });
 
 const SchemaStage2 = z.object({
@@ -185,6 +186,20 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
       // Ensure users are loaded
       if (users.length === 0) fetchUsers();
    }, []);
+
+   const availableTechnicians = useMemo(() => {
+      const filtered = users.filter(u => 
+         u.roleName === 'Electromecánico Labels' || 
+         u.roleName === 'Electromecánico Ravi' ||
+         u.roleName?.toLowerCase().includes('electromec') ||
+         u.roleName?.toLowerCase().includes('técnico') ||
+         u.roleName?.toLowerCase().includes('tecnico') ||
+         u.notification_preferences?.alerts_rmant02 ||
+         u.notification_preferences?.alerts_rmant05 ||
+         u.id === formData.assignedMechanic
+      );
+      return filtered.length > 0 ? filtered : users;
+   }, [users, formData.assignedMechanic]);
 
    const handleDelete = async (e?: React.MouseEvent) => {
       if (e) {
@@ -815,6 +830,23 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                  <option value="Plomería">Plomería</option>
                               </select>
                            </div>
+
+                           {/* 11. Assigned Personnel / Executor */}
+                           <div className="space-y-1">
+                              <label className="text-xs text-industrial-400 font-bold">Personal Asignado / Ejecutante</label>
+                              <select disabled={!isSection1Editable}
+                                 className={`w-full bg-industrial-900 border rounded p-2 text-white text-sm focus:border-emerald-500 outline-none ${invalidFields.has('assignedMechanic') ? 'border-red-500 bg-red-900/10' : 'border-industrial-600'}`}
+                                 value={formData.assignedMechanic || ''}
+                                 onChange={e => {
+                                    setFormData({ ...formData, assignedMechanic: e.target.value });
+                                    clearInvalidField('assignedMechanic');
+                                 }}>
+                                 <option value="">- Seleccionar Técnico -</option>
+                                 {availableTechnicians.map(u => (
+                                    <option key={u.id} value={u.id}>{u.full_name}</option>
+                                 ))}
+                              </select>
+                           </div>
                         </div>
 
                         {/* NEW SECTION: Description & Analysis */}
@@ -1186,10 +1218,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                     value={formData.assignedMechanic || ''}
                                     onChange={e => setFormData({ ...formData, assignedMechanic: e.target.value })}>
                                     <option value="">- Seleccionar Técnico -</option>
-                                    {users.filter(u => 
-                                       u.roleName === 'Electromecánico Labels' || 
-                                       u.roleName === 'Electromecánico Ravi'
-                                    ).map(u => (
+                                    {availableTechnicians.map(u => (
                                        <option key={u.id} value={u.id}>{u.full_name}</option>
                                     ))}
                                  </select>

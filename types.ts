@@ -63,6 +63,7 @@ export interface UserProfile {
   status: 'ACTIVE' | 'INVITED' | 'INACTIVE';
   company_code?: string; // New field: Código de Empresa
   notification_preferences?: {
+    alerts_rmant02: boolean;
     alerts_rmant05: boolean;
     low_stock: boolean;
     pending_approvals: boolean;
