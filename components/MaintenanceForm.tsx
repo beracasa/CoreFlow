@@ -772,16 +772,24 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                        if (val === '') {
                                           handleMachineChange('');
                                        } else {
-                                          const match = machines.find(m => m.isActive && (`${m.name} (Alias: ${m.alias || 'N/A'})` === val || m.plate === val));
+                                          const cleanVal = val.trim().toLowerCase();
+                                          const match = machines.find(m => m.isActive && (
+                                             `${m.name} (Alias: ${m.alias || 'N/A'})`.toLowerCase() === cleanVal ||
+                                             (m.plate && m.plate.trim().toLowerCase() === cleanVal) ||
+                                             (m.alias && m.alias.trim().toLowerCase() === cleanVal)
+                                          ));
                                           if (match) handleMachineChange(match.id);
                                        }
                                     }}
                                  />
                                  <datalist id="rmant05-machine-list">
-                                    {machines.filter(m => m.isActive).map(m => (
-                                       <option key={m.id} value={`${m.name} (Alias: ${m.alias || 'N/A'})`}>
-                                          Placa: {m.plate}
-                                       </option>
+                                    {machines
+                                       .filter(m => m.isActive)
+                                       .sort((a, b) => a.name.localeCompare(b.name) || (a.alias || '').localeCompare(b.alias || ''))
+                                       .map(m => (
+                                          <option key={m.id} value={`${m.name} (Alias: ${m.alias || 'N/A'})`}>
+                                             Placa: {m.plate}
+                                          </option>
                                     ))}
                                  </datalist>
                               </div>
@@ -954,7 +962,12 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                     if (val === '') {
                                        handleMachineChange('');
                                     } else {
-                                       const match = machines.find(m => m.isActive && (`${m.name} (Alias: ${m.alias || 'N/A'})` === val || m.plate === val));
+                                       const cleanVal = val.trim().toLowerCase();
+                                       const match = machines.find(m => m.isActive && (
+                                          `${m.name} (Alias: ${m.alias || 'N/A'})`.toLowerCase() === cleanVal ||
+                                          (m.plate && m.plate.trim().toLowerCase() === cleanVal) ||
+                                          (m.alias && m.alias.trim().toLowerCase() === cleanVal)
+                                       ));
                                        if (match) {
                                           handleMachineChange(match.id);
                                           clearInvalidField('machineId');
@@ -963,10 +976,13 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                  }}
                               />
                               <datalist id="machine-list">
-                                 {machines.filter(m => m.isActive).map(m => (
-                                    <option key={m.id} value={`${m.name} (Alias: ${m.alias || 'N/A'})`}>
-                                       Placa: {m.plate}
-                                    </option>
+                                 {machines
+                                    .filter(m => m.isActive)
+                                    .sort((a, b) => a.name.localeCompare(b.name) || (a.alias || '').localeCompare(b.alias || ''))
+                                    .map(m => (
+                                       <option key={m.id} value={`${m.name} (Alias: ${m.alias || 'N/A'})`}>
+                                          Placa: {m.plate}
+                                       </option>
                                  ))}
                               </datalist>
                            </div>

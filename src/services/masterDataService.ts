@@ -11,6 +11,12 @@ const configService = useMock ? masterMockService : null;
 
 export const MasterDataService = {
   // MACHINES
+  async getAllMachines(): Promise<Machine[]> {
+    return (machineService as any).getAllMachines
+      ? (machineService as any).getAllMachines()
+      : machineService.getMachines(1, 1000).then(r => r.data);
+  },
+
   async getMachines(page: number = 1, limit: number = 25, filters?: any): Promise<{ data: Machine[], total: number }> {
     return machineService.getMachines(page, limit, filters);
   },

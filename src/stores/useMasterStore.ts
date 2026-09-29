@@ -203,10 +203,8 @@ export const useMasterStore = create<MasterState>((set, get) => ({
 
     setMachinePage: async (page: number) => {
         set((state) => ({ 
-            machinePagination: { ...state.machinePagination, page },
-            isInitialized: false // Force re-fetch
+            machinePagination: { ...state.machinePagination, page }
         }));
-        await get().fetchMasterData();
     },
 
     setInventoryPage: async (page: number) => {
@@ -219,10 +217,8 @@ export const useMasterStore = create<MasterState>((set, get) => ({
     setMachineFilters: async (newFilters) => {
         set((state) => ({
             machineFilters: { ...state.machineFilters, ...newFilters },
-            machinePagination: { ...state.machinePagination, page: 1 }, // Reset to page 1 on filter change
-            isInitialized: false
+            machinePagination: { ...state.machinePagination, page: 1 } // Reset to page 1 on filter change
         }));
-        await get().fetchMasterData();
     },
 
     setInventoryFilters: async (newFilters) => {
@@ -277,18 +273,13 @@ export const useMasterStore = create<MasterState>((set, get) => ({
         };
 
             try {
-                const { page: machinePage, limit: machineLimit } = state.machinePagination;
-                const { page: inventoryPage, limit: inventoryLimit } = state.inventoryPagination;
-                const machineFilters = state.machineFilters;
-                const inventoryFilters = state.inventoryFilters;
-
-                // Phase 1: Fetch core data needed immediately (Dashboard, Map, Auth UI)
+                // Phase 1: Fetch core data needed immediately (Dashboard, Map, Auth UI, Maintenance Forms)
                 const [
-                    machinesResult,
+                    allMachines,
                     zones,
                     plantSettings
                 ] = await Promise.all([
-                    safeFetch(MasterDataService.getMachines(machinePage, machineLimit, machineFilters), { data: [], total: 0 }, 'machines'),
+                    safeFetch(MasterDataService.getAllMachines(), [], 'machines'),
                     (!force && get().zones.length > 0) ? Promise.resolve(get().zones) : safeFetch(MasterDataService.getZones(), [], 'zones'),
                     (!force && get().plantSettings && Object.keys(get().plantSettings).length > 0 && (get().plantSettings as any).width) ? Promise.resolve(get().plantSettings) : safeFetch(SettingsSupabaseService.getSettings(), get().plantSettings, 'plantSettings')
                 ]);
@@ -296,7 +287,7 @@ export const useMasterStore = create<MasterState>((set, get) => ({
                 if (currentFetchId !== lastFetchId) return;
 
                 const currentState = get();
-                const machines = machinesResult.data;
+                const machines = allMachines;
 
                 // Extract maintenance plans from machines
                 const extractedMaintenancePlans = machines
@@ -305,7 +296,7 @@ export const useMasterStore = create<MasterState>((set, get) => ({
 
                 set({
                     machines,
-                    machinePagination: { ...currentState.machinePagination, total: machinesResult.total },
+                    machinePagination: { ...currentState.machinePagination, total: machines.length },
                     zones: zones.sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0)),
                     plantSettings: plantSettings,
                     maintenancePlans: extractedMaintenancePlans,
