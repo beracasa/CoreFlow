@@ -169,6 +169,14 @@ export const MachinesList: React.FC = () => {
     return matchesSearch && matchesBranch && matchesCategory && matchesType && matchesZone && matchesActiveStatus;
   });
 
+  const currentPage = pagination.page || 1;
+  const itemsPerPage = pagination.limit || 25;
+  const totalFiltered = filteredMachines.length;
+  const paginatedMachines = filteredMachines.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
   const openAddGateway = () => {
     if (!canManage) return;
     setEditingId(null);
@@ -527,7 +535,7 @@ export const MachinesList: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-industrial-700">
-                {filteredMachines.map((m) => (
+                {paginatedMachines.map((m) => (
                   <tr
                     key={m.id}
                     className="hover:bg-industrial-700/30 transition-colors cursor-pointer"
@@ -574,9 +582,9 @@ export const MachinesList: React.FC = () => {
 
           <div className="mt-4 flex justify-end">
             <TablePagination
-              totalItems={pagination.total}
-              currentPage={pagination.page}
-              itemsPerPage={pagination.limit}
+              totalItems={totalFiltered}
+              currentPage={currentPage}
+              itemsPerPage={itemsPerPage}
               onPageChange={setPage}
               isLoading={isLoading}
             />

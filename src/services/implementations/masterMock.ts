@@ -99,6 +99,10 @@ const INITIAL_ZONES: ZoneStructure[] = [
 ];
 
 export class MasterMockService {
+    async getAllMachines(): Promise<Machine[]> {
+        return loadFromStorage(MACHINES_KEY, INITIAL_MACHINES);
+    }
+
     async getMachines(page: number = 1, limit: number = 25, filters?: any): Promise<{ data: Machine[], total: number }> {
         let machines = loadFromStorage(MACHINES_KEY, INITIAL_MACHINES);
         

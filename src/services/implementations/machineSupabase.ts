@@ -2,7 +2,66 @@ import { supabase, getPaginationRange } from '../supabaseClient';
 import { PaginationParams } from '../../types/pagination';
 import { Machine } from '../../../types';
 
+function mapMachineRecord(record: any): Machine {
+  const specs = record.specifications || {};
+  const code = (record.code || '').trim();
+  const serialNumber = (record.serial_number || '').trim();
+
+  return {
+    id: record.id,
+    name: (record.name || '').trim(),
+    code: code,
+    alias: code,
+    serialNumber: serialNumber,
+    plate: serialNumber, // Map serial_number to plate for component compatibility
+    type: record.type || '', // Use empty string if null, default to GENERIC in UI
+    status: record.status || 'IDLE',
+    location: { x: record.location_x || 0, y: record.location_y || 0 },
+    branch: (record.branch || '').trim(),
+    category: (record.category || '').trim(),
+    zone: (record.zone || '').trim(),
+    brand: (record.brand || '').trim(),
+    model: (record.model || '').trim(),
+    year: record.year || null,
+    imageUrl: record.image_url || '',
+    brandId: record.brand_id || undefined,
+    typeId: record.type_id || undefined,
+    isIot: record.is_iot || false,
+    isActive: record.is_active !== false, // Default to true if not specified
+    runningHours: record.running_hours || 0,
+    lastMaintenance: record.last_maintenance || null,
+    nextMaintenance: record.next_maintenance || null,
+    specifications: specs,
+    // Extract technical specs from JSONB for component compatibility
+    voltage: specs.voltage || null,
+    frequency: specs.frequency || null,
+    power: specs.power || null,
+    capacity: specs.capacity || null,
+    currentRating: specs.currentRating || null,
+    intervals: [],
+    history: [],
+    telemetry: { timestamp: new Date().toISOString(), temperature: 0, vibration: 0, pressure: 0, powerConsumption: 0 },
+    documents: record.documents || [],
+    maintenancePlans: record.maintenance_plans || [],
+    criticalParts: record.critical_parts || []
+  };
+}
+
 export const MachineSupabaseService = {
+  async getAllMachines(): Promise<Machine[]> {
+    const { data, error } = await supabase
+      .from('machines')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching all machines:', error);
+      throw error;
+    }
+
+    return (data || []).map(mapMachineRecord);
+  },
+
   async getMachines(
     page: number = 1, 
     limit: number = 25,
@@ -55,48 +114,7 @@ export const MachineSupabaseService = {
       throw error;
     }
 
-    const mappedData = (data || []).map((record: any) => {
-      const specs = record.specifications || {};
-
-      return {
-        id: record.id,
-        name: record.name,
-        code: record.code || '',
-        alias: record.code || '',
-        serialNumber: record.serial_number || '',
-        plate: record.serial_number || '', // Map serial_number to plate for component compatibility
-        type: record.type || '', // Use empty string if null, default to GENERIC in UI
-        status: record.status || 'IDLE',
-        location: { x: record.location_x || 0, y: record.location_y || 0 },
-        branch: record.branch || '',
-        category: record.category || '',
-        zone: record.zone || '',
-        brand: record.brand || '',
-        model: record.model || '',
-        year: record.year || null,
-        imageUrl: record.image_url || '',
-        brandId: record.brand_id || undefined,
-        typeId: record.type_id || undefined,
-        isIot: record.is_iot || false,
-        isActive: record.is_active !== false, // Default to true if not specified
-        runningHours: record.running_hours || 0,
-        lastMaintenance: record.last_maintenance || null,
-        nextMaintenance: record.next_maintenance || null,
-        specifications: specs,
-        // Extract technical specs from JSONB for component compatibility
-        voltage: specs.voltage || null,
-        frequency: specs.frequency || null,
-        power: specs.power || null,
-        capacity: specs.capacity || null,
-        currentRating: specs.currentRating || null,
-        intervals: [],
-        history: [],
-        telemetry: { timestamp: new Date().toISOString(), temperature: 0, vibration: 0, pressure: 0, powerConsumption: 0 },
-        documents: record.documents || [], // ✅ FIX: Map documents field
-        maintenancePlans: record.maintenance_plans || [], // ✅ FIX: Map maintenance plans
-        criticalParts: record.critical_parts || [] // ✅ FIX: Map Kardex
-      };
-    }) as Machine[];
+    const mappedData = (data || []).map(mapMachineRecord);
 
     return { data: mappedData, total: count || 0 };
   },
