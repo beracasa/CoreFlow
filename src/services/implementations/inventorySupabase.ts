@@ -137,11 +137,52 @@ export class InventorySupabaseService implements IInventoryService {
         return (data || []).map((record: any) => record.company);
     }
 
+    async checkPartNumberExists(partNumber: string, excludeId?: string): Promise<boolean> {
+        const cleanSku = (partNumber || '').trim();
+        if (!cleanSku) return false;
+
+        const escapedSku = cleanSku.replace(/[%_]/g, '\\$&');
+        let query = supabase
+            .from('spare_parts')
+            .select('id, sku')
+            .ilike('sku', escapedSku);
+
+        if (excludeId) {
+            query = query.neq('id', excludeId);
+        }
+
+        const { data, error } = await query.limit(10);
+        if (error) {
+            console.error('Error comprobando código de repuesto:', error);
+            const fallback = await supabase
+                .from('spare_parts')
+                .select('id, sku')
+                .eq('sku', cleanSku)
+                .limit(10);
+            if (!fallback.error && fallback.data) {
+                return fallback.data.some(p => (!excludeId || p.id !== excludeId) && p.sku?.trim().toLowerCase() === cleanSku.toLowerCase());
+            }
+            return false;
+        }
+
+        return (data || []).some(p => p.sku?.trim().toLowerCase() === cleanSku.toLowerCase());
+    }
+
     async createPart(partData: Omit<SparePart, 'id' | 'currentStock'> & { initialStock?: number }): Promise<SparePart> {
+        const cleanSku = (partData.partNumber || '').trim();
+        if (!cleanSku) {
+            throw new Error('El código del repuesto es obligatorio.');
+        }
+
+        const isDuplicate = await this.checkPartNumberExists(cleanSku);
+        if (isDuplicate) {
+            throw new Error(`El código del repuesto "${cleanSku}" ya existe en el inventario. No se permiten artículos con códigos duplicados.`);
+        }
+
         const id = crypto.randomUUID();
         const { data, error } = await supabase.rpc('upsert_spare_part', {
             p_id:               id,
-            p_sku:              partData.partNumber,
+            p_sku:              cleanSku,
             p_name:             partData.name,
             p_description:      partData.description || null,
             p_category:         partData.category,
@@ -188,9 +229,19 @@ export class InventorySupabaseService implements IInventoryService {
     }
 
     async updatePart(updatedPart: SparePart): Promise<SparePart> {
+        const cleanSku = (updatedPart.partNumber || '').trim();
+        if (!cleanSku) {
+            throw new Error('El código del repuesto es obligatorio.');
+        }
+
+        const isDuplicate = await this.checkPartNumberExists(cleanSku, updatedPart.id);
+        if (isDuplicate) {
+            throw new Error(`El código del repuesto "${cleanSku}" ya está asignado a otro artículo.`);
+        }
+
         const { data, error } = await supabase.rpc('upsert_spare_part', {
             p_id:               updatedPart.id,
-            p_sku:              updatedPart.partNumber,
+            p_sku:              cleanSku,
             p_name:             updatedPart.name,
             p_description:      updatedPart.description || null,
             p_category:         updatedPart.category,
@@ -265,7 +316,47 @@ export class InventorySupabaseService implements IInventoryService {
     }
 
     async bulkCreate(parts: Omit<SparePart, 'id'>[]): Promise<void> {
-        const dbPayloads = parts.map(part => {
+        const cleanParts = parts.filter(p => p.partNumber && p.partNumber.trim());
+        if (cleanParts.length === 0) return;
+
+        const skus = Array.from(new Set(cleanParts.map(p => p.partNumber.trim())));
+
+        // Fetch existing SKUs in batches of 100 to avoid URL length issues
+        const existingSet = new Set<string>();
+        const batchSize = 100;
+        for (let i = 0; i < skus.length; i += batchSize) {
+            const chunk = skus.slice(i, i + batchSize);
+            const { data: existingRecords, error: fetchErr } = await supabase
+                .from('spare_parts')
+                .select('sku')
+                .in('sku', chunk);
+
+            if (fetchErr) throw fetchErr;
+            (existingRecords || []).forEach(r => {
+                if (r.sku) existingSet.add(r.sku.trim().toLowerCase());
+            });
+        }
+
+        const seenInBatch = new Set<string>();
+        const toInsert: Omit<SparePart, 'id'>[] = [];
+
+        for (const p of cleanParts) {
+            const lowerSku = p.partNumber.trim().toLowerCase();
+            if (existingSet.has(lowerSku) || seenInBatch.has(lowerSku)) {
+                continue;
+            }
+            seenInBatch.add(lowerSku);
+            toInsert.push({
+                ...p,
+                partNumber: p.partNumber.trim()
+            });
+        }
+
+        if (toInsert.length === 0) {
+            return;
+        }
+
+        const dbPayloads = toInsert.map(part => {
             const payload = this.mapPartToDB(part);
             payload.id = crypto.randomUUID();
             return payload;

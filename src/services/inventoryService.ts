@@ -12,6 +12,7 @@ export interface IInventoryService {
     }): Promise<{ data: SparePart[], total: number }>;
     getPartById(id: string): Promise<SparePart | null>;
     getPartCompanies(): Promise<string[]>;
+    checkPartNumberExists(partNumber: string, excludeId?: string): Promise<boolean>;
     getAllRequests(params?: PaginationParams, filters?: { searchTerm?: string; status?: string; priority?: string; startDate?: string; endDate?: string }): Promise<PaginatedResult<PartsRequest>>;
     getRequestById(id: string): Promise<PartsRequest>;
     createRequest(requestData: Omit<PartsRequest, 'id' | 'createdDate' | 'status' | 'requestNumber' | 'items'> & { items: { partId: string; quantity: number }[] }): Promise<PartsRequest>;

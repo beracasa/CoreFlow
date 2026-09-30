@@ -28,12 +28,33 @@ export const SparePartSupabaseService = {
     })) as SparePart[];
   },
 
+  async checkPartNumberExists(sku: string, excludeId?: string): Promise<boolean> {
+    const cleanSku = (sku || '').trim();
+    if (!cleanSku) return false;
+    let query = supabase
+      .from('spare_parts')
+      .select('id, sku')
+      .ilike('sku', cleanSku.replace(/[%_]/g, '\\$&'));
+    if (excludeId) query = query.neq('id', excludeId);
+    const { data } = await query.limit(5);
+    return (data || []).some(p => p.sku?.trim().toLowerCase() === cleanSku.toLowerCase());
+  },
+
   async createPart(part: Omit<SparePart, 'id'>): Promise<SparePart> {
+    const cleanSku = (part.sku || '').trim();
+    if (!cleanSku) {
+      throw new Error('El código del repuesto es obligatorio.');
+    }
+    const isDuplicate = await this.checkPartNumberExists(cleanSku);
+    if (isDuplicate) {
+      throw new Error(`El código del repuesto "${cleanSku}" ya existe.`);
+    }
+
     const { data, error } = await supabase
       .from('spare_parts')
       .insert({
         // id: part.id, // Let DB generate ID
-        sku: part.sku,
+        sku: cleanSku,
         name: part.name,
         category: part.category,
         current_stock: part.currentStock,
@@ -52,15 +73,25 @@ export const SparePartSupabaseService = {
     // Map back
     return {
         ...part,
+        sku: cleanSku,
         id: data.id
     } as SparePart;
   },
 
   async updatePart(part: SparePart): Promise<void> {
+    const cleanSku = (part.sku || '').trim();
+    if (!cleanSku) {
+      throw new Error('El código del repuesto es obligatorio.');
+    }
+    const isDuplicate = await this.checkPartNumberExists(cleanSku, part.id);
+    if (isDuplicate) {
+      throw new Error(`El código del repuesto "${cleanSku}" ya existe en otro repuesto.`);
+    }
+
     const { error } = await supabase
       .from('spare_parts')
       .update({
-        sku: part.sku,
+        sku: cleanSku,
         name: part.name,
         category: part.category,
         current_stock: part.currentStock,
