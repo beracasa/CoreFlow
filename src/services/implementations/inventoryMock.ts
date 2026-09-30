@@ -203,6 +203,16 @@ export class InventoryMockService implements IInventoryService {
         return Array.from(companies).sort();
     }
 
+    async checkPartNumberExists(partNumber: string, excludeId?: string): Promise<boolean> {
+        const cleanSku = (partNumber || '').trim().toLowerCase();
+        if (!cleanSku) return false;
+        const parts = this.getParts();
+        return parts.some(p => {
+            if (excludeId && p.id === excludeId) return false;
+            return (p.partNumber || '').trim().toLowerCase() === cleanSku;
+        });
+    }
+
     async getAllRequests(params?: PaginationParams, filters?: { searchTerm?: string; status?: string; priority?: string; startDate?: string; endDate?: string }): Promise<PaginatedResult<PartsRequest>> {
         let allRequests = this.getRequests();
 
@@ -480,19 +490,25 @@ export class InventoryMockService implements IInventoryService {
      * Create a new Spare Part.
      */
     async createPart(partData: Omit<SparePart, 'id' | 'currentStock'> & { initialStock?: number }): Promise<SparePart> {
+        const cleanSku = (partData.partNumber || '').trim();
+        if (!cleanSku) {
+            throw new Error('El código del repuesto es obligatorio.');
+        }
+
+        const isDuplicate = await this.checkPartNumberExists(cleanSku);
+        if (isDuplicate) {
+            throw new Error(`El código del repuesto "${cleanSku}" ya existe en el inventario. No se permiten artículos con códigos duplicados.`);
+        }
+
         const parts = this.getParts();
         const transactions = this.getTransactions();
-
-        // Check for duplicate part number
-        if (parts.some(p => p.partNumber === partData.partNumber)) {
-            throw new Error(`Part number ${partData.partNumber} already exists.`);
-        }
 
         const initialStock = partData.initialStock || 0;
 
         const newPart: SparePart = {
             id: `P-${Date.now()}`,
             ...partData,
+            partNumber: cleanSku,
             currentStock: initialStock,
             createdAt: new Date().toISOString()
         };
@@ -521,23 +537,26 @@ export class InventoryMockService implements IInventoryService {
      * Update an existing Spare Part.
      */
     async updatePart(updatedPart: SparePart): Promise<SparePart> {
+        const cleanSku = (updatedPart.partNumber || '').trim();
+        if (!cleanSku) {
+            throw new Error('El código del repuesto es obligatorio.');
+        }
+
         const parts = this.getParts();
         const index = parts.findIndex(p => p.id === updatedPart.id);
         if (index === -1) throw new Error('Part not found');
 
-        // Check for duplicate part number if it changed (though UI blocks this)
-        if (parts[index].partNumber !== updatedPart.partNumber) {
-            if (parts.some(p => p.partNumber === updatedPart.partNumber)) {
-                throw new Error(`Part number ${updatedPart.partNumber} already exists.`);
-            }
+        const isDuplicate = await this.checkPartNumberExists(cleanSku, updatedPart.id);
+        if (isDuplicate) {
+            throw new Error(`El código del repuesto "${cleanSku}" ya está asignado a otro artículo.`);
         }
 
-        // Preserve fields that shouldn't change via this update if needed, but here we update all passed fields
-        // except keeping the ID safe is good practice, but updatedPart includes it.
-
-        parts[index] = updatedPart;
+        parts[index] = {
+            ...updatedPart,
+            partNumber: cleanSku
+        };
         this.saveParts(parts);
-        return updatedPart;
+        return parts[index];
     }
     /**
      * Delete a request.
@@ -602,16 +621,23 @@ export class InventoryMockService implements IInventoryService {
         const parts = this.getParts();
         const transactions = this.getTransactions();
 
+        const existingSet = new Set(parts.map(p => (p.partNumber || '').trim().toLowerCase()));
+        const seenInBatch = new Set<string>();
+
         for (const partData of partsData) {
-            // Check for duplicate part number
-            if (parts.some(p => p.partNumber === partData.partNumber)) {
+            const cleanSku = (partData.partNumber || '').trim();
+            const lowerSku = cleanSku.toLowerCase();
+            if (!cleanSku || existingSet.has(lowerSku) || seenInBatch.has(lowerSku)) {
                 console.warn(`Skipping duplicate part number: ${partData.partNumber}`);
                 continue;
             }
+            seenInBatch.add(lowerSku);
+            existingSet.add(lowerSku);
 
             const newPart: SparePart = {
                 id: `P-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
                 ...partData,
+                partNumber: cleanSku,
                 currentStock: partData.currentStock || 0
             };
 

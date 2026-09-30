@@ -90,11 +90,31 @@ export const ImportSpareParts: React.FC<ImportSparePartsProps> = ({ onClose, onS
                     console.log("2. Fila Mapeada para BD:", mappedData[0]);
                 }
 
-                if (mappedData.length === 0) {
-                    setError("Error: No se encontraron datos válidos. Asegúrese de incluir 'Código / Nº Parte' y 'Nombre Repuesto'.");
+                // Deduplicar dentro del archivo por código
+                const seenSkus = new Set<string>();
+                const uniqueMappedData: Omit<SparePart, 'id'>[] = [];
+                let dupesCount = 0;
+
+                for (const row of mappedData) {
+                    const cleanSku = row.partNumber.trim().toLowerCase();
+                    if (seenSkus.has(cleanSku)) {
+                        dupesCount++;
+                        continue;
+                    }
+                    seenSkus.add(cleanSku);
+                    uniqueMappedData.push({
+                        ...row,
+                        partNumber: row.partNumber.trim()
+                    });
                 }
 
-                setPreviewData(mappedData);
+                if (uniqueMappedData.length === 0) {
+                    setError("Error: No se encontraron datos válidos. Asegúrese de incluir 'Código / Nº Parte' y 'Nombre Repuesto'.");
+                } else if (dupesCount > 0) {
+                    setError(`Aviso: Se detectaron y omitieron ${dupesCount} repuesto(s) con códigos duplicados en el archivo.`);
+                }
+
+                setPreviewData(uniqueMappedData);
             } catch (err) {
                 console.error("Error al parsear archivo:", err);
                 setError('Error al procesar el archivo. Por favor, verifique el formato.');

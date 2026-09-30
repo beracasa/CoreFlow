@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { inventoryService } from '../../services';
-import { Package, PlusCircle, Save, Edit, Plus, FileSpreadsheet, Loader2 } from 'lucide-react';
+import { Package, PlusCircle, Save, Edit, Plus, FileSpreadsheet, Loader2, AlertCircle } from 'lucide-react';
 import { SparePart } from '../../types/inventory';
 import { useMasterStore } from '../../stores/useMasterStore';
 import { ImportSpareParts } from './ImportSpareParts';
@@ -139,9 +139,36 @@ export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData,
     };
 
     const [feedback, setFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+    const [skuError, setSkuError] = useState<string | null>(null);
+    const [isCheckingSku, setIsCheckingSku] = useState(false);
+
+    const handlePartNumberBlur = async () => {
+        const cleanSku = formData.partNumber.trim();
+        if (!cleanSku || initialData) {
+            setSkuError(null);
+            return;
+        }
+
+        setIsCheckingSku(true);
+        try {
+            const exists = await inventoryService.checkPartNumberExists(cleanSku, initialData?.id);
+            if (exists) {
+                setSkuError(`El código "${cleanSku}" ya existe en el inventario. Ingrese un código único.`);
+            } else {
+                setSkuError(null);
+            }
+        } catch (err) {
+            console.error('Error al verificar código:', err);
+        } finally {
+            setIsCheckingSku(false);
+        }
+    };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
+        if (name === 'partNumber' && skuError) {
+            setSkuError(null);
+        }
         setFormData(prev => ({
             ...prev,
             [name]: name === 'minStock' || name === 'maxStock' || name === 'initialStock' ? parseFloat(value) || 0 : value
@@ -152,15 +179,22 @@ export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData,
         e.preventDefault();
         setIsSubmitting(true);
         try {
-            // Uniqueness check for partNumber (SKU)
-            if (!initialData) {
-                const { parts } = useMasterStore.getState();
-                const isDuplicate = parts.some(p => p.partNumber.toLowerCase() === formData.partNumber.toLowerCase());
-                if (isDuplicate) {
-                    setFeedback({ type: 'error', message: 'El código del repuesto ya existe.' });
-                    setIsSubmitting(false);
-                    return;
-                }
+            const cleanPartNumber = formData.partNumber.trim();
+            if (!cleanPartNumber) {
+                setFeedback({ type: 'error', message: 'El código del repuesto es obligatorio.' });
+                setSkuError('El código del repuesto es obligatorio.');
+                setIsSubmitting(false);
+                return;
+            }
+
+            // Uniqueness check for partNumber (SKU) querying database directly
+            const isDuplicate = await inventoryService.checkPartNumberExists(cleanPartNumber, initialData?.id);
+            if (isDuplicate) {
+                const errorMsg = `El código "${cleanPartNumber}" ya existe en el inventario. No se permiten artículos con códigos duplicados.`;
+                setSkuError(errorMsg);
+                setFeedback({ type: 'error', message: errorMsg });
+                setIsSubmitting(false);
+                return;
             }
 
             if (initialData) {
@@ -168,9 +202,11 @@ export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData,
                 const { initialStock, ...dataWithoutStock } = formData;
                 const updated = await updatePart({
                     ...initialData,
-                    ...dataWithoutStock
+                    ...dataWithoutStock,
+                    partNumber: cleanPartNumber
                 });
                 setFeedback({ type: 'success', message: 'Repuesto actualizado exitosamente.' });
+                setSkuError(null);
                 if (onSuccess) onSuccess(updated as any);
             } else {
                 let finalCreatedAt = formData.createdAt;
@@ -185,10 +221,12 @@ export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData,
 
                 const created = await addPart({
                     ...formData,
+                    partNumber: cleanPartNumber,
                     createdAt: finalCreatedAt
                 });
 
                 setFeedback({ type: 'success', message: 'Repuesto creado exitosamente.' });
+                setSkuError(null);
                 setFormData({
                     name: '',
                     partNumber: '',
@@ -273,17 +311,39 @@ export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData,
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Part Number */}
                     <div>
-                        <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">Código / N° Parte</label>
+                        <div className="flex justify-between items-center mb-2">
+                            <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider">
+                                Código / N° Parte <span className="text-red-400">*</span>
+                            </label>
+                            {isCheckingSku && (
+                                <span className="text-xs text-blue-400 flex items-center gap-1">
+                                    <Loader2 className="w-3 h-3 animate-spin" /> Verificando...
+                                </span>
+                            )}
+                        </div>
                         <input
                             type="text"
                             name="partNumber"
                             required
                             disabled={!!initialData}
-                            className={`w-full bg-industrial-900 border border-industrial-600 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-blue-500 transition-colors placeholder-industrial-600 font-mono ${initialData ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            onBlur={handlePartNumberBlur}
+                            className={`w-full bg-industrial-900 border ${
+                                skuError 
+                                    ? 'border-red-500 focus:ring-red-500 focus:border-red-500' 
+                                    : 'border-industrial-600 focus:ring-blue-500'
+                            } rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 transition-colors placeholder-industrial-600 font-mono ${
+                                initialData ? 'opacity-50 cursor-not-allowed' : ''
+                            }`}
                             placeholder="Ej. BRG-6204"
                             value={formData.partNumber}
                             onChange={handleChange}
                         />
+                        {skuError && (
+                            <p className="text-xs text-red-400 mt-1.5 flex items-center gap-1 font-medium">
+                                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                                {skuError}
+                            </p>
+                        )}
                     </div>
 
                     {/* Name */}
