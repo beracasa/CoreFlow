@@ -6,6 +6,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useMasterStore } from '../../stores/useMasterStore';
 import { inventoryService } from '../../services';
+import { formatDate, formatDateTime } from '../../utils/dateUtils';
 
 interface PurchaseRequestModalProps {
     request: PartsRequest;
@@ -135,9 +136,9 @@ export const PurchaseRequestModal: React.FC<PurchaseRequestModalProps> = ({ requ
                 const reqItem = request.items.find(i => i.partId === partId);
                 return {
                     partId,
-                    code: part?.partNumber || '-',
-                    name: part?.name || partId,
-                    currentStock: part?.currentStock || 0,
+                    code: part?.partNumber || reqItem?.partNumber || '-',
+                    name: part?.name || reqItem?.partName || partId,
+                    currentStock: part?.currentStock ?? reqItem?.currentStock ?? 0,
                     qtyRequested: Number(qty),
                     pendingForRequest: reqItem ? Math.max(0, reqItem.quantityRequested - reqItem.quantityDelivered) : 0
                 };
@@ -148,7 +149,7 @@ export const PurchaseRequestModal: React.FC<PurchaseRequestModalProps> = ({ requ
             return;
         }
 
-        const dateStr = new Date().toLocaleDateString();
+        const dateStr = formatDate(new Date());
         const purchaseReqNumber = `SC-REQ-${request.requestNumber}-${(request.purchaseHistory?.length || 0) + 1}`;
 
         // Generate PDF
@@ -187,15 +188,15 @@ export const PurchaseRequestModal: React.FC<PurchaseRequestModalProps> = ({ requ
             const part = parts.find(p => p.id === item.partId);
             const reqItem = request.items.find(i => i.partId === item.partId);
             return {
-                code: part?.partNumber || '-',
-                name: part?.name || item.partId,
-                currentStock: part?.currentStock || 0,
+                code: part?.partNumber || reqItem?.partNumber || (item as any).partNumber || '-',
+                name: part?.name || reqItem?.partName || (item as any).partName || item.partId,
+                currentStock: part?.currentStock ?? reqItem?.currentStock ?? 0,
                 qtyRequested: item.quantity,
                 pendingForRequest: reqItem ? Math.max(0, reqItem.quantityRequested - reqItem.quantityDelivered) : 0
             };
         });
 
-        const dateStr = new Date(historyItem.requestDate).toLocaleDateString();
+        const dateStr = formatDate(historyItem.requestDate);
         const doc = generatePDFDocument(itemsList, request.requestNumber, dateStr, request.technicianId, 'Solicitud de Compra (Histórico)');
         doc.save(`${historyItem.purchaseRequestNumber}.pdf`);
     };
@@ -246,7 +247,7 @@ export const PurchaseRequestModal: React.FC<PurchaseRequestModalProps> = ({ requ
                                         <div key={hist.id} className="bg-industrial-900/50 border border-industrial-700 rounded-lg p-4 flex justify-between items-center">
                                             <div>
                                                 <p className="text-white font-bold text-sm">{hist.purchaseRequestNumber}</p>
-                                                <p className="text-industrial-400 text-xs">Fecha: {new Date(hist.requestDate).toLocaleString()}</p>
+                                                <p className="text-industrial-400 text-xs">Fecha: {formatDateTime(hist.requestDate)}</p>
                                                 <p className="text-industrial-500 text-xs mt-1">{hist.items.length} items solicitados</p>
                                             </div>
                                             <button
@@ -302,16 +303,22 @@ export const PurchaseRequestModal: React.FC<PurchaseRequestModalProps> = ({ requ
                                                 const item = request.items.find(i => i.partId === partId);
                                                 const part = parts.find(p => p.id === partId);
                                                 const pending = item ? Math.max(0, item.quantityRequested - item.quantityDelivered) : 0;
+                                                const displayName = part?.name || item?.partName || partId;
+                                                const displayPartNumber = part?.partNumber || item?.partNumber;
+                                                const displayStock = part?.currentStock ?? item?.currentStock;
+                                                const displayMinStock = part?.minStock ?? item?.minStock;
 
                                                 return (
                                                     <tr key={partId} className="hover:bg-industrial-700/30">
                                                         <td className="px-4 py-3 text-white">
-                                                            <div className="font-medium">{part?.name || partId}</div>
-                                                            <div className="text-xs text-industrial-500">{part?.partNumber}</div>
+                                                            <div className="font-medium">{displayName}</div>
+                                                            {displayPartNumber && (
+                                                                <div className="text-xs text-industrial-500">{displayPartNumber}</div>
+                                                            )}
                                                         </td>
                                                         <td className="px-4 py-3 text-center text-white font-mono">
-                                                            <span className={part && part.currentStock <= part.minStock ? 'text-red-400 font-bold' : ''}>
-                                                                {part?.currentStock ?? '-'}
+                                                            <span className={displayStock !== undefined && displayMinStock !== undefined && displayStock <= displayMinStock ? 'text-red-400 font-bold' : ''}>
+                                                                {displayStock ?? '-'}
                                                             </span>
                                                         </td>
                                                         <td className="px-4 py-3 text-center text-industrial-300 font-mono">

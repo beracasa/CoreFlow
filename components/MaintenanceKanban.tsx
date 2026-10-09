@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useWorkOrderStore } from '../src/stores/useWorkOrderStore';
 import { useMasterStore } from '../src/stores/useMasterStore';
 import { calculatePlantMTTR, calculatePlantMTBF } from '../src/utils/metricsCalculator';
+import { formatDate } from '../src/utils/dateUtils';
 
 
 export const MaintenanceKanban: React.FC = () => {
@@ -152,7 +153,7 @@ export const MaintenanceKanban: React.FC = () => {
                           {isMant02 ? 'PREVENTIVO' : 'CORRECTIVO'}
                         </span>
                         <span className="font-mono font-medium">
-                          {new Date(order.createdDate).toLocaleDateString()}
+                          {formatDate(order.createdDate)}
                         </span>
                       </div>
                     </div>

@@ -18,12 +18,12 @@ export const Inventory: React.FC<any> = () => {
   const [selectedRequest, setSelectedRequest] = useState<PartsRequest | null>(null);
   const [parts, setParts] = useState<SparePart[]>([]);
 
-  // Fetch parts when showing details, as we need them for names
+  // Fetch parts when entering requests list, as we need them for names and details
   useEffect(() => {
-    if (activeTab === 'requests_list' && selectedRequest) {
-      inventoryService.getAllParts(1, 1000).then(res => setParts(res.data));
+    if (activeTab === 'requests_list') {
+      inventoryService.getAllParts(1, 1000).then(res => setParts(res.data)).catch(err => console.error('Error fetching parts:', err));
     }
-  }, [activeTab, selectedRequest]);
+  }, [activeTab]);
 
   const handleSelectRequest = async (request: PartsRequest) => {
     try {

@@ -239,7 +239,21 @@ export class InventoryMockService implements IInventoryService {
         const from = (page - 1) * pageSize;
         const to = from + pageSize;
         
-        const mappedData = allRequests.slice(from, to).map(r => ({ ...r, items: [] }));
+        const parts = this.getParts();
+        const mappedData = allRequests.slice(from, to).map(r => ({
+            ...r,
+            items: (r.items || []).map(item => {
+                const p = parts.find(part => part.id === item.partId);
+                return {
+                    ...item,
+                    partName: item.partName || p?.name,
+                    partNumber: item.partNumber || p?.partNumber,
+                    currentStock: item.currentStock ?? p?.currentStock,
+                    minStock: item.minStock ?? p?.minStock,
+                    unitOfMeasure: item.unitOfMeasure || p?.unitOfMeasure
+                };
+            })
+        }));
         return {
             data: mappedData,
             count: total,
@@ -252,7 +266,21 @@ export class InventoryMockService implements IInventoryService {
     async getRequestById(id: string): Promise<PartsRequest> {
         const req = this.getRequests().find(r => r.id === id);
         if (!req) throw new Error('Request not found');
-        return req;
+        const parts = this.getParts();
+        return {
+            ...req,
+            items: (req.items || []).map(item => {
+                const p = parts.find(part => part.id === item.partId);
+                return {
+                    ...item,
+                    partName: item.partName || p?.name,
+                    partNumber: item.partNumber || p?.partNumber,
+                    currentStock: item.currentStock ?? p?.currentStock,
+                    minStock: item.minStock ?? p?.minStock,
+                    unitOfMeasure: item.unitOfMeasure || p?.unitOfMeasure
+                };
+            })
+        };
     }
 
     /**

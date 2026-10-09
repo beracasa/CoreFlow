@@ -5,6 +5,8 @@ import { useAuth } from "../contexts/AuthContext";
 import { MasterDataService } from "../src/services/masterDataService";
 import { Clock, History, Save, FileDown, Filter, X, Lock, AlertCircle } from 'lucide-react';
 import { TablePagination } from './shared/TablePagination';
+import { DateInput } from './shared/DateInput';
+import { formatDate } from '../src/utils/dateUtils';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useMasterStore } from '../src/stores/useMasterStore';
@@ -287,7 +289,7 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
 
         doc.setFontSize(11);
         doc.setTextColor(100);
-        const dateStr = startDate && endDate ? `${startDate} a ${endDate}` : 'Todos los registros';
+        const dateStr = startDate && endDate ? `${formatDate(startDate)} a ${formatDate(endDate)}` : 'Todos los registros';
         const machineStr = selectedMachine ? `Máquina: ${selectedMachine.name}` : 'Todas las máquinas';
         doc.text(`${machineStr} | ${dateStr}`, 14, currentY + 8);
 
@@ -304,7 +306,7 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
             const reading = `${new Intl.NumberFormat('en-US').format(log.hoursLogged)} ${log.unit || 'h'}`;
 
             const logData = [
-                log.date,
+                formatDate(log.date),
                 machineName,
                 aliasPlate,
                 reading,
@@ -445,10 +447,9 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
                             <label className="text-xs text-industrial-400 font-bold uppercase">
                                 {t('hours.nextMaintenanceDate')}
                             </label>
-                            <input
-                                type="date"
+                            <DateInput
                                 disabled={!canRegister || !selectedMachineId}
-                                className={`w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white outline-none focus:border-emerald-500 transition-colors [color-scheme:dark] ${!canRegister || !selectedMachineId ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                className={`w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white outline-none focus:border-emerald-500 transition-colors ${!canRegister || !selectedMachineId ? 'opacity-50 cursor-not-allowed' : ''}`}
                                 value={nextMaintenanceDate}
                                 onChange={(e) => setNextMaintenanceDate(e.target.value)}
                             />
@@ -507,9 +508,8 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
 
                         <div className="flex items-center gap-2">
                             <label className="text-xs text-industrial-500">Desde:</label>
-                            <input
-                                type="date"
-                                className="bg-industrial-900 border border-industrial-600 text-white text-xs rounded px-2 py-1 outline-none focus:border-emerald-500"
+                            <DateInput
+                                className="bg-industrial-900 border border-industrial-600 text-white text-xs rounded px-2 py-1 outline-none focus:border-emerald-500 w-32"
                                 value={startDate}
                                 onChange={e => setStartDate(e.target.value)}
                             />
@@ -517,9 +517,8 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
 
                         <div className="flex items-center gap-2">
                             <label className="text-xs text-industrial-500">Hasta:</label>
-                            <input
-                                type="date"
-                                className="bg-industrial-900 border border-industrial-600 text-white text-xs rounded px-2 py-1 outline-none focus:border-emerald-500"
+                            <DateInput
+                                className="bg-industrial-900 border border-industrial-600 text-white text-xs rounded px-2 py-1 outline-none focus:border-emerald-500 w-32"
                                 value={endDate}
                                 onChange={e => setEndDate(e.target.value)}
                             />
@@ -560,7 +559,7 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
                                                 className="hover:bg-industrial-700/30 cursor-pointer transition-colors"
                                                 onClick={() => setSelectedLogForDetails(log)}
                                             >
-                                                <td className="px-6 py-3">{log.date}</td>
+                                                <td className="px-6 py-3">{formatDate(log.date)}</td>
                                                 <td className="px-6 py-3 text-white">
                                                     {machine?.name || 'Unknown Log'}
                                                 </td>
@@ -629,14 +628,13 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
                                                                     <div className="space-y-1">
                                                                         <span className="text-xs text-industrial-500 font-bold uppercase block">Fecha del Registro</span>
                                                                         {isEditing ? (
-                                                                            <input
-                                                                                type="date"
-                                                                                className="w-full bg-industrial-900 border border-industrial-600 rounded px-2 py-1 text-white font-mono text-xs focus:border-emerald-500 outline-none [color-scheme:dark]"
+                                                                            <DateInput
+                                                                                className="w-full bg-industrial-900 border border-industrial-600 rounded px-2 py-1 text-white font-mono text-xs focus:border-emerald-500 outline-none"
                                                                                 value={editDate}
                                                                                 onChange={e => setEditDate(e.target.value)}
                                                                             />
                                                                         ) : (
-                                                                            <span className="text-white font-mono">{selectedLogForDetails.date}</span>
+                                                                            <span className="text-white font-mono">{formatDate(selectedLogForDetails.date)}</span>
                                                                         )}
                                                                     </div>
                                                                     <div className="space-y-1">
@@ -690,15 +688,14 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
                                                                     <div>
                                                                         <span className="text-xs text-industrial-500 font-bold uppercase block">Fecha Próximo Mantenimiento</span>
                                                                         {isEditing ? (
-                                                                            <input
-                                                                                type="date"
-                                                                                className="w-full bg-industrial-900 border border-industrial-600 rounded px-2 py-1 text-white font-mono text-xs focus:border-emerald-500 outline-none [color-scheme:dark]"
+                                                                            <DateInput
+                                                                                className="w-full bg-industrial-900 border border-industrial-600 rounded px-2 py-1 text-white font-mono text-xs focus:border-emerald-500 outline-none"
                                                                                 value={editNextMaintenanceDate}
                                                                                 onChange={e => setEditNextMaintenanceDate(e.target.value)}
                                                                             />
                                                                         ) : (
                                                                             <span className="text-white font-mono">
-                                                                                {nextMaintenance ? nextMaintenance.split('T')[0] : '-'}
+                                                                                {nextMaintenance ? formatDate(nextMaintenance) : '-'}
                                                                             </span>
                                                                         )}
                                                                     </div>

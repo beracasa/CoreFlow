@@ -7,6 +7,7 @@ import { supabase } from '../src/services/supabaseClient';
 import { Box, Wifi, Plus, X, Camera, FileText, Server, Clock, Calendar, Pencil, Eye, Download, Trash2, Lock, AlertCircle, Loader2 } from 'lucide-react';
 import { TablePagination } from './shared/TablePagination';
 import { useAuth } from '../contexts/AuthContext';
+import { formatDate } from '../src/utils/dateUtils';
 
 export const MachinesList: React.FC = () => {
   const {
@@ -690,7 +691,7 @@ export const MachinesList: React.FC = () => {
                         <div>
                           <label className="text-[10px] text-industrial-500 uppercase">Último Mantenimiento</label>
                           <p className="text-sm text-white">
-                            {lastMaintenanceDate ? new Date(lastMaintenanceDate).toLocaleDateString() : ''}
+                            {lastMaintenanceDate ? formatDate(lastMaintenanceDate) : ''}
                           </p>
                         </div>
                       </div>
@@ -762,7 +763,7 @@ export const MachinesList: React.FC = () => {
                                   {!isLegacyFormat && docSize > 0 && (
                                     <p className="text-xs text-industrial-500">
                                       {DocumentService.formatFileSize(docSize)}
-                                      {docDate && ` • ${new Date(docDate).toLocaleDateString()}`}
+                                      {docDate && ` • ${formatDate(docDate)}`}
                                     </p>
                                   )}
                                   {isLegacyFormat && (

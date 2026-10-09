@@ -4,6 +4,7 @@ import { ExtendedPurchaseRequest, SparePart } from '../../types/inventory';
 import { Search, FileText, Clock, ChevronDown, ChevronRight, Plus, Download, Eye, X, Package } from 'lucide-react';
 import { exportPurchaseRequestPDF } from '../../utils/pdfExport';
 import { TablePagination } from '../shared/TablePagination';
+import { formatDate } from '../../utils/dateUtils';
 
 import { useAuth } from '../../../contexts/AuthContext';
 
@@ -241,7 +242,7 @@ export const PurchaseRequestList: React.FC = () => {
                                                 {getGroupStatus(groupedRequests[key])}
                                             </span>
                                         </h3>
-                                        <p className="text-[10px] text-industrial-500 font-medium">Última actualización: {new Date(groupedRequests[key][0].requestDate).toLocaleDateString()}</p>
+                                        <p className="text-[10px] text-industrial-500 font-medium">Última actualización: {formatDate(groupedRequests[key][0].requestDate)}</p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2 pr-4">
@@ -318,7 +319,7 @@ export const PurchaseRequestList: React.FC = () => {
                                                         </div>
                                                     </td>
                                                     <td className="px-6 py-4 text-industrial-400 text-xs align-middle">
-                                                        {new Date(req.requestDate).toLocaleDateString()}
+                                                        {formatDate(req.requestDate)}
                                                     </td>
                                                     <td className="px-6 py-4 text-center align-middle">
                                                         <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider ${getRequestStatus(req) === 'Recibido'
@@ -545,7 +546,7 @@ export const PurchaseRequestList: React.FC = () => {
                                     <span className="text-[10px] text-industrial-500 uppercase font-black tracking-widest">Fecha de Requisición</span>
                                     <p className="text-white font-medium flex items-center gap-2">
                                         <Clock className="w-4 h-4 text-industrial-600" />
-                                        {new Date(selectedRequest.requestDate).toLocaleDateString()}
+                                        {formatDate(selectedRequest.requestDate)}
                                     </p>
                                 </div>
                                 <div className="space-y-1">

@@ -3,6 +3,8 @@ import { inventoryService } from '../../services';
 import { SparePart, StockReception, ExtendedPurchaseRequest } from '../../types/inventory';
 import { ArrowDownCircle, Clock, FileText, Package, ChevronDown, ChevronRight, Search, FileDown, Filter, X, Loader2 } from 'lucide-react';
 import { TablePagination } from '../shared/TablePagination';
+import { DateInput } from '../shared/DateInput';
+import { formatDate, formatDateTime } from '../../utils/dateUtils';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useMasterStore } from '../../stores/useMasterStore';
@@ -195,9 +197,7 @@ export const ReceptionForm: React.FC = () => {
         // Date
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
-        const dateStr = new Date().toLocaleDateString('es-DO', {
-            day: '2-digit', month: '2-digit', year: 'numeric'
-        });
+        const dateStr = formatDate(new Date());
         doc.text(`Fecha de Emisión: ${dateStr}`, margin, headerY + 7);
 
         // Filters under date
@@ -220,9 +220,7 @@ export const ReceptionForm: React.FC = () => {
         const tableRows: any[] = [];
 
         receptions.forEach(rec => {
-            const date = new Date(rec.receptionDate).toLocaleDateString('es-DO', {
-                day: '2-digit', month: '2-digit', year: 'numeric'
-            });
+            const date = formatDate(rec.receptionDate);
 
             // Filter items in the PDF table if a specific spare part filter is active
             const itemsToShow = selectedHistoryPartId
@@ -579,18 +577,16 @@ export const ReceptionForm: React.FC = () => {
                             <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
                                 <div className="flex items-center gap-2">
                                     <span className="text-industrial-400 text-xs font-bold uppercase tracking-wider">Desde:</span>
-                                    <input
-                                        type="date"
-                                        className="bg-industrial-900 border border-industrial-600 rounded-lg px-3 py-1.5 text-white text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-colors"
+                                    <DateInput
+                                        className="bg-industrial-900 border border-industrial-600 rounded-lg px-3 py-1.5 text-white text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-colors w-36"
                                         value={startDate}
                                         onChange={e => setStartDate(e.target.value)}
                                     />
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <span className="text-industrial-400 text-xs font-bold uppercase tracking-wider">Hasta:</span>
-                                    <input
-                                        type="date"
-                                        className="bg-industrial-900 border border-industrial-600 rounded-lg px-3 py-1.5 text-white text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-colors"
+                                    <DateInput
+                                        className="bg-industrial-900 border border-industrial-600 rounded-lg px-3 py-1.5 text-white text-sm outline-none focus:ring-2 focus:ring-emerald-500 transition-colors w-36"
                                         value={endDate}
                                         onChange={e => setEndDate(e.target.value)}
                                     />
@@ -664,10 +660,7 @@ export const ReceptionForm: React.FC = () => {
                                                     )}
                                                 </p>
                                                 <p className="text-industrial-500 text-xs">
-                                                    {new Date(rec.receptionDate).toLocaleString('es', {
-                                                        day: '2-digit', month: 'short', year: 'numeric',
-                                                        hour: '2-digit', minute: '2-digit'
-                                                    })}
+                                                    {formatDateTime(rec.receptionDate)}
                                                 </p>
                                             </div>
                                         </div>

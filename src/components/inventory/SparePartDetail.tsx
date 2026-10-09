@@ -5,6 +5,7 @@ import { PartCreationForm } from './PartCreationForm';
 import { inventoryService } from '../../services';
 
 import { useAuth } from '../../../contexts/AuthContext';
+import { formatDate } from '../../utils/dateUtils';
 
 // Service initialized in index.ts
 
@@ -167,7 +168,7 @@ export const SparePartDetail: React.FC<SparePartDetailProps> = ({ part, onClose 
                         <div className="bg-industrial-900/50 p-3 rounded-lg border border-industrial-700">
                             <p className="text-[10px] text-industrial-500 uppercase font-bold mb-1 tracking-wider">Fecha de Creación</p>
                             <p className="text-white text-lg font-bold">
-                                {currentPart.createdAt ? new Date(currentPart.createdAt).toLocaleDateString() : '-'}
+                                {formatDate(currentPart.createdAt)}
                             </p>
                         </div>
                     </div>

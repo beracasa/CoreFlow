@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { WorkOrder, Machine } from '../../types';
+import { formatDate, formatDateTime } from '../utils/dateUtils';
 
 export const generateWorkOrderReport = (
   orders: WorkOrder[], 
@@ -44,7 +45,7 @@ export const generateWorkOrderReport = (
     
     // Subtítulos e info
     doc.setFontSize(10);
-    doc.text(`Fecha de emisión: ${new Date().toLocaleString()}`, 14, currentY + 8);
+    doc.text(`Fecha de emisión: ${formatDateTime(new Date())}`, 14, currentY + 8);
     
     // Filtros detallados
     doc.setFontSize(9);
@@ -74,7 +75,7 @@ export const generateWorkOrderReport = (
 
         return [
           order.displayId || order.id.substring(0, 6),
-          order.createdDate ? new Date(order.createdDate).toLocaleDateString() : '-',
+          formatDate(order.createdDate),
           machine?.name || 'N/A',
           machine?.zone || '-',
           typeLabel,
@@ -97,7 +98,7 @@ export const generateWorkOrderReport = (
 
         return [
           order.displayId || order.id.substring(0, 6),
-          order.createdDate ? new Date(order.createdDate).toLocaleDateString() : '-',
+          formatDate(order.createdDate),
           machine?.name || 'N/A',
           machine?.zone || '-',
           machine?.alias || '-',

@@ -1,8 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { inventoryService } from '../../services';
 import { PartsRequest, SparePart } from '../../types/inventory';
 import { Package, Calendar, User, Clock, ArrowLeft, CheckCircle, Truck, XCircle, Save, Edit, Trash2, Search } from 'lucide-react';
-import { useState, useEffect } from 'react';
 import { PartRequestForm } from './PartRequestForm';
 import { PurchaseRequestModal } from './PurchaseRequestModal';
 import { UserSupabaseService } from '../../services/UserSupabaseService';
@@ -17,16 +16,14 @@ interface RequestDetailProps {
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useMasterStore } from '../../stores/useMasterStore';
-
 import { useAuth } from '../../../contexts/AuthContext';
-
-// ... (existing imports)
+import { formatDateTime } from '../../utils/dateUtils';
 
 export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, onBack }) => {
     const { hasPermission } = useAuth();
     const canManage = hasPermission('manage_inventory');
     const { technicians, plantSettings, parts: storeParts } = useMasterStore();
-    const activeParts = storeParts.length > 0 ? storeParts : parts;
+    const [loadedParts, setLoadedParts] = useState<SparePart[]>([]);
 
     const [isProcessing, setIsProcessing] = useState(false);
     const currentUser = (useMasterStore.getState() as any).currentUser;
@@ -40,6 +37,73 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
     const [systemUsers, setSystemUsers] = useState<UserProfile[]>([]);
     const [receiverSearch, setReceiverSearch] = useState('');
     const [isReceiverDropdownOpen, setIsReceiverDropdownOpen] = useState(false);
+
+    // Keep localRequest updated if request prop updates
+    useEffect(() => {
+        setLocalRequest(request);
+    }, [request]);
+
+    // Fetch missing parts for request items
+    useEffect(() => {
+        const itemPartIds = localRequest.items.map(item => item.partId).filter(Boolean);
+        if (itemPartIds.length === 0) return;
+
+        const knownIds = new Set([
+            ...storeParts.map(p => p.id),
+            ...parts.map(p => p.id),
+            ...loadedParts.map(p => p.id)
+        ]);
+
+        const missingIds = itemPartIds.filter(id => !knownIds.has(id));
+
+        if (missingIds.length > 0) {
+            Promise.all(missingIds.map(id => inventoryService.getPartById(id))).then(results => {
+                const valid = results.filter((p): p is SparePart => p !== null);
+                if (valid.length > 0) {
+                    setLoadedParts(prev => {
+                        const existing = new Set(prev.map(p => p.id));
+                        const additions = valid.filter(p => !existing.has(p.id));
+                        return additions.length > 0 ? [...prev, ...additions] : prev;
+                    });
+                }
+            }).catch(err => {
+                console.error('Error fetching missing parts for request detail:', err);
+            });
+        }
+    }, [localRequest.items, parts, storeParts, loadedParts]);
+
+    // Merge store parts, prop parts, loaded parts and embedded item info
+    const activeParts = useMemo(() => {
+        const map = new Map<string, SparePart>();
+        // 1. Add store parts
+        storeParts.forEach(p => map.set(p.id, p));
+        // 2. Add prop parts
+        parts.forEach(p => map.set(p.id, p));
+        // 3. Add loaded parts
+        loadedParts.forEach(p => map.set(p.id, p));
+
+        // 4. If an item has partName/partNumber embedded, add synthetic entry if still missing
+        localRequest.items.forEach(item => {
+            if (!map.has(item.partId) && item.partName) {
+                map.set(item.partId, {
+                    id: item.partId,
+                    name: item.partName,
+                    partNumber: item.partNumber || '',
+                    description: '',
+                    category: '',
+                    unitOfMeasure: item.unitOfMeasure || 'PCS',
+                    currentStock: item.currentStock ?? 0,
+                    minStock: item.minStock ?? 0,
+                    maxStock: 0,
+                    location: '',
+                    subLocation: '',
+                    cost: 0
+                });
+            }
+        });
+
+        return Array.from(map.values());
+    }, [storeParts, parts, loadedParts, localRequest.items]);
 
     // Load system users on mount so we can resolve names in the "Entregado a" field
     useEffect(() => {
@@ -67,10 +131,8 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
     const selectedReceiverUser = systemUsers.find(u => u.id === selectedReceiver);
 
     const handleQuantityChange = (partId: string, value: number) => {
-        const part = activeParts.find(p => p.id === partId);
         const item = localRequest.items.find(i => i.partId === partId);
-        
-        if (!item || !part) return;
+        if (!item) return;
 
         // Ensure not negative
         const qty = Math.max(0, value);
@@ -96,22 +158,26 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
             const part = activeParts.find(p => p.id === partId);
             const item = localRequest.items.find(i => i.partId === partId);
 
-            if (!part) {
-                errors.push(`Información de repuesto no disponible para ID: ${partId}`);
-                return;
-            }
             if (!item) {
                 errors.push(`Ítem no encontrado en la solicitud para ID: ${partId}`);
                 return;
             }
 
+            const partName = part?.name || item.partName || partId;
+            const currentStock = part?.currentStock ?? item.currentStock;
+
+            if (currentStock === undefined && !part) {
+                errors.push(`Información de repuesto no disponible para ID: ${partId}`);
+                return;
+            }
+
             const pending = item.quantityRequested - item.quantityDelivered;
             
-            if (qty > part.currentStock) {
-                errors.push(`Stock insuficiente para ${part.name} (Disponible: ${part.currentStock})`);
+            if (currentStock !== undefined && qty > currentStock) {
+                errors.push(`Stock insuficiente para ${partName} (Disponible: ${currentStock})`);
             }
             if (qty > pending) {
-                errors.push(`La cantidad de ${part.name} excede lo pendiente (${pending})`);
+                errors.push(`La cantidad de ${partName} excede lo pendiente (${pending})`);
             }
         });
 
@@ -199,7 +265,7 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
 
         doc.setFontSize(10);
         doc.text(`Solicitud N°: ${localRequest.requestNumber}`, 14, 45);
-        doc.text(`Fecha Creación: ${new Date(localRequest.createdDate).toLocaleString()}`, 14, 51);
+        doc.text(`Fecha Creación: ${formatDateTime(localRequest.createdDate)}`, 14, 51);
         doc.text(`Solicitante: ${localRequest.technicianId}`, 14, 57);
         const priorityMap: Record<string, string> = {
             'NORMAL': 'Normal',
@@ -228,8 +294,8 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
         const tableBody = localRequest.items.map(item => {
             const part = activeParts.find(p => p.id === item.partId);
             return [
-                part?.partNumber || '-',
-                part?.name || item.partId,
+                part?.partNumber || item.partNumber || '-',
+                part?.name || item.partName || item.partId,
                 item.quantityRequested,
                 item.quantityDelivered,
                 item.quantityDelivered >= item.quantityRequested ? 'Completado' : 'Pendiente/Parcial'
@@ -262,11 +328,17 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
     };
 
     const getPartName = (partId: string) => {
-        return activeParts.find(p => p.id === partId)?.name || partId;
+        const part = activeParts.find(p => p.id === partId);
+        if (part?.name) return part.name;
+        const item = localRequest.items.find(i => i.partId === partId);
+        return item?.partName || partId;
     };
 
     const getPartNumber = (partId: string) => {
-        return activeParts.find(p => p.id === partId)?.partNumber || '';
+        const part = activeParts.find(p => p.id === partId);
+        if (part?.partNumber) return part.partNumber;
+        const item = localRequest.items.find(i => i.partId === partId);
+        return item?.partNumber || '';
     };
 
     if (isEditing) {
@@ -404,7 +476,7 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
                                 <Calendar className="w-4 h-4 text-industrial-500" />
                                 <div>
                                     <p className="text-xs text-industrial-500">Fecha Creación</p>
-                                    <p className="font-medium text-white">{new Date(localRequest.createdDate).toLocaleString()}</p>
+                                    <p className="font-medium text-white">{formatDateTime(localRequest.createdDate)}</p>
                                 </div>
                             </div>
 
@@ -464,13 +536,19 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
                                 {localRequest.items.map((item, idx) => {
                                     const part = activeParts.find(p => p.id === item.partId);
                                     const isFullyDelivered = item.quantityDelivered >= item.quantityRequested;
+                                    const displayName = part?.name || item.partName || item.partId;
+                                    const displayPartNumber = part?.partNumber || item.partNumber;
+                                    const displayStock = part?.currentStock ?? item.currentStock;
+                                    const displayMinStock = part?.minStock ?? item.minStock;
 
                                     return (
                                         <tr key={idx} className="hover:bg-industrial-800/50">
                                             <td className="px-6 py-4">
                                                 <div>
-                                                    <p className="text-white font-medium">{part?.name || item.partId}</p>
-                                                    <p className="text-industrial-500 text-xs font-mono">{part?.partNumber}</p>
+                                                    <p className="text-white font-medium">{displayName}</p>
+                                                    {displayPartNumber && (
+                                                        <p className="text-industrial-500 text-xs font-mono">{displayPartNumber}</p>
+                                                    )}
                                                     {item.usageLocation && (
                                                         <p className="text-industrial-400 text-xs mt-1">Uso: {item.usageLocation}</p>
                                                     )}
@@ -483,18 +561,18 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
                                                 {item.quantityDelivered}
                                             </td>
                                             <td className="px-6 py-4 text-center text-white font-mono">
-                                                <span className={`${part && part.currentStock <= part.minStock ? 'text-red-400 font-bold' : ''}`}>
-                                                    {part?.currentStock ?? '-'}
+                                                <span className={`${displayStock !== undefined && displayMinStock !== undefined && displayStock <= displayMinStock ? 'text-red-400 font-bold' : ''}`}>
+                                                    {displayStock ?? '-'}
                                                 </span>
                                             </td>
                                             {isProcessing && (
                                                 <td className="px-6 py-4">
                                                     {(() => {
-                                                        if (!part) return null;
                                                         const pending = item.quantityRequested - item.quantityDelivered;
-                                                        const maxAllowed = Math.min(part.currentStock, pending);
+                                                        const availableStock = displayStock ?? 0;
+                                                        const maxAllowed = Math.min(availableStock, pending);
                                                         const currentInput = deliveryQuantities[item.partId] || 0;
-                                                        const hasStockError = currentInput > part.currentStock;
+                                                        const hasStockError = currentInput > availableStock;
                                                         const hasRequestError = currentInput > pending;
 
                                                         return (

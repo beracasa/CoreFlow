@@ -7,6 +7,7 @@ import { useMasterStore } from '../../src/stores/useMasterStore';
 import { useWorkOrderStore } from '../../src/stores/useWorkOrderStore';
 import { useAuth } from '../../contexts/AuthContext';
 import { calculateMachineOEE, calculateMachineMTTR, calculateMachineMTBF } from '../../src/utils/metricsCalculator';
+import { formatDate } from '../../src/utils/dateUtils';
 
 interface AssetDrawerProps {
   machine: Machine | null;
@@ -173,7 +174,7 @@ export const AssetDrawer: React.FC<AssetDrawerProps> = ({ machine, onClose, anal
             <div className="bg-industrial-900 rounded-lg p-4 border border-industrial-700 flex items-center justify-between">
               <div>
                 <p className="text-white text-sm font-medium">Preventivo R-MANT-02</p>
-                <p className="text-xs text-industrial-500">Programado: {new Date(machine.nextMaintenance).toLocaleDateString()}</p>
+                <p className="text-xs text-industrial-500">Programado: {formatDate(machine.nextMaintenance)}</p>
               </div>
               <div className="text-right">
                 <span className="block text-2xl font-mono text-industrial-accent">
