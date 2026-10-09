@@ -4,6 +4,7 @@ import { Package, PlusCircle, Save, Edit, Plus, FileSpreadsheet, Loader2, AlertC
 import { SparePart } from '../../types/inventory';
 import { useMasterStore } from '../../stores/useMasterStore';
 import { ImportSpareParts } from './ImportSpareParts';
+import { DateInput } from '../shared/DateInput';
 
 // Service initialized in index.ts
 
@@ -496,11 +497,10 @@ export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData,
                     {/* Created At */}
                     <div>
                         <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">Fecha de Creación</label>
-                        <input
-                            type="date"
+                        <DateInput
                             name="createdAt"
                             required
-                            className="w-full bg-industrial-900 border border-industrial-600 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-blue-500 transition-colors font-mono [color-scheme:dark]"
+                            className="w-full bg-industrial-900 border border-industrial-600 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-blue-500 transition-colors font-mono"
                             value={formData.createdAt}
                             onChange={handleChange}
                         />

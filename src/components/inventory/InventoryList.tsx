@@ -7,6 +7,7 @@ import { useMasterStore } from '../../stores/useMasterStore';
 import { TablePagination } from '../shared/TablePagination';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { formatDate } from '../../utils/dateUtils';
 
 // Service initialized in index.ts
 
@@ -63,7 +64,7 @@ export const InventoryList: React.FC = () => {
 
         // Date
         doc.setFontSize(10);
-        const dateStr = new Date().toLocaleDateString();
+        const dateStr = formatDate(new Date());
         doc.text(`Fecha de Emisión: ${dateStr}`, 14, 42);
 
         // Filters Info

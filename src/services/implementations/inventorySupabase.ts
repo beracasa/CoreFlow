@@ -382,7 +382,11 @@ export class InventorySupabaseService implements IInventoryService {
         let query = supabase
             .from('spare_part_requests')
             .select(`
-                id, request_number, technician_name, status, priority, created_at, delivered_to
+                id, request_number, technician_name, status, priority, created_at, delivered_to,
+                spare_part_request_items (
+                    part_id, quantity_requested, quantity_delivered, usage_location,
+                    spare_parts (id, name, sku, company, current_stock, minimum_stock, unit_of_measure)
+                )
             `, { count: 'exact' })
             .order('created_at', { ascending: false });
 
@@ -403,20 +407,43 @@ export class InventorySupabaseService implements IInventoryService {
         }
 
         query = query.range(from, to);
-        const { data, error, count } = await query;
+        let { data, error, count } = await query;
 
         if (error) {
-            console.error('Error fetching requests:', error);
-            throw error;
+            console.warn('Error fetching requests with items, falling back to simple select:', error);
+            const fallback = await supabase
+                .from('spare_part_requests')
+                .select(`id, request_number, technician_name, status, priority, created_at, delivered_to`, { count: 'exact' })
+                .order('created_at', { ascending: false })
+                .range(from, to);
+            if (fallback.error) {
+                console.error('Error fetching requests:', fallback.error);
+                throw fallback.error;
+            }
+            data = fallback.data as any;
+            count = fallback.count;
         }
 
-        const mappedData = data.map(record => ({
+        const mappedData = ((data || []) as any[]).map(record => ({
             id: record.id,
             requestNumber: record.request_number,
             technicianId: record.technician_name,
             status: record.status as any,
             priority: record.priority as any,
-            items: [], // Details are fetched in getRequestById
+            items: (record.spare_part_request_items || []).map((item: any) => {
+                const partObj = Array.isArray(item.spare_parts) ? item.spare_parts[0] : item.spare_parts;
+                return {
+                    partId: item.part_id,
+                    partName: partObj?.name,
+                    partNumber: partObj?.sku,
+                    currentStock: partObj?.current_stock != null ? Number(partObj.current_stock) : undefined,
+                    minStock: partObj?.minimum_stock != null ? Number(partObj.minimum_stock) : undefined,
+                    unitOfMeasure: partObj?.unit_of_measure,
+                    quantityRequested: Number(item.quantity_requested),
+                    quantityDelivered: Number(item.quantity_delivered),
+                    usageLocation: item.usage_location
+                };
+            }),
             createdDate: record.created_at,
             deliveredTo: record.delivered_to,
             purchaseHistory: []
@@ -432,19 +459,36 @@ export class InventorySupabaseService implements IInventoryService {
     }
 
     async getRequestById(id: string): Promise<PartsRequest> {
-        const { data, error } = await supabase
+        let { data, error } = await supabase
             .from('spare_part_requests')
             .select(`
                 *,
-                spare_part_request_items (*),
+                spare_part_request_items (
+                    *,
+                    spare_parts (*)
+                ),
                 purchase_requests (*)
             `)
             .eq('id', id)
             .single();
 
         if (error) {
-            console.error('Error fetching request by id:', error);
-            throw error;
+            console.warn('Error fetching request with joined spare_parts, retrying simple select:', error);
+            const fallback = await supabase
+                .from('spare_part_requests')
+                .select(`
+                    *,
+                    spare_part_request_items (*),
+                    purchase_requests (*)
+                `)
+                .eq('id', id)
+                .single();
+
+            if (fallback.error) {
+                console.error('Error fetching request by id:', fallback.error);
+                throw fallback.error;
+            }
+            data = fallback.data as any;
         }
 
         return {
@@ -453,12 +497,20 @@ export class InventorySupabaseService implements IInventoryService {
             technicianId: data.technician_name,
             status: data.status as any,
             priority: data.priority as any,
-            items: (data.spare_part_request_items || []).map((item: any) => ({
-                partId: item.part_id,
-                quantityRequested: Number(item.quantity_requested),
-                quantityDelivered: Number(item.quantity_delivered),
-                usageLocation: item.usage_location
-            })),
+            items: (data.spare_part_request_items || []).map((item: any) => {
+                const partObj = Array.isArray(item.spare_parts) ? item.spare_parts[0] : item.spare_parts;
+                return {
+                    partId: item.part_id,
+                    partName: partObj?.name,
+                    partNumber: partObj?.sku,
+                    currentStock: partObj?.current_stock != null ? Number(partObj.current_stock) : undefined,
+                    minStock: partObj?.minimum_stock != null ? Number(partObj.minimum_stock) : undefined,
+                    unitOfMeasure: partObj?.unit_of_measure,
+                    quantityRequested: Number(item.quantity_requested),
+                    quantityDelivered: Number(item.quantity_delivered),
+                    usageLocation: item.usage_location
+                };
+            }),
             createdDate: data.created_at,
             deliveredTo: data.delivered_to,
             purchaseHistory: (data.purchase_requests || []).map((pr: any) => ({

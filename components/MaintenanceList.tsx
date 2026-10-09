@@ -8,6 +8,8 @@ import { FileText, Plus, Calendar, AlertCircle, CheckCircle, Clock, Download } f
 import { generateMaintenanceListPDF, generateRMant02PDF, generateRMant05PDF } from '../src/utils/pdf/pdfGenerator';
 import { generateWorkOrderReport } from '../src/services/ReportService';
 import { TablePagination } from './shared/TablePagination';
+import { DateInput } from './shared/DateInput';
+import { formatDate } from '../src/utils/dateUtils';
 
 
 interface MaintenanceListProps {
@@ -131,7 +133,7 @@ export const MaintenanceList: React.FC<MaintenanceListProps> = ({ type }) => {
     if (type === 'R-MANT-05' && selectedFailureType) parts.push(`Falla: ${selectedFailureType}`);
 
     if (startDateFilter || endDateFilter) {
-      parts.push(`Rango: ${startDateFilter || 'Inicio'} a ${endDateFilter || 'Hoy'}`);
+      parts.push(`Rango: ${startDateFilter ? formatDate(startDateFilter) : 'Inicio'} a ${endDateFilter ? formatDate(endDateFilter) : 'Hoy'}`);
     }
 
     return parts.length > 0 ? parts.join(' | ') : 'Todos los registros';
@@ -247,46 +249,22 @@ export const MaintenanceList: React.FC<MaintenanceListProps> = ({ type }) => {
             Filtrar por Rango de Fechas:
           </span>
           <div className="flex gap-2 flex-1">
-            <div className="relative flex-1 group">
-              <input
-                ref={startDateRef}
-                type="date"
-                lang="es"
+            <div className="relative flex-1">
+              <DateInput
                 value={startDateFilter}
                 onChange={(e) => setStartDateFilter(e.target.value)}
-                className="w-full px-3 py-1.5 bg-industrial-900 border border-industrial-700 rounded text-xs text-white [color-scheme:dark] accent-industrial-accent pr-8 focus:border-industrial-accent outline-none"
-                style={{ colorScheme: 'dark' }}
+                className="w-full px-3 py-1.5 bg-industrial-900 border border-industrial-700 rounded text-xs text-white focus:border-industrial-accent outline-none"
               />
-              <button
-                type="button"
-                onClick={() => startDateRef.current?.showPicker()}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-white hover:text-industrial-accent transition-colors"
-                title="Seleccionar fecha inicial"
-              >
-                <Calendar className="w-3.5 h-3.5" strokeWidth={2.5} />
-              </button>
             </div>
 
             <span className="text-industrial-600 flex items-center">al</span>
 
-            <div className="relative flex-1 group">
-              <input
-                ref={endDateRef}
-                type="date"
-                lang="es"
+            <div className="relative flex-1">
+              <DateInput
                 value={endDateFilter}
                 onChange={(e) => setEndDateFilter(e.target.value)}
-                className="w-full px-3 py-1.5 bg-industrial-900 border border-industrial-700 rounded text-xs text-white [color-scheme:dark] accent-industrial-accent pr-8 focus:border-industrial-accent outline-none"
-                style={{ colorScheme: 'dark' }}
+                className="w-full px-3 py-1.5 bg-industrial-900 border border-industrial-700 rounded text-xs text-white focus:border-industrial-accent outline-none"
               />
-              <button
-                type="button"
-                onClick={() => endDateRef.current?.showPicker()}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-white hover:text-industrial-accent transition-colors"
-                title="Seleccionar fecha final"
-              >
-                <Calendar className="w-3.5 h-3.5" strokeWidth={2.5} />
-              </button>
             </div>
           </div>
         </div>
@@ -413,7 +391,7 @@ export const MaintenanceList: React.FC<MaintenanceListProps> = ({ type }) => {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2 text-sm text-white font-medium">
                           <Calendar className="w-4 h-4" style={{ color: '#FFFFFF', strokeWidth: 3 }} />
-                          {new Date(order.createdDate).toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US')}
+                          {formatDate(order.createdDate)}
                         </div>
                       </td>
 

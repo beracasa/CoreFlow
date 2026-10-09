@@ -4,6 +4,7 @@ import html2canvas from 'html2canvas';
 import { HelpCircle, Headphones, X, Camera, Send, Ticket, PlusCircle, Trash2, RefreshCw, Check, Maximize, Crop, ChevronRight, ChevronLeft } from 'lucide-react';
 import { HelpDeskTicket } from '../../types/helpdesk';
 import { useAuth } from '../../../contexts/AuthContext';
+import { formatDate } from '../../utils/dateUtils';
 
 let audioCtx: AudioContext | null = null;
 
@@ -1070,7 +1071,7 @@ export const FloatingHelpDesk: React.FC = () => {
                               {ticket.category}
                             </span>
                             <span className="flex items-center gap-1 font-mono text-[9px]">
-                              {new Date(ticket.created_at).toLocaleDateString()}
+                              {formatDate(ticket.created_at)}
                             </span>
                           </div>
                         </button>

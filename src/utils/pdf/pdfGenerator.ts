@@ -5,6 +5,7 @@ import autoTable from 'jspdf-autotable';
 import { WorkOrder, Machine } from '../../../types';
 import { useMasterStore } from '../../stores/useMasterStore';
 import { useUserStore } from '../../stores/useUserStore';
+import { formatDate, formatDateTime } from '../dateUtils';
 
 // Opcional: Logo de la empresa en base64 para reemplazar el texto "RAVICARIBE INC."
 const COMPANY_LOGO_BASE64 = ''; 
@@ -180,7 +181,7 @@ export const generateRMant02PDF = (order: WorkOrder, machine?: Machine, logoUrl?
   if (typeLabel === 'Programmed' || typeLabel === 'PROGRAMMED') typeLabel = 'Programado';
   if (typeLabel === 'Other' || typeLabel === 'OTHER') typeLabel = 'Otro';
   drawField("Tipo de Mantenimiento", typeLabel, xCol2, 57);
-  const startDateStr = order.startDate ? new Date(order.startDate).toLocaleDateString('es-ES') : '-';
+  const startDateStr = formatDate(order.startDate);
   drawField("Fecha de Inicio", startDateStr, xCol3, 57);
 
   // Fila 2 (Y = 69)
@@ -621,7 +622,7 @@ export const generateRMant02PDF = (order: WorkOrder, machine?: Machine, logoUrl?
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-  const execDateStr = order.signatureExecutorDate ? new Date(order.signatureExecutorDate).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' }) : 'Pendiente';
+  const execDateStr = formatDateTime(order.signatureExecutorDate, 'Pendiente');
   doc.text(execDateStr, margin + 18, sigY + 39.5);
 
 
@@ -673,9 +674,7 @@ export const generateRMant02PDF = (order: WorkOrder, machine?: Machine, logoUrl?
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-  const superDateStr = order.signatureSupervisorDate || order.closingDate 
-    ? new Date(order.signatureSupervisorDate || order.closingDate || '').toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' }) 
-    : 'Pendiente';
+  const superDateStr = formatDateTime(order.signatureSupervisorDate || order.closingDate, 'Pendiente');
   doc.text(superDateStr, pageWidth - margin - colSigW + 18, sigY + 39.5);
 
 
@@ -839,7 +838,7 @@ export const generateRMant05PDF = (order: WorkOrder, machine?: Machine, logoUrl?
   drawField("Número de Orden", order.displayId || order.id, xCol1, 57);
   const applicantName = getUserFullName(order.assignedTo); // Nombre del solicitante
   drawField("Nombre del Solicitante", applicantName, xCol2, 57);
-  const requestDateStr = order.createdDate ? new Date(order.createdDate).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' }) : '-';
+  const requestDateStr = formatDateTime(order.createdDate);
   drawField("Fecha y Hora Solicitud", requestDateStr, xCol3, 57);
 
   // Fila 2 (Y = 69)
@@ -946,7 +945,7 @@ export const generateRMant05PDF = (order: WorkOrder, machine?: Machine, logoUrl?
 
   // Reporte Recibido y Personal Asignado
   drawField("Reporte Recibido Por", getUserFullName(order.requestReceivedBy), xCol1, 211);
-  const receivedDateStr = order.requestReceivedDate ? new Date(order.requestReceivedDate).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' }) : '-';
+  const receivedDateStr = formatDateTime(order.requestReceivedDate);
   drawField("Fecha y Hora Recibido", receivedDateStr, xCol2, 211);
   drawField("Personal Asignado / Ejecutante", getUserFullName(order.assignedMechanic || order.assignedTo), xCol3, 211);
 
@@ -1196,7 +1195,7 @@ export const generateRMant05PDF = (order: WorkOrder, machine?: Machine, logoUrl?
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-  const execDateStr = order.signatureExecutorDate ? new Date(order.signatureExecutorDate).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' }) : 'Pendiente';
+  const execDateStr = formatDateTime(order.signatureExecutorDate, 'Pendiente');
   doc.text(execDateStr, margin + 18, sigY + 39.5);
 
 
@@ -1248,9 +1247,7 @@ export const generateRMant05PDF = (order: WorkOrder, machine?: Machine, logoUrl?
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
   doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-  const superDateStr = order.signatureSupervisorDate || order.closingDate 
-    ? new Date(order.signatureSupervisorDate || order.closingDate || '').toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' }) 
-    : 'Pendiente';
+  const superDateStr = formatDateTime(order.signatureSupervisorDate || order.closingDate, 'Pendiente');
   doc.text(superDateStr, pageWidth - margin - colSigW + 18, sigY + 39.5);
 
 
@@ -1314,7 +1311,7 @@ export const generateMaintenanceListPDF = (orders: WorkOrder[], title: string, m
   // Date and Metadata
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
-  doc.text(`Fecha de Reporte: ${new Date().toLocaleDateString()}`, pageWidth - margin - 5, margin + 8, { align: 'right' });
+  doc.text(`Fecha de Reporte: ${formatDate(new Date())}`, pageWidth - margin - 5, margin + 8, { align: 'right' });
   doc.text(`Registros Encontrados: ${orders.length}`, pageWidth - margin - 5, margin + 14, { align: 'right' });
 
   // --- TABLE SECTION ---
@@ -1326,7 +1323,7 @@ export const generateMaintenanceListPDF = (orders: WorkOrder[], title: string, m
 
   const body = orders.map(o => {
     const machine = machines.find(m => m.id === o.machineId);
-    const date = new Date(o.createdDate).toLocaleDateString();
+    const date = formatDate(o.createdDate);
     
     if (isRMant02) {
       return [

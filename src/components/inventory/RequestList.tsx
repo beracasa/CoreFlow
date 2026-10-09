@@ -7,9 +7,10 @@ import autoTable from 'jspdf-autotable';
 import { SparePart } from '../../types/inventory'; // Need this to lookup part names if not in request item
 
 
-import { useMasterStore } from '../../stores/useMasterStore';
-
 import { TablePagination } from '../shared/TablePagination';
+import { DateInput } from '../shared/DateInput';
+import { formatDate } from '../../utils/dateUtils';
+import { useMasterStore } from '../../stores/useMasterStore';
 
 import { useAuth } from '../../../contexts/AuthContext';
 import { UserSupabaseService } from '../../services/UserSupabaseService';
@@ -118,14 +119,14 @@ export const RequestList: React.FC<RequestListProps> = ({ onSelectRequest }) => 
         // Date
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
-        const dateStr = new Date().toLocaleDateString();
+        const dateStr = formatDate(new Date());
         doc.text(`Fecha de Emisión: ${dateStr}`, margin, headerY + 7);
 
         const yPos = headerY + 15;
 
         // Flatten all request items into a single list of rows
         const tableBody = filteredRequests.flatMap(req => {
-            const reqDate = new Date(req.createdDate).toLocaleDateString();
+            const reqDate = formatDate(req.createdDate);
             const deliveredToName = req.deliveredTo
                 ? (systemUsers.find(u => u.id === req.deliveredTo)?.full_name
                     || technicians.find(t => t.id === req.deliveredTo)?.name
@@ -135,8 +136,8 @@ export const RequestList: React.FC<RequestListProps> = ({ onSelectRequest }) => 
                 const part = parts.find(p => p.id === item.partId);
                 return [
                     reqDate,
-                    part?.partNumber || 'N/A',
-                    part?.name || item.partId,
+                    part?.partNumber || item.partNumber || 'N/A',
+                    part?.name || item.partName || item.partId,
                     item.usageLocation || '-',
                     part?.company || '-',
                     item.quantityRequested,
@@ -267,40 +268,20 @@ export const RequestList: React.FC<RequestListProps> = ({ onSelectRequest }) => 
 
                     <div>
                         <label className="block text-xs font-bold text-industrial-500 uppercase tracking-wider mb-2">Desde</label>
-                        <div className="relative">
-                            <input
-                                ref={startDateRef}
-                                type="date"
-                                className="w-full pl-3 pr-10 py-2 bg-industrial-900 border border-industrial-600 rounded-lg focus:ring-1 focus:ring-industrial-accent outline-none text-white text-sm"
-                                value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
-                            />
-                            <button
-                                onClick={() => startDateRef.current?.showPicker()}
-                                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-industrial-400 hover:text-white"
-                            >
-                                <Calendar className="w-4 h-4" />
-                            </button>
-                        </div>
+                        <DateInput
+                            className="w-full pl-3 pr-10 py-2 bg-industrial-900 border border-industrial-600 rounded-lg focus:ring-1 focus:ring-industrial-accent outline-none text-white text-sm"
+                            value={startDate}
+                            onChange={(e) => setStartDate(e.target.value)}
+                        />
                     </div>
 
                     <div>
                         <label className="block text-xs font-bold text-industrial-500 uppercase tracking-wider mb-2">Hasta</label>
-                        <div className="relative">
-                            <input
-                                ref={endDateRef}
-                                type="date"
-                                className="w-full pl-3 pr-10 py-2 bg-industrial-900 border border-industrial-600 rounded-lg focus:ring-1 focus:ring-industrial-accent outline-none text-white text-sm"
-                                value={endDate}
-                                onChange={(e) => setEndDate(e.target.value)}
-                            />
-                            <button
-                                onClick={() => endDateRef.current?.showPicker()}
-                                className="absolute right-2 top-1/2 transform -translate-y-1/2 text-industrial-400 hover:text-white"
-                            >
-                                <Calendar className="w-4 h-4" />
-                            </button>
-                        </div>
+                        <DateInput
+                            className="w-full pl-3 pr-10 py-2 bg-industrial-900 border border-industrial-600 rounded-lg focus:ring-1 focus:ring-industrial-accent outline-none text-white text-sm"
+                            value={endDate}
+                            onChange={(e) => setEndDate(e.target.value)}
+                        />
                     </div>
                 </div>
             </div>
@@ -334,7 +315,7 @@ export const RequestList: React.FC<RequestListProps> = ({ onSelectRequest }) => 
                                 >
                                     <td className="px-6 py-4 text-white font-mono font-medium">{req.requestNumber}</td>
                                     <td className="px-6 py-4 text-industrial-300 text-sm">
-                                        {new Date(req.createdDate).toLocaleDateString()}
+                                        {formatDate(req.createdDate)}
                                     </td>
                                     <td className="px-6 py-4 text-white">{req.technicianId}</td>
                                     <td className="px-6 py-4">

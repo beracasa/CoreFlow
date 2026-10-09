@@ -6,6 +6,7 @@ import { useWorkOrderStore } from '../src/stores/useWorkOrderStore';
 import { useMasterStore } from '../src/stores/useMasterStore';
 import { WorkOrder, Machine } from '../types';
 import { Calendar, ChevronLeft, ChevronRight, Printer, Search, Plus, MoreHorizontal } from 'lucide-react';
+import { formatDate } from '../src/utils/dateUtils';
 
 export const MaintenanceCalendar: React.FC = () => {
   const { t, language } = useLanguage();
@@ -224,13 +225,15 @@ export const MaintenanceCalendar: React.FC = () => {
       const startMonth = months[start.getMonth()].substring(0, 3);
       const endMonth = months[end.getMonth()].substring(0, 3);
       
-      return `${startMonth} ${start.getDate()} - ${endMonth} ${end.getDate()}, ${currentDate.getFullYear()}`;
+      return `${start.getDate()} ${startMonth} - ${end.getDate()} ${endMonth}, ${currentDate.getFullYear()}`;
     } else {
       const weekdaysEn = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
       const weekdaysEs = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
       const wDays = language === 'es' ? weekdaysEs : weekdaysEn;
       
-      return `${wDays[currentDate.getDay()]}, ${monthName} ${currentDate.getDate()}, ${currentDate.getFullYear()}`;
+      return language === 'es'
+        ? `${wDays[currentDate.getDay()]}, ${currentDate.getDate()} de ${monthName} de ${currentDate.getFullYear()}`
+        : `${wDays[currentDate.getDay()]}, ${monthName} ${currentDate.getDate()}, ${currentDate.getFullYear()}`;
     }
   };
 
@@ -811,9 +814,9 @@ export const MaintenanceCalendar: React.FC = () => {
                 <span className="block text-[10px] text-slate-400 font-normal normal-case">
                   {hoveredItem.type === 'NEXT_MAINTENANCE' ? 'Fecha' : 'Orden'}
                 </span>
-                <span className="text-slate-800 truncate block font-mono" title={hoveredItem.type === 'NEXT_MAINTENANCE' ? hoveredItem.date : (hoveredItem.order?.displayId || hoveredItem.id)}>
+                <span className="text-slate-800 truncate block font-mono" title={hoveredItem.type === 'NEXT_MAINTENANCE' ? formatDate(hoveredItem.date) : (hoveredItem.order?.displayId || hoveredItem.id)}>
                   {hoveredItem.type === 'NEXT_MAINTENANCE'
-                    ? hoveredItem.date
+                    ? formatDate(hoveredItem.date)
                     : (hoveredItem.order?.displayId || hoveredItem.id.substring(0, 8))}
                 </span>
               </div>

@@ -2,6 +2,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { ExtendedPurchaseRequest } from '../types/inventory';
 import { useMasterStore } from '../stores/useMasterStore';
+import { formatDate } from './dateUtils';
 
 export const exportPurchaseRequestPDF = (request: ExtendedPurchaseRequest) => {
     const doc = new jsPDF();
@@ -14,8 +15,7 @@ export const exportPurchaseRequestPDF = (request: ExtendedPurchaseRequest) => {
         // ==========================================
         // FORMATO DE PROVEEDOR INTERNACIONAL (ELEGANTE)
         // ==========================================
-        const dateObj = new Date(request.requestDate);
-        const formattedDate = `${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}/${dateObj.getFullYear()}`;
+        const formattedDate = formatDate(request.requestDate);
         const senderCompany = request.items[0]?.company || 'RAVI CARIBE INC';
         const requestNumber = request.purchaseRequestNumber.replace('SC-PROV-', '') || request.purchaseRequestNumber;
         const supplierName = request.items[0]?.supplier || 'SACMI MEXICO';
@@ -201,7 +201,7 @@ export const exportPurchaseRequestPDF = (request: ExtendedPurchaseRequest) => {
         // Date
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
-        const dateStr = new Date().toLocaleDateString();
+        const dateStr = formatDate(new Date());
         doc.text(`Fecha de Emisión: ${dateStr}`, margin, headerY + 7);
 
         // --- Request Metadata Block ---
@@ -218,7 +218,7 @@ export const exportPurchaseRequestPDF = (request: ExtendedPurchaseRequest) => {
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9);
         doc.setTextColor(80, 80, 80);
-        const reqDate = new Date(request.requestDate).toLocaleDateString();
+        const reqDate = formatDate(request.requestDate);
         
         doc.text(`Código de Requisición: ${request.purchaseRequestNumber}`, margin, metaY + 8);
         doc.text(`Solicitado Por: ${request.requestedBy}`, margin, metaY + 14);
@@ -230,7 +230,7 @@ export const exportPurchaseRequestPDF = (request: ExtendedPurchaseRequest) => {
 
         // --- Items Table ---
         const tableBody = request.items.map(item => {
-            const itemDate = new Date(request.requestDate).toLocaleDateString();
+            const itemDate = formatDate(request.requestDate);
             const itemStatus = request.status === 'Cancelado'
                 ? 'Cancelado'
                 : (item.quantityReceived || 0) >= item.quantity

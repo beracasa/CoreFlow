@@ -10,6 +10,8 @@ import { useMasterStore } from '../src/stores/useMasterStore';
 import { useUserStore } from '../src/stores/useUserStore';
 import { useWorkOrderStore } from '../src/stores/useWorkOrderStore';
 import { generateRMant02PDF, generateRMant05PDF } from '../src/utils/pdf/pdfGenerator';
+import { DateInput } from './shared/DateInput';
+import { formatDate } from '../src/utils/dateUtils';
 
 // --- 1. CONFIGURATION & MASTER DATA ENGINE ---
 
@@ -694,10 +696,9 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                            <div className="space-y-1">
                               <label className="text-xs text-industrial-400 font-bold">Fecha y Hora Solicitud</label>
                               <div className="flex gap-2">
-                                 <input
-                                    type="date"
+                                 <DateInput
                                     disabled={!isSection1Editable}
-                                    className={`flex-1 bg-industrial-900 border rounded p-2 text-white text-sm focus:border-emerald-500 outline-none [color-scheme:dark] ${invalidFields.has('createdDate') ? 'border-red-500 bg-red-900/10' : 'border-industrial-600'}`}
+                                    className={`flex-1 bg-industrial-900 border rounded p-2 text-white text-sm focus:border-emerald-500 outline-none ${invalidFields.has('createdDate') ? 'border-red-500 bg-red-900/10' : 'border-industrial-600'}`}
                                     value={formData.createdDate?.split('T')[0] || new Date().toISOString().split('T')[0]}
                                     onChange={(e) => setFormData({ ...formData, createdDate: `${e.target.value}T${new Date().toLocaleTimeString()}` })}
                                  />
@@ -997,10 +998,9 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                         {/* 5. Start Date (Calendar) */}
                         <div className="space-y-1">
                            <label className="text-xs text-industrial-400 font-bold">Fecha de Inicio</label>
-                           <input
-                              type="date"
+                           <DateInput
                               disabled={!isSection1Editable}
-                              className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm focus:border-emerald-500 outline-none [color-scheme:dark]"
+                              className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm focus:border-emerald-500 outline-none"
                               value={formData.startDate || ''}
                               onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
                            />
@@ -1207,8 +1207,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                               <div className="space-y-1">
                                  <label className="text-xs text-industrial-400 font-bold">Fecha y Hora de Reporte Recibido</label>
                                  <div className="flex gap-2">
-                                    <input
-                                       type="date"
+                                    <DateInput
                                        disabled={!isSection2Editable}
                                        className="flex-1 bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm focus:border-pink-500 outline-none"
                                        value={formData.requestReceivedDate?.split('T')[0] || new Date().toISOString().split('T')[0]}
@@ -1924,8 +1923,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                            <div className="space-y-1">
                               <label className="text-xs text-industrial-400 font-bold">Fecha y Hora de Recepción</label>
                               <div className="flex gap-2 items-center">
-                                 <input
-                                    type="date"
+                                 <DateInput
                                     disabled={!isSection3Editable}
                                     className={`flex-1 bg-industrial-900 border rounded p-2 text-white text-sm focus:border-emerald-500 outline-none ${invalidFields.has('closingDate') ? 'border-red-500 bg-red-900/10 shadow-[0_0_10px_rgba(239,68,68,0.1)]' : 'border-industrial-600'}`}
                                     value={formData.closingDate?.split('T')[0] || new Date().toISOString().split('T')[0]}
@@ -1979,7 +1977,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                  {formData.signatureExecutor && formData.signatureExecutor !== 'false' ? (
                                     <>
                                        <span className="text-pink-400 font-script text-xl">{formData.signatureExecutor}</span>
-                                       <span className="text-xs text-industrial-500">{formData.signatureExecutorDate ? new Date(formData.signatureExecutorDate).toLocaleDateString() : ''}</span>
+                                       <span className="text-xs text-industrial-500">{formData.signatureExecutorDate ? formatDate(formData.signatureExecutorDate) : ''}</span>
                                     </>
                                  ) : (
                                     <span className={`text-xs ${invalidFields.has('signatureExecutor') ? 'text-red-400 font-bold' : 'text-industrial-500'}`}>
@@ -2004,7 +2002,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                  {formData.signatureSupervisor && formData.signatureSupervisor !== 'false' ? (
                                     <>
                                        <span className="text-emerald-400 font-script text-xl">{formData.signatureSupervisor}</span>
-                                       <span className="text-xs text-industrial-500">{formData.signatureSupervisorDate ? new Date(formData.signatureSupervisorDate).toLocaleDateString() : ''}</span>
+                                       <span className="text-xs text-industrial-500">{formData.signatureSupervisorDate ? formatDate(formData.signatureSupervisorDate) : ''}</span>
                                     </>
                                  ) : (
                                     <span className={`text-xs ${invalidFields.has('signatureSupervisor') ? 'text-red-400 font-bold' : 'text-industrial-500'}`}>

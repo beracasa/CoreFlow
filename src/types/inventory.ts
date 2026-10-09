@@ -48,6 +48,11 @@ export type RequestPriority = 'NORMAL' | 'HIGH' | 'EMERGENCY';
 
 export interface RequestItem {
     partId: string;
+    partName?: string;
+    partNumber?: string;
+    currentStock?: number;
+    minStock?: number;
+    unitOfMeasure?: string;
     quantityRequested: number;
     quantityDelivered: number;
     usageLocation?: string;
