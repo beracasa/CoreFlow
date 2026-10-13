@@ -97,7 +97,7 @@ export const UserSupabaseService = {
       email: p.email,
       full_name: p.full_name || '',
       role: p.role_id || p.role, // map role_id from DB to role in UI. Fallback to role if migration is partial.
-      roleName: p.app_roles?.name,
+      roleName: (Array.isArray(p.app_roles) ? p.app_roles[0]?.name : p.app_roles?.name) || p.role,
       job_title: p.job_title || '',
       tenant_id: p.tenant_id,
       status: p.status,

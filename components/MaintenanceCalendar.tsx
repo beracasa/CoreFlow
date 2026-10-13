@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useWorkOrderStore } from '../src/stores/useWorkOrderStore';
 import { useMasterStore } from '../src/stores/useMasterStore';
 import { WorkOrder, Machine } from '../types';
-import { Calendar, ChevronLeft, ChevronRight, Printer, Search, Plus, MoreHorizontal } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Printer, Search, Plus, MoreHorizontal, Shield } from 'lucide-react';
 import { formatDate } from '../src/utils/dateUtils';
 
 export const MaintenanceCalendar: React.FC = () => {
@@ -14,6 +14,17 @@ export const MaintenanceCalendar: React.FC = () => {
   const { calendarOrders, fetchCalendarOrders, loading } = useWorkOrderStore();
   const { machines, fetchMasterData, isInitialized: masterInitialized } = useMasterStore();
   const navigate = useNavigate();
+
+  const canManageCalendar = hasPermission('manage_calendar');
+
+  if (!hasPermission('view_calendar')) {
+    return (
+      <div className="h-full flex items-center justify-center bg-industrial-900 text-industrial-500 flex-col gap-4">
+        <Shield className="w-12 h-12 text-red-900" />
+        <span>Acceso Restringido: Se requiere el permiso de Ver Calendario.</span>
+      </div>
+    );
+  }
 
   // Calendar States
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
@@ -343,18 +354,21 @@ export const MaintenanceCalendar: React.FC = () => {
                         onMouseEnter={(e) => handleMouseEnter(e, item)}
                         onMouseLeave={handleMouseLeave}
                         onClick={() => {
+                          if (!canManageCalendar) return;
                           if (isNextMaint) {
                             navigate('/orders/new', { state: { machineId: item.machineId } });
                           } else {
                             navigate(`/orders/${item.id}`, { state: { type: item.type } });
                           }
                         }}
-                        className={`cursor-pointer px-2 py-1 rounded text-[11px] font-medium transition-all duration-150 truncate block select-none border ${
+                        className={`px-2 py-1 rounded text-[11px] font-medium transition-all duration-150 truncate block select-none border ${
+                          canManageCalendar ? 'cursor-pointer' : 'cursor-default'
+                        } ${
                           isMant02
-                            ? 'bg-emerald-600/10 text-emerald-300 border-emerald-500/20 hover:bg-emerald-600/20 hover:border-emerald-500/40'
+                            ? `bg-emerald-600/10 text-emerald-300 border-emerald-500/20 ${canManageCalendar ? 'hover:bg-emerald-600/20 hover:border-emerald-500/40' : ''}`
                             : isMant05
-                            ? 'bg-amber-600/10 text-amber-300 border-amber-500/20 hover:bg-amber-600/20 hover:border-amber-500/40'
-                            : 'bg-blue-600/10 text-blue-300 border-blue-500/20 hover:bg-blue-600/20 hover:border-blue-500/40'
+                            ? `bg-amber-600/10 text-amber-300 border-amber-500/20 ${canManageCalendar ? 'hover:bg-amber-600/20 hover:border-amber-500/40' : ''}`
+                            : `bg-blue-600/10 text-blue-300 border-blue-500/20 ${canManageCalendar ? 'hover:bg-blue-600/20 hover:border-blue-500/40' : ''}`
                         }`}
                       >
                         {isNextMaint ? '🔧 ' : ''}{item.title} - {item.line}
@@ -437,18 +451,21 @@ export const MaintenanceCalendar: React.FC = () => {
                         onMouseEnter={(e) => handleMouseEnter(e, item)}
                         onMouseLeave={handleMouseLeave}
                         onClick={() => {
+                          if (!canManageCalendar) return;
                           if (isNextMaint) {
                             navigate('/orders/new', { state: { machineId: item.machineId } });
                           } else {
                             navigate(`/orders/${item.id}`, { state: { type: item.type } });
                           }
                         }}
-                        className={`cursor-pointer p-2.5 rounded-lg border text-xs transition-all duration-200 shadow-md ${
+                        className={`p-2.5 rounded-lg border text-xs transition-all duration-200 shadow-md ${
+                          canManageCalendar ? 'cursor-pointer' : 'cursor-default'
+                        } ${
                           isMant02
-                            ? 'bg-emerald-600/10 text-emerald-200 border-emerald-500/30 hover:border-emerald-400/50 hover:bg-emerald-600/20'
+                            ? `bg-emerald-600/10 text-emerald-200 border-emerald-500/30 ${canManageCalendar ? 'hover:border-emerald-400/50 hover:bg-emerald-600/20' : ''}`
                             : isMant05
-                            ? 'bg-amber-600/10 text-amber-200 border-amber-500/30 hover:border-amber-400/50 hover:bg-amber-600/20'
-                            : 'bg-blue-600/10 text-blue-200 border-blue-500/30 hover:border-blue-400/50 hover:bg-blue-600/20'
+                            ? `bg-amber-600/10 text-amber-200 border-amber-500/30 ${canManageCalendar ? 'hover:border-amber-400/50 hover:bg-amber-600/20' : ''}`
+                            : `bg-blue-600/10 text-blue-200 border-blue-500/30 ${canManageCalendar ? 'hover:border-blue-400/50 hover:bg-blue-600/20' : ''}`
                         }`}
                       >
                         <div className="flex justify-between items-center mb-1">
@@ -522,13 +539,16 @@ export const MaintenanceCalendar: React.FC = () => {
                   onMouseEnter={(e) => handleMouseEnter(e, item)}
                   onMouseLeave={handleMouseLeave}
                   onClick={() => {
+                    if (!canManageCalendar) return;
                     if (isNextMaint) {
                       navigate('/orders/new', { state: { machineId: item.machineId } });
                     } else {
                       navigate(`/orders/${item.id}`, { state: { type: item.type } });
                     }
                   }}
-                  className={`cursor-pointer p-4 rounded-xl border flex justify-between items-start gap-4 transition-all duration-200 hover:shadow-lg hover:border-industrial-500 ${
+                  className={`p-4 rounded-xl border flex justify-between items-start gap-4 transition-all duration-200 ${
+                    canManageCalendar ? 'cursor-pointer hover:shadow-lg hover:border-industrial-500' : 'cursor-default'
+                  } ${
                     isMant02
                       ? 'bg-emerald-600/10 text-emerald-200 border-emerald-500/20'
                       : isMant05
@@ -625,13 +645,15 @@ export const MaintenanceCalendar: React.FC = () => {
           <button className="p-2 bg-industrial-800 hover:bg-industrial-700 rounded text-slate-400 hover:text-white transition-colors" title="Search">
             <Search size={18} />
           </button>
-          <button
-            onClick={() => navigate('/orders/new')}
-            className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors shadow-lg shadow-blue-500/20"
-            title="Add Order"
-          >
-            <Plus size={18} />
-          </button>
+          {canManageCalendar && (
+            <button
+              onClick={() => navigate('/orders/new')}
+              className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors shadow-lg shadow-blue-500/20"
+              title="Add Order"
+            >
+              <Plus size={18} />
+            </button>
+          )}
           <button className="p-2 bg-industrial-800 hover:bg-industrial-700 rounded text-slate-400 hover:text-white transition-colors" title="Settings">
             <MoreHorizontal size={18} />
           </button>

@@ -23,7 +23,7 @@ export enum UserRole {
 // NEW: Dynamic Role Definitions
 export interface Permission {
   id: string;
-  category: 'OPERATIONAL' | 'ADMINISTRATIVE' | 'FINANCIAL' | 'SYSTEM';
+  category: 'INFORMATIVE' | 'OPERATIONAL' | 'ADMINISTRATIVE' | 'FINANCIAL' | 'SYSTEM' | string;
   label: string;
   description: string;
 }
