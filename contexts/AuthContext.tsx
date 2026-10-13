@@ -43,7 +43,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const fetchProfile = async (userId: string): Promise<UserProfile | null> => {
     const { data, error } = await supabase
       .from('profiles')
-      .select('*')
+      .select('*, app_roles(*)')
       .eq('id', userId)
       .single();
 
@@ -67,11 +67,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     }
 
+    const appRole = Array.isArray(data.app_roles) ? data.app_roles[0] : data.app_roles;
+    const roleId = data.role_id || appRole?.id || data.role;
+    const roleName = appRole?.name || data.role;
+
     return {
       id: data.id,
       email: data.email,
       full_name: data.full_name,
-      role: data.role_id || data.role, // Source of truth: role_id from new schema
+      role: roleId, // Source of truth: role_id or appRole.id or role
+      roleName: roleName,
       company_code: data.company_code,
       job_title: data.job_title,
       status: status,
@@ -317,8 +322,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // Si el rol sigue siendo el string hardcodeado, usa la lógica vieja
     if (allowedRoles.includes(user.role as UserRole)) return true;
 
-    // Si el rol es un UUID, buscar en los roles dinámicos
-    const userRoleDef = roles.find(r => r.id === user.role);
+    // Buscar en los roles dinámicos por ID o por Nombre
+    const userRoleStr = (user.role || '').toString().toLowerCase().trim();
+    const userRoleNameStr = (user.roleName || '').toString().toLowerCase().trim();
+
+    const userRoleDef = roles.find(r => {
+      const rId = (r.id || '').toString().toLowerCase().trim();
+      const rName = (r.name || '').toString().toLowerCase().trim();
+      return rId === userRoleStr || rName === userRoleStr || (userRoleNameStr && rName === userRoleNameStr);
+    });
 
     if (userRoleDef) {
       // Si el rol de DB dice "Admin", "Manager" o "Supervisor" o es de sistema
@@ -349,10 +361,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // 1. Super Admin Bypass (optional, but good for dev)
     if (user.role === UserRole.ADMIN_SOLICITANTE) return true;
 
-    // 2. Check Dynamic Roles
-    const userRoleDef = roles.find(r => r.id === user.role);
+    // 2. Check Dynamic Roles por ID o Nombre
+    const userRoleStr = (user.role || '').toString().toLowerCase().trim();
+    const userRoleNameStr = (user.roleName || '').toString().toLowerCase().trim();
 
-    if (!userRoleDef) return false;
+    const userRoleDef = roles.find(r => {
+      const rId = (r.id || '').toString().toLowerCase().trim();
+      const rName = (r.name || '').toString().toLowerCase().trim();
+      return rId === userRoleStr || rName === userRoleStr || (userRoleNameStr && rName === userRoleNameStr);
+    });
+
+    if (!userRoleDef) {
+      if (roles.length === 0) {
+        useUserStore.getState().fetchRoles().catch(console.error);
+      }
+      return false;
+    }
 
     // 2.5 New System Admin Bypass
     if (userRoleDef.isSystem ||
@@ -362,14 +386,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     // 3. Check specific permission
-    if (!userRoleDef.permissions) return false;
-
-    if (Array.isArray(userRoleDef.permissions)) {
-      return userRoleDef.permissions.includes(permissionId);
-    } else {
-      // Object format { [id]: boolean }
-      return !!(userRoleDef.permissions as Record<string, boolean>)[permissionId];
+    let perms = userRoleDef.permissions;
+    if (typeof perms === 'string') {
+      try {
+        perms = JSON.parse(perms);
+      } catch {
+        perms = {};
+      }
     }
+
+    if (!perms) return false;
+
+    if (Array.isArray(perms)) {
+      return perms.includes(permissionId);
+    } else if (typeof perms === 'object') {
+      return !!(perms as Record<string, boolean>)[permissionId];
+    }
+
+    return false;
   };
 
   return (

@@ -9,11 +9,21 @@ import { RequestDetail } from '../src/components/inventory/RequestDetail';
 import { inventoryService } from '../src/services';
 import { PartsRequest, SparePart } from '../src/types/inventory';
 import { useAuth } from '../contexts/AuthContext';
-import { Layers, FileText, ArrowDownCircle, PlusCircle, List } from 'lucide-react';
+import { Layers, FileText, ArrowDownCircle, PlusCircle, List, Shield } from 'lucide-react';
 
 export const Inventory: React.FC<any> = () => {
   const { hasPermission } = useAuth();
   const canManage = hasPermission('manage_inventory');
+  const canView = hasPermission('view_inventory') || canManage;
+
+  if (!canView) {
+    return (
+      <div className="h-full flex items-center justify-center bg-industrial-900 text-industrial-500 flex-col gap-4">
+        <Shield className="w-12 h-12 text-red-900" />
+        <span>Acceso Restringido: Se requiere el permiso de Ver Repuestos.</span>
+      </div>
+    );
+  }
   const [activeTab, setActiveTab] = useState<'list' | 'request' | 'requests_list' | 'receive' | 'create' | 'purchase_requests'>('list');
   const [selectedRequest, setSelectedRequest] = useState<PartsRequest | null>(null);
   const [parts, setParts] = useState<SparePart[]>([]);
@@ -60,7 +70,7 @@ export const Inventory: React.FC<any> = () => {
           <Layers className="w-4 h-4 mr-2" />
           Stock Actual
         </button>
-        {(canManage || hasPermission('view_part_requests')) && (
+        {(canManage || hasPermission('view_part_requests') || canView) && (
           <button
             onClick={() => { setActiveTab('requests_list'); setSelectedRequest(null); }}
             className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${activeTab === 'requests_list'
@@ -106,7 +116,7 @@ export const Inventory: React.FC<any> = () => {
             </button>
           </>
         )}
-        {(canManage || hasPermission('view_purchase_requests')) && (
+        {(canManage || hasPermission('view_purchase_requests') || canView) && (
           <button
             onClick={() => { setActiveTab('purchase_requests'); setSelectedRequest(null); }}
             className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${activeTab === 'purchase_requests'

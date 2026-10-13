@@ -4,7 +4,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useMasterStore } from '../src/stores/useMasterStore';
 import { DocumentService } from '../src/services/documentService';
 import { supabase } from '../src/services/supabaseClient';
-import { Box, Wifi, Plus, X, Camera, FileText, Server, Clock, Calendar, Pencil, Eye, Download, Trash2, Lock, AlertCircle, Loader2 } from 'lucide-react';
+import { Box, Wifi, Plus, X, Camera, FileText, Server, Clock, Calendar, Pencil, Eye, Download, Trash2, Lock, AlertCircle, Loader2, Shield } from 'lucide-react';
 import { TablePagination } from './shared/TablePagination';
 import { useAuth } from '../contexts/AuthContext';
 import { formatDate } from '../src/utils/dateUtils';
@@ -21,7 +21,17 @@ export const MachinesList: React.FC = () => {
 
   const { t } = useLanguage();
   const { hasPermission } = useAuth();
-  const canManage = hasPermission('manage_assets');
+  const canManage = hasPermission('manage_machines') || hasPermission('manage_assets');
+  const canView = hasPermission('view_machines') || canManage;
+
+  if (!canView) {
+    return (
+      <div className="h-full flex items-center justify-center bg-industrial-900 text-industrial-500 flex-col gap-4">
+        <Shield className="w-12 h-12 text-red-900" />
+        <span>Acceso Restringido: Se requiere el permiso de Ver Equipos.</span>
+      </div>
+    );
+  }
 
   // Flatten Zones for Selection
   const zones = zoneStructures.flatMap(z =>

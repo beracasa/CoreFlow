@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { z } from 'zod';
-import { WorkOrder, Machine, Technician, Priority, WorkOrderStatus, SparePart, WorkOrderStage, MaintenanceTask, UserRole } from '../types';
+import { WorkOrder, Machine, Technician, Priority, WorkOrderStatus, SparePart, WorkOrderStage, MaintenanceTask, UserRole, UserProfile } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { X, Calendar, User, FileText, CheckCircle, Clock, AlertCircle, Wrench, Package, ShieldCheck, FileKey, Info, ChevronRight, Lock, Save, PenTool, CheckSquare, Plus, Trash2, Camera, Upload, ImageIcon, Trash, FileIcon, UserCircle, Download, ArrowRight, PlayCircle, Settings, UploadCloud, Image, Paperclip, Loader2 } from 'lucide-react';
@@ -129,6 +129,115 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
    const isSection3Editable = (formData.currentStage === WorkOrderStage.HANDOVER && hasPermission('supervise_order')) || (editingSection === 3 && hasPermission('edit_wo'));
 
 
+   // Access store
+   const { maintenancePlans, categories, parts: spareParts } = useMasterStore();
+   const { users, roles, fetchUsers, fetchRoles } = useUserStore();
+   const { deleteOrder } = useWorkOrderStore();
+
+   useEffect(() => {
+      // Ensure users and roles are loaded
+      if (users.length === 0) fetchUsers();
+      if (roles.length === 0) fetchRoles();
+   }, []);
+
+   const getUserRoleName = (u: UserProfile) => {
+      if (u.roleName) return u.roleName;
+      const found = roles.find(r => 
+         r.id === u.role || 
+         r.name?.toLowerCase().trim() === (u.role || '').toString().toLowerCase().trim()
+      );
+      return found?.name || u.job_title || '';
+   };
+
+   // Helper general para validar permisos RBAC de cualquier usuario según su configuración en Roles y Permisos
+   const hasUserPermission = (u: UserProfile, permissionId: string): boolean => {
+      if (!u) return false;
+      // Si es el usuario actual autenticado, usar directamente hasPermission de AuthContext
+      if (user && u.id === user.id && hasPermission(permissionId)) return true;
+
+      // 1. Super Admin bypass
+      if (u.role === UserRole.ADMIN_SOLICITANTE) return true;
+
+      // 2. Buscar definición del rol en el listado de roles
+      const userRoleStr = (u.role || '').toString().toLowerCase().trim();
+      const userRoleNameStr = (u.roleName || '').toString().toLowerCase().trim();
+
+      const roleDef = roles.find(r => {
+         const rId = (r.id || '').toString().toLowerCase().trim();
+         const rName = (r.name || '').toString().toLowerCase().trim();
+         return rId === userRoleStr || rName === userRoleStr || (userRoleNameStr && rName === userRoleNameStr);
+      });
+
+      if (!roleDef) {
+         // Fallback heurístico por si el rol aún no terminó de cargar
+         if (permissionId === 'create_wo' || permissionId === 'supervise_order') {
+            if (
+               userRoleNameStr.includes('admin') ||
+               userRoleNameStr.includes('gerente') ||
+               userRoleNameStr.includes('supervisor') ||
+               userRoleNameStr.includes('encargado') ||
+               (u.job_title && (u.job_title.toLowerCase().includes('supervisor') || u.job_title.toLowerCase().includes('encargado') || u.job_title.toLowerCase().includes('gerente')))
+            ) {
+               return true;
+            }
+         }
+         return false;
+      }
+
+      // 3. Bypass de sistema / administradores
+      if (roleDef.isSystem || roleDef.name?.toLowerCase().includes('admin') || roleDef.name?.toLowerCase().includes('manager')) {
+         return true;
+      }
+
+      // 4. Verificación del permiso configurado
+      let perms = roleDef.permissions;
+      if (typeof perms === 'string') {
+         try { perms = JSON.parse(perms); } catch { perms = {}; }
+      }
+      if (!perms) return false;
+
+      if (Array.isArray(perms)) {
+         return perms.includes(permissionId);
+      } else if (typeof perms === 'object') {
+         return !!(perms as Record<string, boolean>)[permissionId];
+      }
+
+      return false;
+   };
+
+   // Available Requesters for R-MANT-05 (Nombre del Solicitante): Usuarios con permiso 'create_wo'
+   const availableRequesters = useMemo(() => {
+      const filtered = users.filter(u => hasUserPermission(u, 'create_wo'));
+      if (user && hasPermission('create_wo') && !filtered.some(u => u.id === user.id)) {
+         filtered.push(user);
+      }
+      return filtered.length > 0 ? filtered : users;
+   }, [users, roles, user, hasPermission]);
+
+   // Available Supervisors for R-MANT-02 y Sección 3 (Supervisión y Cierre): Usuarios con 'supervise_order' o 'create_wo'
+   const availableSupervisors = useMemo(() => {
+      const filtered = users.filter(u => hasUserPermission(u, 'supervise_order') || hasUserPermission(u, 'create_wo'));
+      if (user && (hasPermission('supervise_order') || hasPermission('create_wo')) && !filtered.some(u => u.id === user.id)) {
+         filtered.push(user);
+      }
+      return filtered.length > 0 ? filtered : users;
+   }, [users, roles, user, hasPermission]);
+
+   // Available Received By for R-MANT-05 (Sección 2): Usuarios con 'execute_wo' o 'supervise_order'
+   const availableReceivedBy = useMemo(() => {
+      const filtered = users.filter(u => 
+         hasUserPermission(u, 'execute_wo') || 
+         hasUserPermission(u, 'supervise_order') ||
+         u.roleName?.toLowerCase().includes('electromec') ||
+         u.roleName?.toLowerCase().includes('técnico') ||
+         u.roleName?.toLowerCase().includes('tecnico')
+      );
+      if (user && !filtered.some(u => u.id === user.id)) {
+         filtered.push(user);
+      }
+      return filtered.length > 0 ? filtered : users;
+   }, [users, roles, user]);
+
    // -- INITIALIZATION EFFECT --
    useEffect(() => {
       if (initialMachineId) {
@@ -176,18 +285,15 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                }
             }
          }
+      } else if (user) {
+         // Default initialization for new work orders
+         setFormData(prev => ({
+            ...prev,
+            assignedTo: prev.assignedTo || (hasPermission('create_wo') ? user.id : prev.assignedTo),
+            supervisor: prev.supervisor || (hasPermission('supervise_order') || hasPermission('create_wo') ? user.id : prev.supervisor)
+         }));
       }
-   }, [initialMachineId, initialData]);
-
-   // Access store
-   const { maintenancePlans, categories, parts: spareParts } = useMasterStore();
-   const { users, fetchUsers } = useUserStore();
-   const { deleteOrder } = useWorkOrderStore();
-
-   useEffect(() => {
-      // Ensure users are loaded
-      if (users.length === 0) fetchUsers();
-   }, []);
+   }, [initialMachineId, initialData, user]);
 
    const availableTechnicians = useMemo(() => {
       const filtered = users.filter(u => 
@@ -553,9 +659,14 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
 
       setFormData(prev => ({
          ...prev,
-         signatureSupervisor: user?.full_name || user?.name || 'Admin User',
+         supervisorId: prev.supervisorId || user?.id,
+         closingDate: prev.closingDate || new Date().toISOString(),
+         signatureSupervisor: user?.full_name || user?.name || 'Supervisor',
          signatureSupervisorDate: new Date().toISOString()
       }));
+      clearInvalidField('signatureSupervisor');
+      clearInvalidField('supervisorId');
+      clearInvalidField('closingDate');
    };
 
    return (
@@ -683,10 +794,12 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                               <select disabled={!isSection1Editable}
                                  className={`w-full bg-industrial-900 border rounded p-2 text-white text-sm focus:border-emerald-500 outline-none ${invalidFields.has('assignedTo') ? 'border-red-500 bg-red-900/10' : 'border-industrial-600'}`}
                                  value={formData.assignedTo || ''}
-                                 onChange={e => setFormData({ ...formData, assignedTo: e.target.value })}>
+                                 onChange={e => {
+                                    setFormData({ ...formData, assignedTo: e.target.value });
+                                    clearInvalidField('assignedTo');
+                                 }}>
                                  <option value="">- Seleccionar -</option>
-                                 {/* Only show users with appropriate role (Gerente or Supervisor de Mantenimiento) */}
-                                 {users.filter(u => u.roleName === 'Gerente de Mantenimiento' || u.roleName === 'Supervisor de Mantenimiento').map(u => (
+                                 {availableRequesters.map(u => (
                                     <option key={u.id} value={u.id}>{u.full_name}</option>
                                  ))}
                               </select>
@@ -1080,7 +1193,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                  clearInvalidField('supervisor');
                               }}>
                               <option value="">- Seleccionar Supervisor -</option>
-                              {users.filter(u => u.roleName === 'Supervisor de Mantenimiento').map(u => (
+                              {availableSupervisors.map(u => (
                                  <option key={u.id} value={u.id}>{u.full_name}</option>
                               ))}
                            </select>
@@ -1192,12 +1305,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                     value={formData.requestReceivedBy || ''}
                                     onChange={e => setFormData({ ...formData, requestReceivedBy: e.target.value })}>
                                     <option value="">- Seleccionar -</option>
-                                    {users.filter(u => 
-                                       u.roleName === 'Supervisor de Mantenimiento' || 
-                                       u.roleName === 'Gerente de Mantenimiento' || 
-                                       u.roleName === 'Electromecánico Labels' || 
-                                       u.roleName === 'Electromecánico Ravi'
-                                    ).map(u => (
+                                    {availableReceivedBy.map(u => (
                                        <option key={u.id} value={u.id}>{u.full_name}</option>
                                     ))}
                                  </select>
@@ -1913,7 +2021,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                     clearInvalidField('supervisorId');
                                  }}>
                                  <option value="">- Seleccionar Supervisor -</option>
-                                 {users.filter(u => u.roleName === 'Supervisor de Mantenimiento').map(u => (
+                                 {availableSupervisors.map(u => (
                                     <option key={u.id} value={u.id}>{u.full_name}</option>
                                  ))}
                               </select>

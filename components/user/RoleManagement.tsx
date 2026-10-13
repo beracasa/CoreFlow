@@ -7,9 +7,18 @@ import { useAuth } from '../../contexts/AuthContext';
 
 // --- DEFINICIÓN DE PERMISOS DEL SISTEMA ---
 const SYSTEM_PERMISSIONS: Permission[] = [
+    // Informativos
+    { id: 'view_dashboard', category: 'INFORMATIVE', label: 'Ver Planta Visual y Mapa', description: 'Ver información en la planta visual. No puede editar el diseño del mapa.' },
+    { id: 'edit_dashboard_map', category: 'INFORMATIVE', label: 'Editar Planta Visual y Mapa', description: 'Editar información en la planta visual. Puede editar el diseño del mapa.' },
+    { id: 'view_kanban', category: 'INFORMATIVE', label: 'Ver Tablero Kanban', description: 'Ver estado de tickets de mantenimiento.' },
+    { id: 'edit_kanban', category: 'INFORMATIVE', label: 'Editar Tablero Kanban', description: 'Permiso de Edición de la Tabla Kanban.' },
+    { id: 'view_analytics', category: 'INFORMATIVE', label: 'Ver Analíticas y BI', description: 'Acceso completo a dashboard de reportes.' },
+    { id: 'view_calendar', category: 'INFORMATIVE', label: 'Ver Calendario', description: 'Permite solo ver el calendario de mantenimiento.' },
+    { id: 'manage_calendar', category: 'INFORMATIVE', label: 'Gestionar Calendario', description: 'Permite hacer clic en el mantenimiento y acceder al detalle.' },
+    
     // Operativos
-    { id: 'view_dashboard', category: 'OPERATIONAL', label: 'Ver Planta Visual y Mapa', description: 'Ver información en la planta visual. No puede editar el diseño del mapa.' },
-    { id: 'edit_dashboard_map', category: 'OPERATIONAL', label: 'Editar Planta Visual y Mapa', description: 'Editar información en la planta visual. Puede editar el diseño del mapa.' },
+    { id: 'manage_machines', category: 'OPERATIONAL', label: 'Gestionar Equipos', description: 'Agregar, editar y desactivar equipos y máquinas.' },
+    { id: 'view_machines', category: 'OPERATIONAL', label: 'Ver Equipos', description: 'Ver listado de equipos y fichas de detalle, sin editar ni desactivar.' },
     { id: 'create_wo', category: 'OPERATIONAL', label: 'Crear Órdenes de Mantenimiento', description: 'Generar nuevos tickets R-MANT-02/05.' },
     { id: 'execute_wo', category: 'OPERATIONAL', label: 'Ejecutar Órdenes de Mantenimiento', description: 'Llenar checklists y consumir repuestos.' },
     { id: 'supervise_order', category: 'OPERATIONAL', label: 'Supervisar y Recibir Órdenes', description: 'Llenar checklists y recepción de una orden.' },
@@ -17,15 +26,10 @@ const SYSTEM_PERMISSIONS: Permission[] = [
     { id: 'log_hours', category: 'OPERATIONAL', label: 'Registrar Uso del Equipo', description: 'Actualizar contadores de horas de máquinas.' },
     
     // Administrativos
-    { id: 'manage_assets', category: 'ADMINISTRATIVE', label: 'Gestionar Activos', description: 'Agregar/Editar Equipos y Máquinas' },
-    { id: 'manage_inventory', category: 'ADMINISTRATIVE', label: 'Gestionar Inventario', description: 'Agregar/Editar repuestos y stock.' },
+    { id: 'manage_inventory', category: 'ADMINISTRATIVE', label: 'Gestionar Repuestos', description: 'Agregar/Editar repuestos, stock, recepciones y solicitudes.' },
+    { id: 'view_inventory', category: 'ADMINISTRATIVE', label: 'Ver Repuestos', description: 'Ver repuestos y detalles, sin editar ni crear solicitudes.' },
     { id: 'view_part_requests', category: 'ADMINISTRATIVE', label: 'Ver Solicitudes de Repuestos', description: 'Visualizar listado y detalle de solicitudes de repuestos.' },
     { id: 'view_purchase_requests', category: 'ADMINISTRATIVE', label: 'Ver Solicitudes a Compras', description: 'Visualizar listado y detalle de solicitudes de compras.' },
-    
-    // Analíticas
-    { id: 'view_kanban', category: 'FINANCIAL', label: 'Ver Tablero Kanban', description: 'Ver estado de tickets de mantenimiento.' },
-    { id: 'edit_kanban', category: 'FINANCIAL', label: 'Editar Tablero Kanban', description: 'Permiso de Edición de la Tabla Kanban.' },
-    { id: 'view_analytics', category: 'FINANCIAL', label: 'Ver Analíticas y BI', description: 'Acceso completo a dashboard de reportes.' },
     
     // Sistema
     { id: 'manage_config', category: 'SYSTEM', label: 'Gestionar Configuración', description: 'Acceso al módulo de Configuración y gestión de submódulos.' },
@@ -247,6 +251,7 @@ export const RoleManagement: React.FC = () => {
     };
 
     const categoryLabels: Record<string, string> = {
+        'INFORMATIVE': 'Acceso Informativo',
         'OPERATIONAL': 'Acceso Operativo',
         'ADMINISTRATIVE': 'Acceso Administrativo',
         'FINANCIAL': 'Acceso Analíticas',

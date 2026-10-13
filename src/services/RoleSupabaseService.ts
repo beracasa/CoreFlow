@@ -17,7 +17,15 @@ export const RoleSupabaseService = {
           description: 'Acceso total de administración y solicitudes',
           parentRoleId: null,
           isSystem: true,
-          permissions: { view_analytics: true },
+          permissions: {
+            view_analytics: true,
+            view_calendar: true,
+            manage_calendar: true,
+            manage_machines: true,
+            view_machines: true,
+            manage_inventory: true,
+            view_inventory: true
+          },
           shareDataWithPeers: true,
           usersCount: 1
         },
