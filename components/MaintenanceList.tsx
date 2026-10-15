@@ -4,6 +4,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useWorkOrderStore } from '../src/stores/useWorkOrderStore';
 import { useMasterStore } from '../src/stores/useMasterStore';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { FileText, Plus, Calendar, AlertCircle, CheckCircle, Clock, Download } from 'lucide-react';
 import { generateMaintenanceListPDF, generateRMant02PDF, generateRMant05PDF } from '../src/utils/pdf/pdfGenerator';
 import { generateWorkOrderReport } from '../src/services/ReportService';
@@ -20,6 +21,8 @@ export const MaintenanceList: React.FC<MaintenanceListProps> = ({ type }) => {
   const { t, language } = useLanguage();
   const { workOrders, pagination, fetchOrders, setPage, loading } = useWorkOrderStore();
   const { machines, plantSettings, fetchMasterData, isInitialized: masterInitialized } = useMasterStore();
+  const { hasPermission } = useAuth();
+  const canCreate = hasPermission('create_wo');
   const navigate = useNavigate();
 
   React.useEffect(() => {
@@ -165,13 +168,15 @@ export const MaintenanceList: React.FC<MaintenanceListProps> = ({ type }) => {
             <FileText className="w-4 h-4" />
             Exportar PDF
           </button>
-          <button
-            onClick={() => navigate('/orders/new', { state: { type } })}
-            className="bg-industrial-accent hover:bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium transition-colors shadow-lg shadow-blue-900/20 flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            {t('mant.new')}
-          </button>
+          {canCreate && (
+            <button
+              onClick={() => navigate('/orders/new', { state: { type } })}
+              className="bg-industrial-accent hover:bg-blue-600 text-white px-4 py-2 rounded text-sm font-medium transition-colors shadow-lg shadow-blue-900/20 flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" />
+              {t('mant.new')}
+            </button>
+          )}
         </div>
       </div>
 

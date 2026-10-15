@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useWorkOrderStore } from '../src/stores/useWorkOrderStore';
 import { useMasterStore } from '../src/stores/useMasterStore';
 import { WorkOrder, Machine } from '../types';
-import { Calendar, ChevronLeft, ChevronRight, Printer, Search, Plus, MoreHorizontal, Shield } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Printer, Search, Plus, MoreHorizontal, Shield, Eye, Edit3 } from 'lucide-react';
 import { formatDate } from '../src/utils/dateUtils';
 
 export const MaintenanceCalendar: React.FC = () => {
@@ -16,6 +16,7 @@ export const MaintenanceCalendar: React.FC = () => {
   const navigate = useNavigate();
 
   const canManageCalendar = hasPermission('manage_calendar');
+  const canCreateWO = hasPermission('create_wo');
 
   if (!hasPermission('view_calendar')) {
     return (
@@ -356,19 +357,20 @@ export const MaintenanceCalendar: React.FC = () => {
                         onClick={() => {
                           if (!canManageCalendar) return;
                           if (isNextMaint) {
+                            if (!canCreateWO) return;
                             navigate('/orders/new', { state: { machineId: item.machineId } });
                           } else {
                             navigate(`/orders/${item.id}`, { state: { type: item.type } });
                           }
                         }}
                         className={`px-2 py-1 rounded text-[11px] font-medium transition-all duration-150 truncate block select-none border ${
-                          canManageCalendar ? 'cursor-pointer' : 'cursor-default'
+                          canManageCalendar && (!isNextMaint || canCreateWO) ? 'cursor-pointer' : 'cursor-default'
                         } ${
                           isMant02
                             ? `bg-emerald-600/10 text-emerald-300 border-emerald-500/20 ${canManageCalendar ? 'hover:bg-emerald-600/20 hover:border-emerald-500/40' : ''}`
                             : isMant05
                             ? `bg-amber-600/10 text-amber-300 border-amber-500/20 ${canManageCalendar ? 'hover:bg-amber-600/20 hover:border-amber-500/40' : ''}`
-                            : `bg-blue-600/10 text-blue-300 border-blue-500/20 ${canManageCalendar ? 'hover:bg-blue-600/20 hover:border-blue-500/40' : ''}`
+                            : `bg-blue-600/10 text-blue-300 border-blue-500/20 ${canManageCalendar && (!isNextMaint || canCreateWO) ? 'hover:bg-blue-600/20 hover:border-blue-500/40' : ''}`
                         }`}
                       >
                         {isNextMaint ? '🔧 ' : ''}{item.title} - {item.line}
@@ -453,19 +455,20 @@ export const MaintenanceCalendar: React.FC = () => {
                         onClick={() => {
                           if (!canManageCalendar) return;
                           if (isNextMaint) {
+                            if (!canCreateWO) return;
                             navigate('/orders/new', { state: { machineId: item.machineId } });
                           } else {
                             navigate(`/orders/${item.id}`, { state: { type: item.type } });
                           }
                         }}
                         className={`p-2.5 rounded-lg border text-xs transition-all duration-200 shadow-md ${
-                          canManageCalendar ? 'cursor-pointer' : 'cursor-default'
+                          canManageCalendar && (!isNextMaint || canCreateWO) ? 'cursor-pointer' : 'cursor-default'
                         } ${
                           isMant02
                             ? `bg-emerald-600/10 text-emerald-200 border-emerald-500/30 ${canManageCalendar ? 'hover:border-emerald-400/50 hover:bg-emerald-600/20' : ''}`
                             : isMant05
                             ? `bg-amber-600/10 text-amber-200 border-amber-500/30 ${canManageCalendar ? 'hover:border-amber-400/50 hover:bg-amber-600/20' : ''}`
-                            : `bg-blue-600/10 text-blue-200 border-blue-500/30 ${canManageCalendar ? 'hover:border-blue-400/50 hover:bg-blue-600/20' : ''}`
+                            : `bg-blue-600/10 text-blue-200 border-blue-500/30 ${canManageCalendar && (!isNextMaint || canCreateWO) ? 'hover:border-blue-400/50 hover:bg-blue-600/20' : ''}`
                         }`}
                       >
                         <div className="flex justify-between items-center mb-1">
@@ -541,13 +544,14 @@ export const MaintenanceCalendar: React.FC = () => {
                   onClick={() => {
                     if (!canManageCalendar) return;
                     if (isNextMaint) {
+                      if (!canCreateWO) return;
                       navigate('/orders/new', { state: { machineId: item.machineId } });
                     } else {
                       navigate(`/orders/${item.id}`, { state: { type: item.type } });
                     }
                   }}
                   className={`p-4 rounded-xl border flex justify-between items-start gap-4 transition-all duration-200 ${
-                    canManageCalendar ? 'cursor-pointer hover:shadow-lg hover:border-industrial-500' : 'cursor-default'
+                    canManageCalendar && (!isNextMaint || canCreateWO) ? 'cursor-pointer hover:shadow-lg hover:border-industrial-500' : 'cursor-default'
                   } ${
                     isMant02
                       ? 'bg-emerald-600/10 text-emerald-200 border-emerald-500/20'
@@ -632,6 +636,15 @@ export const MaintenanceCalendar: React.FC = () => {
             <span className="hidden print:inline text-lg font-medium text-slate-600 ml-2">
               - {getHeaderTitle()}
             </span>
+            {canManageCalendar ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 print-hide ml-2">
+                <Edit3 size={12} /> Gestión Habilitada
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-industrial-800 text-industrial-400 border border-industrial-700 print-hide ml-2">
+                <Eye size={12} /> Modo Solo Lectura
+              </span>
+            )}
           </h2>
           <p className="text-xs text-industrial-500 mt-0.5 print-hide">
             {language === 'es'
@@ -645,11 +658,11 @@ export const MaintenanceCalendar: React.FC = () => {
           <button className="p-2 bg-industrial-800 hover:bg-industrial-700 rounded text-slate-400 hover:text-white transition-colors" title="Search">
             <Search size={18} />
           </button>
-          {canManageCalendar && (
+          {canManageCalendar && canCreateWO && (
             <button
               onClick={() => navigate('/orders/new')}
               className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors shadow-lg shadow-blue-500/20"
-              title="Add Order"
+              title="Nueva Orden"
             >
               <Plus size={18} />
             </button>

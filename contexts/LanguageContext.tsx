@@ -174,6 +174,7 @@ const translations: Translations = {
     'config.tab.assets': 'Asset Registry (Digital Twin)',
     'config.tab.workforce': 'Workforce (HR)',
     'config.tab.settings': 'Plant Settings',
+    'config.tab.zones': 'Lines & Areas',
 
     // Config - Assets
     'assets.title': 'Connected Machinery',
@@ -392,7 +393,7 @@ const translations: Translations = {
     'config.tab.workforce': 'Fuerza Laboral (RH)',
     'config.tab.settings': 'Datos Generales',
     'config.tab.roles': 'Roles y Permisos',
-    'config.tab.zones': 'Zonas y Líneas',
+    'config.tab.zones': 'Líneas y Áreas',
     'config.tab.equipment': 'Equipos',
     'config.tab.inventory': 'Repuestos',
 

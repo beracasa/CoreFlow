@@ -69,6 +69,7 @@ export interface UserProfile {
     pending_approvals: boolean;
   };
   requires_password_change?: boolean;
+  permissions?: string[] | Record<string, boolean>;
 }
 
 export interface TelemetryData {

@@ -90,11 +90,22 @@ class ErrorBoundary extends React.Component<any, any> {
   }
 }
 
-// --- PAGE WRAPPERS ---
 const InventoryPage = () => {
   const { hasPermission } = useAuth();
-  if (!hasPermission('view_inventory') && !hasPermission('manage_inventory') && !hasPermission('manage_assets')) {
-    return <div className="h-full flex items-center justify-center bg-industrial-900 text-industrial-500 flex-col gap-4"><Shield className="w-12 h-12 text-red-900" /><span>Acceso Restringido: Se requiere el permiso de Ver Repuestos.</span></div>;
+  const canAccessInventory =
+    hasPermission('manage_inventory') ||
+    hasPermission('view_inventory') ||
+    hasPermission('view_part_requests') ||
+    hasPermission('view_purchase_requests') ||
+    hasPermission('manage_assets');
+
+  if (!canAccessInventory) {
+    return (
+      <div className="h-full flex items-center justify-center bg-industrial-900 text-industrial-500 flex-col gap-4">
+        <Shield className="w-12 h-12 text-red-900" />
+        <span>Acceso Restringido: Se requieren permisos del módulo de Repuestos.</span>
+      </div>
+    );
   }
   const { parts, addPart } = useMasterStore();
   return <Inventory parts={parts} onAddPart={addPart} />;
@@ -102,7 +113,7 @@ const InventoryPage = () => {
 
 const MachinesPage = () => {
   const { hasPermission } = useAuth();
-  if (!hasPermission('view_machines') && !hasPermission('manage_machines') && !hasPermission('manage_assets')) {
+  if (!hasPermission('view_machines')) {
     return <div className="h-full flex items-center justify-center bg-industrial-900 text-industrial-500 flex-col gap-4"><Shield className="w-12 h-12 text-red-900" /><span>Acceso Restringido: Se requiere el permiso de Ver Equipos.</span></div>;
   }
   return <MachinesList />;
@@ -136,6 +147,19 @@ const ConfigurationPage = () => {
   );
 };
 
+const KanbanPage = () => {
+  const { hasPermission } = useAuth();
+  if (!hasPermission('view_kanban')) {
+    return (
+      <div className="h-full flex items-center justify-center bg-industrial-900 text-industrial-500 flex-col gap-4">
+        <Shield className="w-12 h-12 text-red-900" />
+        <span>Acceso Restringido: Se requiere el permiso de Ver Tablero Kanban.</span>
+      </div>
+    );
+  }
+  return <MaintenanceKanban />;
+};
+
 const AnalyticsPage = () => {
   const { hasPermission } = useAuth();
   if (!hasPermission('view_analytics')) {
@@ -155,6 +179,7 @@ const CalendarPage = () => {
 const MaintenanceFormPage = () => {
   const { machines, technicians } = useMasterStore();
   const { addOrder, updateOrder, getOrderById } = useWorkOrderStore();
+  const { hasPermission } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -165,6 +190,15 @@ const MaintenanceFormPage = () => {
   // Determine Order ID from URL or State
   const orderId = id || state?.orderId;
   const existingOrder = orderId ? getOrderById(orderId) : undefined;
+
+  if (!orderId && !hasPermission('create_wo')) {
+    return (
+      <div className="h-full flex items-center justify-center bg-industrial-900 text-industrial-500 flex-col gap-4">
+        <Shield className="w-12 h-12 text-red-900" />
+        <span>Acceso Restringido: Se requiere el permiso de Crear Órdenes de Mantenimiento.</span>
+      </div>
+    );
+  }
 
   // If we have an ID but no order in store (e.g. reload), we might need to fetch. 
   // However, useWorkOrderStore usually loads all. If empty, maybe trigger fetch?
@@ -270,9 +304,9 @@ const AppLayout = () => {
 
           <nav className="flex-1 space-y-1 mt-4">
             <SidebarItem label={t('sidebar.visualPlant')} icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>}
-              active={path === '/'} onClick={() => navigate('/')} />
+              active={path === '/'} onClick={() => navigate('/')} disabled={!hasPermission('view_dashboard')} />
             <SidebarItem label={t('sidebar.maintenanceCanvas')} icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>}
-              active={path === '/kanban'} onClick={() => navigate('/kanban')} />
+              active={path === '/kanban'} onClick={() => navigate('/kanban')} disabled={!hasPermission('view_kanban')} />
 
             <SidebarItem label={t('sidebar.biAnalytics')} icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>}
               active={path === '/stats'} onClick={() => navigate('/stats')} disabled={!hasPermission('view_analytics')} />
@@ -294,11 +328,17 @@ const AppLayout = () => {
 
             <SidebarItem label="Equipos" icon={<Server className="w-5 h-5" />}
               active={path === '/machines'} onClick={() => navigate('/machines')}
-              disabled={!hasPermission('view_machines') && !hasPermission('manage_machines') && !hasPermission('manage_assets')} />
+              disabled={!hasPermission('view_machines')} />
 
             <SidebarItem label="Repuestos" icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>}
               active={path === '/inventory'} onClick={() => navigate('/inventory')}
-              disabled={!hasPermission('view_inventory') && !hasPermission('manage_inventory') && !hasPermission('manage_assets')} />
+              disabled={
+                !hasPermission('manage_inventory') &&
+                !hasPermission('view_inventory') &&
+                !hasPermission('view_part_requests') &&
+                !hasPermission('view_purchase_requests') &&
+                !hasPermission('manage_assets')
+              } />
 
             <div className="pt-4 mt-4 border-t border-industrial-800">
               <SidebarItem label={t('sidebar.masterData')} icon={<svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} /><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} /></svg>}
@@ -454,7 +494,7 @@ const AppRoutes = () => {
       <Route path="/change-password" element={<ChangePasswordView />} />
       <Route path="/" element={<AppLayout />}>
         <Route index element={<Dashboard />} />
-        <Route path="kanban" element={<MaintenanceKanban />} />
+        <Route path="kanban" element={<KanbanPage />} />
         <Route path="orders/preventive" element={<MaintenanceList key="preventive" type="R-MANT-02" />} />
         <Route path="orders/corrective" element={<MaintenanceList key="corrective" type="R-MANT-05" />} />
         <Route path="orders/new" element={<MaintenanceFormPage />} />

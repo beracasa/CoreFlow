@@ -3,11 +3,22 @@ import { Layers, Activity, Wrench, Battery, Gauge, ZoomIn, ZoomOut, Maximize, Ed
 import { AssetNode, MapLayer } from './AssetNode';
 import { AssetDrawer } from './AssetDrawer';
 import { AssetSelectionModal } from '../modals/AssetSelectionModal';
+import { ZoneModal } from '../modals/ZoneModal';
 import { Machine, ZoneStructure } from '../../types';
 import { analyzeMachineHealth, PredictiveAnalysis } from '../../services/geminiService';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { useWorkOrderStore } from '../../src/stores/useWorkOrderStore';
+
+const ZONE_STYLE_MAP: Record<string, { border: string; bg: string; text: string; subtext: string; dotHex: string }> = {
+  blue: { border: 'border-blue-500/60', bg: 'bg-blue-500/5', text: 'text-blue-400', subtext: 'text-blue-200', dotHex: '#3b82f6' },
+  emerald: { border: 'border-emerald-500/60', bg: 'bg-emerald-500/5', text: 'text-emerald-400', subtext: 'text-emerald-200', dotHex: '#10b981' },
+  amber: { border: 'border-amber-500/60', bg: 'bg-amber-500/5', text: 'text-amber-400', subtext: 'text-amber-200', dotHex: '#f59e0b' },
+  purple: { border: 'border-purple-500/60', bg: 'bg-purple-500/5', text: 'text-purple-400', subtext: 'text-purple-200', dotHex: '#8b5cf6' },
+  red: { border: 'border-red-500/60', bg: 'bg-red-500/5', text: 'text-red-400', subtext: 'text-red-200', dotHex: '#ef4444' },
+  cyan: { border: 'border-cyan-500/60', bg: 'bg-cyan-500/5', text: 'text-cyan-400', subtext: 'text-cyan-200', dotHex: '#06b6d4' },
+  slate: { border: 'border-industrial-500/50', bg: 'bg-industrial-800/30', text: 'text-industrial-200', subtext: 'text-industrial-300', dotHex: '#64748b' }
+};
 
 interface PlantMapContainerProps {
   machines: Machine[];
@@ -60,6 +71,30 @@ export const PlantMapContainer: React.FC<PlantMapContainerProps> = ({ machines, 
   const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
   const [assetModalType, setAssetModalType] = useState<'MACHINE' | 'ZONE'>('ZONE');
   const [targetZoneForMachine, setTargetZoneForMachine] = useState<{ id: string, line: string } | null>(null);
+
+  // Zone Creation and Format Editing State
+  const [isZoneModalOpen, setIsZoneModalOpen] = useState(false);
+  const [editingZone, setEditingZone] = useState<ZoneStructure | null>(null);
+
+  const handleOpenCreateZone = () => {
+    setEditingZone(null);
+    setIsZoneModalOpen(true);
+  };
+
+  const handleEditZone = (zone: ZoneStructure) => {
+    setEditingZone(zone);
+    setIsZoneModalOpen(true);
+  };
+
+  const handleSaveZoneModal = async (zoneData: ZoneStructure) => {
+    if (editingZone && onUpdateZone) {
+      await onUpdateZone(zoneData);
+    } else if (onAddZone) {
+      await onAddZone(zoneData);
+    }
+    setIsZoneModalOpen(false);
+    setEditingZone(null);
+  };
 
   const handleMachineClick = (machine: Machine) => {
     if (isEditMode) return;
@@ -318,20 +353,30 @@ export const PlantMapContainer: React.FC<PlantMapContainerProps> = ({ machines, 
             {hasPermission('edit_dashboard_map') && (
               <div className="bg-industrial-800/90 backdrop-blur p-1 rounded-xl border border-industrial-600 shadow-xl flex gap-1">
                 {isEditMode && (
-                  <button
-                    onClick={() => handleOpenAssetModal('ZONE')}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold bg-industrial-700 text-industrial-300 hover:bg-industrial-600 hover:text-white transition-colors border-r border-industrial-600/50"
-                  >
-                    <Plus size={14} /> <span>Agregar Zona</span>
-                  </button>
-                )}
-                {isEditMode && (
-                  <button
-                    onClick={() => handleOpenAssetModal('MACHINE')}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold bg-industrial-700 text-industrial-300 hover:bg-industrial-600 hover:text-white transition-colors border-r border-industrial-600/50"
-                  >
-                    <Plus size={14} /> <span>Agregar Equipo</span>
-                  </button>
+                  <>
+                    <button
+                      onClick={handleOpenCreateZone}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-industrial-700 text-industrial-200 hover:bg-industrial-600 hover:text-white transition-colors"
+                      title="Crear una nueva Línea con formato y áreas"
+                    >
+                      <Plus size={14} /> <span>Crear Línea</span>
+                    </button>
+                    {unplacedZones.length > 0 && (
+                      <button
+                        onClick={() => handleOpenAssetModal('ZONE')}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-industrial-700 text-industrial-300 hover:bg-industrial-600 hover:text-white transition-colors border-r border-industrial-600/50"
+                        title="Agregar líneas existentes que no están en el mapa"
+                      >
+                        <Layers size={14} /> <span>Agregar Línea ({unplacedZones.length})</span>
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleOpenAssetModal('MACHINE')}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-industrial-700 text-industrial-300 hover:bg-industrial-600 hover:text-white transition-colors border-r border-industrial-600/50"
+                    >
+                      <Plus size={14} /> <span>Agregar Equipo</span>
+                    </button>
+                  </>
                 )}
                 <button
                   onClick={() => {
@@ -388,89 +433,112 @@ export const PlantMapContainer: React.FC<PlantMapContainerProps> = ({ machines, 
           style={{ transform: `scale(${zoomLevel})` }}
         >
           {/* --- DYNAMIC ZONES --- */}
-          {displayZones.map(zone => (
-            <div
-              key={zone.id}
-              className={`absolute transition-all duration-75 group ${isEditMode ? 'cursor-move' : 'pointer-events-none'}`}
-              style={{
-                left: `${zone.x || 0}%`,
-                top: `${zone.y || 0}%`,
-                width: `${zone.width || 20}%`,
-                height: `${zone.height || 20}%`,
-                zIndex: isEditMode && draggingZoneId === zone.id ? 20 : 1
-              }}
-              onMouseDown={(e) => handleZoneMouseDown(e, zone)}
-            >
-              {/* Zone Border */}
+          {displayZones.map(zone => {
+            const zoneStyle = ZONE_STYLE_MAP[zone.color || 'slate'] || ZONE_STYLE_MAP.slate;
+            return (
               <div
-                className={`absolute inset-0 border-2 rounded-xl transition-colors ${isEditMode ? 'border-yellow-500/50 border-dashed bg-yellow-500/5' : 'border-white/50 border-dashed'}`}
-              ></div>
-
-              {/* Resize Handle (SE) */}
-              {isEditMode && (
+                key={zone.id}
+                className={`absolute transition-all duration-75 group ${isEditMode ? 'cursor-move' : 'pointer-events-none'}`}
+                style={{
+                  left: `${zone.x || 0}%`,
+                  top: `${zone.y || 0}%`,
+                  width: `${zone.width || 20}%`,
+                  height: `${zone.height || 20}%`,
+                  zIndex: isEditMode && draggingZoneId === zone.id ? 20 : 1
+                }}
+                onMouseDown={(e) => handleZoneMouseDown(e, zone)}
+              >
+                {/* Zone Border & Format */}
                 <div
-                  className="absolute bottom-0 right-0 w-6 h-6 bg-yellow-500 rounded-tl-xl cursor-se-resize flex items-center justify-center hover:scale-110 transition-transform z-30"
-                  onMouseDown={(e) => handleResizeMouseDown(e, zone, 'se')}
-                >
-                  <Maximize size={12} className="text-black rotate-90" />
+                  className={`absolute inset-0 border-2 rounded-xl transition-colors ${
+                    isEditMode
+                      ? 'border-yellow-500/50 border-dashed bg-yellow-500/5'
+                      : `${zoneStyle.border} ${zoneStyle.bg} border-dashed`
+                  }`}
+                ></div>
+
+                {/* Resize Handle (SE) */}
+                {isEditMode && (
+                  <div
+                    className="absolute bottom-0 right-0 w-6 h-6 bg-yellow-500 rounded-tl-xl cursor-se-resize flex items-center justify-center hover:scale-110 transition-transform z-30"
+                    onMouseDown={(e) => handleResizeMouseDown(e, zone, 'se')}
+                    title="Arrastra para redimensionar la zona"
+                  >
+                    <Maximize size={12} className="text-black rotate-90" />
+                  </div>
+                )}
+
+                {/* Delete Zone Button (Edit Mode) */}
+                {isEditMode && onRemoveZone && (
+                  <button
+                    onMouseDown={(e) => {
+                      e.stopPropagation();
+                      if (window.confirm(`¿Remover la línea "${zone.name}" del mapa?`)) {
+                        onRemoveZone(zone.id);
+                      }
+                    }}
+                    className="absolute top-0 left-0 p-1.5 bg-red-500/80 hover:bg-red-500 text-white rounded-br-lg opacity-0 group-hover:opacity-100 transition-opacity z-40 cursor-pointer"
+                    title="Remover Línea del mapa"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                )}
+
+                {/* Edit Zone Format Button (Edit Mode) */}
+                {isEditMode && (
+                  <button
+                    onMouseDown={(e) => {
+                      e.stopPropagation();
+                      handleEditZone(zone);
+                    }}
+                    className="absolute top-0 right-0 p-1.5 bg-industrial-700/90 hover:bg-industrial-600 text-white rounded-bl-lg opacity-0 group-hover:opacity-100 transition-opacity z-40 cursor-pointer"
+                    title="Editar Formato, Color y Áreas de la Línea"
+                  >
+                    <Edit3 size={12} />
+                  </button>
+                )}
+
+                {/* Drag Handle Indicator (Center) - Only in Edit Mode */}
+                {isEditMode && (
+                  <div className="absolute top-2 right-8 p-1 bg-yellow-500/20 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Move size={14} className="text-yellow-500" />
+                  </div>
+                )}
+
+                {/* Zone Content */}
+                <div className="absolute inset-0 p-4 overflow-hidden pointer-events-auto">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: zoneStyle.dotHex }} />
+                    <h3 className={`text-xl font-black font-mono uppercase tracking-widest truncate transition-opacity ${isEditMode ? 'text-yellow-400 opacity-100' : `${zoneStyle.text} opacity-100`}`}>
+                      {zone.name}
+                    </h3>
+                  </div>
+
+                  <div className="mt-3 space-y-2 ml-1 border-l-2 border-industrial-600/50 pl-3">
+                    {zone.lines.map((line, idx) => (
+                      <div key={idx} className="flex items-center justify-between group/line">
+                        <p className={`text-xs font-bold font-mono tracking-wide truncate ${isEditMode ? 'text-yellow-200' : zoneStyle.subtext}`}>
+                          {line}
+                        </p>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenAssetModal('MACHINE', { id: zone.id, line });
+                          }}
+                          className="p-1 rounded bg-industrial-800 hover:bg-industrial-accent text-industrial-400 hover:text-white transition-colors border border-industrial-700 opacity-0 group-hover/line:opacity-100"
+                          title="Agregar Equipo a esta Área"
+                        >
+                          <Plus size={12} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              )}
 
-
-
-              {/* Delete Zone Button (Edit Mode) */}
-              {isEditMode && onRemoveZone && (
-                <button
-                  onMouseDown={(e) => {
-                    e.stopPropagation();
-                    if (window.confirm(`Remove zone ${zone.name} from map?`)) {
-                      onRemoveZone(zone.id);
-                    }
-                  }}
-                  className="absolute top-0 left-0 p-1.5 bg-red-500/80 hover:bg-red-500 text-white rounded-br-lg opacity-0 group-hover:opacity-100 transition-opacity z-40 cursor-pointer"
-                  title="Remove Zone"
-                >
-                  <Trash2 size={12} />
-                </button>
-              )}
-
-              {/* Drag Handle Indicator (Center) - Only in Edit Mode */}
-              {isEditMode && (
-                <div className="absolute top-2 right-2 p-1 bg-yellow-500/20 rounded opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Move size={14} className="text-yellow-500" />
-                </div>
-              )}
-
-              {/* Zone Content */}
-              <div className="absolute inset-0 p-4 overflow-hidden pointer-events-auto">
-                <h3 className={`text-2xl font-black font-mono uppercase tracking-widest truncate transition-opacity ${isEditMode ? 'text-yellow-500 opacity-100' : 'text-industrial-200 opacity-100'}`}>
-                  {zone.name}
-                </h3>
-
-                <div className="mt-4 space-y-2 ml-1 border-l-2 border-industrial-600/50 pl-4">
-                  {zone.lines.map((line, idx) => (
-                    <div key={idx} className="flex items-center justify-between group/line">
-                      <p className={`text-sm font-bold font-mono tracking-wide ${isEditMode ? 'text-yellow-200' : 'text-industrial-300'}`}>
-                        {line}
-                      </p>
-
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenAssetModal('MACHINE', { id: zone.id, line });
-                        }}
-                        className="p-1 rounded bg-industrial-800 hover:bg-industrial-accent text-industrial-400 hover:text-white transition-colors border border-industrial-700 opacity-0 group-hover/line:opacity-100"
-                        title="Agregar Equipo a esta Línea"
-                      >
-                        <Plus size={12} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
               </div>
-
-            </div>
-          ))}
+            );
+          })}
 
           {/* --- MACHINES --- */}
           {displayMachines.map((machine) => (
@@ -494,7 +562,7 @@ export const PlantMapContainer: React.FC<PlantMapContainerProps> = ({ machines, 
         {/* Editing Overlay Indicator */}
         {isEditMode && (
           <div className="absolute top-0 w-full bg-yellow-500/10 border-b border-yellow-500/50 text-yellow-500 text-center py-1 text-xs font-bold pointer-events-none z-20">
-            MODO EDICIÓN ACTIVO - ARRASTRA ZONAS Y EQUIPOS PARA REUBICAR - REDIMENSIONA ZONAS DESDE LA ESQUINA INFERIOR DERECHA
+            MODO EDICIÓN ACTIVO - ARRASTRA LÍNEAS Y EQUIPOS PARA REUBICAR - REDIMENSIONA LÍNEAS DESDE LA ESQUINA INFERIOR DERECHA
           </div>
         )}
       </div>
@@ -512,12 +580,27 @@ export const PlantMapContainer: React.FC<PlantMapContainerProps> = ({ machines, 
       <AssetSelectionModal
         isOpen={isAssetModalOpen}
         onClose={() => setIsAssetModalOpen(false)}
-        title={assetModalType === 'MACHINE' ? 'Select Machine to Place' : 'Select Zone to Place'}
+        title={assetModalType === 'MACHINE' ? 'Select Machine to Place' : 'Seleccionar Línea para Agregar al Mapa'}
         items={assetModalType === 'MACHINE' ? unplacedMachines : unplacedZones}
         onSelect={handleSelectAsset}
         type={assetModalType}
+        onCreateNew={
+          assetModalType === 'MACHINE'
+            ? () => onAddMachine && onAddMachine(targetZoneForMachine?.id || '', targetZoneForMachine?.line || '')
+            : handleOpenCreateZone
+        }
       />
 
-    </div >
+      <ZoneModal
+        isOpen={isZoneModalOpen}
+        onClose={() => {
+          setIsZoneModalOpen(false);
+          setEditingZone(null);
+        }}
+        onSave={handleSaveZoneModal}
+        zone={editingZone}
+      />
+
+    </div>
   );
 };

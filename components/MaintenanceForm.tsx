@@ -753,14 +753,10 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                      <h3 className={`${isSection1Editable ? 'text-emerald-400' : 'text-industrial-400'} font-bold flex items-center gap-2`}>
                         {type === 'R-MANT-02' ? '1. Solicitud de Mantenimiento' : '1. Solicitud de Servicio / Avería'} {!isSection1Editable && <Lock size={14} />}
                      </h3>
-                     {!isSection1Editable && (
+                     {hasPermission('edit_wo') && !isSection1Editable && formData.id && (
                         <button 
-                           onClick={() => hasPermission('edit_wo') && setEditingSection(1)} 
-                           className={`px-4 py-2 rounded text-sm font-bold transition-colors border ${
-                              hasPermission('edit_wo') 
-                              ? 'bg-emerald-900/50 hover:bg-emerald-800 text-emerald-400 border-emerald-500/30' 
-                              : 'bg-emerald-900/10 text-emerald-400/30 border-emerald-500/10 cursor-not-allowed opacity-50'
-                           }`}
+                           onClick={() => setEditingSection(1)} 
+                           className="px-4 py-2 rounded text-sm font-bold transition-colors border bg-emerald-900/50 hover:bg-emerald-800 text-emerald-400 border-emerald-500/30"
                         >
                            Editar
                         </button>
@@ -1249,14 +1245,10 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                {isSaving ? 'Iniciando...' : 'Iniciar Trabajo'}
                             </button>
                          )}
-                         {!isSection2Editable && (
+                         {hasPermission('edit_wo') && !isSection2Editable && formData.id && (
                             <button 
-                               onClick={() => hasPermission('edit_wo') && setEditingSection(2)} 
-                               className={`px-4 py-2 rounded text-sm font-bold transition-colors border ${
-                                  hasPermission('edit_wo') 
-                                  ? 'bg-pink-900/50 hover:bg-pink-800 text-pink-400 border-pink-500/30' 
-                                  : 'bg-pink-900/10 text-pink-400/30 border-pink-500/10 cursor-not-allowed opacity-50'
-                               }`}
+                               onClick={() => setEditingSection(2)} 
+                               className="px-4 py-2 rounded text-sm font-bold transition-colors border bg-pink-900/50 hover:bg-pink-800 text-pink-400 border-pink-500/30"
                             >
                                Editar
                             </button>
@@ -1811,7 +1803,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                      )}
                   </div>
 
-                  {isSection2Editable && (
+                  {isSection2Editable && formData.currentStage === WorkOrderStage.EXECUTION && (
                      <div className="p-4 border-t border-pink-500/30 flex justify-end gap-3">
                         <button 
                            type="button" 
@@ -1846,14 +1838,10 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                      <h3 className={`${isSection3Editable ? 'text-emerald-400' : 'text-industrial-400'} font-bold flex items-center gap-2`}>
                         3. Cierre y Entrega {!isSection3Editable && <Lock size={14} />}
                      </h3>
-                     {!isSection3Editable && formData.currentStage === WorkOrderStage.CLOSED && (
+                     {hasPermission('edit_wo') && !isSection3Editable && formData.id && (
                         <button 
-                           onClick={() => hasPermission('edit_wo') && setEditingSection(3)} 
-                           className={`px-4 py-2 rounded text-sm font-bold transition-colors border ${
-                              hasPermission('edit_wo') 
-                              ? 'bg-emerald-900/50 hover:bg-emerald-800 text-emerald-400 border-emerald-500/30' 
-                              : 'bg-emerald-900/10 text-emerald-400/30 border-emerald-500/10 cursor-not-allowed opacity-50'
-                           }`}
+                           onClick={() => setEditingSection(3)} 
+                           className="px-4 py-2 rounded text-sm font-bold transition-colors border bg-emerald-900/50 hover:bg-emerald-800 text-emerald-400 border-emerald-500/30"
                         >
                            Editar
                         </button>
@@ -2124,7 +2112,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                   </div>
 
                   {
-                     isSection3Editable && (
+                     isSection3Editable && formData.currentStage === WorkOrderStage.HANDOVER && (
                         <div className="p-4 border-t border-emerald-500/30 flex justify-end gap-4">
                            <button 
                               disabled={isSaving}
