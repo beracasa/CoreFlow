@@ -3,7 +3,7 @@ import { Machine, MachineHourLog } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from "../contexts/AuthContext";
 import { MasterDataService } from "../src/services/masterDataService";
-import { Clock, History, Save, FileDown, Filter, X, Lock, AlertCircle } from 'lucide-react';
+import { Clock, History, Save, FileDown, Filter, X, Lock, AlertCircle, Edit3, Eye } from 'lucide-react';
 import { TablePagination } from './shared/TablePagination';
 import { DateInput } from './shared/DateInput';
 import { formatDate } from '../src/utils/dateUtils';
@@ -135,6 +135,7 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
 
     const handleUpdateLog = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!canRegister) return;
         if (!selectedLogForDetails) return;
 
         if (editReading <= 0) {
@@ -197,6 +198,7 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
 
     const handleLog = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!canRegister) return;
         if (!selectedMachine) return;
 
         if (currentReading <= 0) {
@@ -330,9 +332,20 @@ export const MachineHoursLog: React.FC<MachineHoursLogProps> = ({ machines }) =>
         <div className="h-full bg-industrial-900 p-6 flex flex-col overflow-hidden">
             <div className="flex justify-between items-center mb-6">
                 <div>
-                    <h2 className="text-2xl font-bold text-white mb-1 flex items-center gap-2">
-                        <Clock className="w-6 h-6 text-industrial-accent" /> {t('hours.title')}
-                    </h2>
+                    <div className="flex items-center gap-3">
+                        <h2 className="text-2xl font-bold text-white mb-1 flex items-center gap-2">
+                            <Clock className="w-6 h-6 text-industrial-accent" /> {t('hours.title')}
+                        </h2>
+                        {canRegister ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 shadow-sm">
+                                <Edit3 size={12} /> Registro Habilitado
+                            </span>
+                        ) : (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-industrial-800 text-industrial-400 border border-industrial-700 shadow-sm">
+                                <Eye size={12} /> Modo Solo Lectura
+                            </span>
+                        )}
+                    </div>
                     <p className="text-industrial-500 text-sm">{t('hours.subtitle')}</p>
                 </div>
             </div>

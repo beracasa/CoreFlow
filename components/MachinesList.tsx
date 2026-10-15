@@ -4,7 +4,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { useMasterStore } from '../src/stores/useMasterStore';
 import { DocumentService } from '../src/services/documentService';
 import { supabase } from '../src/services/supabaseClient';
-import { Box, Wifi, Plus, X, Camera, FileText, Server, Clock, Calendar, Pencil, Eye, Download, Trash2, Lock, AlertCircle, Loader2, Shield } from 'lucide-react';
+import { Box, Wifi, Plus, X, Camera, FileText, Server, Clock, Calendar, Pencil, Eye, Download, Trash2, Lock, AlertCircle, Loader2, Shield, Edit3 } from 'lucide-react';
 import { TablePagination } from './shared/TablePagination';
 import { useAuth } from '../contexts/AuthContext';
 import { formatDate } from '../src/utils/dateUtils';
@@ -269,6 +269,7 @@ export const MachinesList: React.FC = () => {
 
   const handleGatewaySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManage) return;
     if (!newMachine.name) return;
 
     const intervals = newMachine.customIntervals
@@ -337,6 +338,7 @@ export const MachinesList: React.FC = () => {
 
   const handleManualAssetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canManage) return;
 
     if (!newManualAsset.name) {
       alert("Falta el nombre del equipo");
@@ -432,31 +434,40 @@ export const MachinesList: React.FC = () => {
   return (
     <div className="h-full bg-industrial-900 flex flex-col overflow-hidden relative">
       <div className="p-6 border-b border-industrial-800 bg-industrial-900">
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center flex-wrap gap-4">
           <div>
-            <h2 className="text-2xl font-bold text-white mb-1">{t('assets.title')}</h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-2xl font-bold text-white mb-1">{t('assets.title')}</h2>
+              {canManage ? (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 shadow-sm">
+                  <Edit3 size={12} /> Gestión Total Habilitada
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-industrial-800 text-industrial-400 border border-industrial-700 shadow-sm">
+                  <Eye size={12} /> Modo Solo Lectura
+                </span>
+              )}
+            </div>
             <p className="text-industrial-500 text-sm">{t('config.subtitle')}</p>
           </div>
-          <div className="flex gap-3">
-            <button
-              onClick={openAddManual}
-              disabled={!canManage}
-              className={`${canManage ? 'bg-industrial-800 hover:bg-industrial-700' : 'bg-industrial-800/50 opacity-50 cursor-not-allowed'} text-white border border-industrial-600 px-3 py-1.5 rounded text-xs transition-colors flex items-center gap-2`}
-              title={!canManage ? "No tiene permisos para agregar equipos" : ""}
-            >
-              {canManage ? <Box className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
-              Agregar Equipo
-            </button>
-            <button
-              onClick={openAddGateway}
-              disabled={!canManage}
-              className={`${canManage ? 'bg-industrial-accent hover:bg-blue-600 shadow-lg' : 'bg-industrial-accent/50 opacity-50 cursor-not-allowed'} text-white px-3 py-1.5 rounded text-xs font-medium transition-colors flex items-center gap-2`}
-              title={!canManage ? "No tiene permisos para agregar equipos" : ""}
-            >
-              {canManage ? <Wifi className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
-              {t('assets.provision')}
-            </button>
-          </div>
+          {canManage && (
+            <div className="flex gap-3">
+              <button
+                onClick={openAddManual}
+                className="bg-industrial-800 hover:bg-industrial-700 text-white border border-industrial-600 px-3 py-1.5 rounded text-xs transition-colors flex items-center gap-2"
+              >
+                <Box className="w-3 h-3" />
+                Agregar Equipo
+              </button>
+              <button
+                onClick={openAddGateway}
+                className="bg-industrial-accent hover:bg-blue-600 shadow-lg text-white px-3 py-1.5 rounded text-xs font-medium transition-colors flex items-center gap-2"
+              >
+                <Wifi className="w-3 h-3" />
+                {t('assets.provision')}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -804,61 +815,63 @@ export const MachinesList: React.FC = () => {
                                   >
                                     <Download size={16} />
                                   </button>
-                                  <button
-                                    onClick={async (e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      if (!window.confirm('¿Estás seguro de eliminar este documento?')) return;
+                                  {canManage && (
+                                    <button
+                                      onClick={async (e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        if (!window.confirm('¿Estás seguro de eliminar este documento?')) return;
 
-                                      try {
-                                        console.log('Attempting to delete document:', docName);
+                                        try {
+                                          console.log('Attempting to delete document:', docName);
 
-                                        // 1. Delete from Storage (if applicable)
-                                        // Only attempt storage deletion for non-legacy files
-                                        if (!isLegacyFormat && docUrl) {
-                                          const filePath = DocumentService.extractFilePathFromUrl(docUrl);
-                                          console.log('Extracted file path for deletion:', filePath);
+                                          // 1. Delete from Storage (if applicable)
+                                          // Only attempt storage deletion for non-legacy files
+                                          if (!isLegacyFormat && docUrl) {
+                                            const filePath = DocumentService.extractFilePathFromUrl(docUrl);
+                                            console.log('Extracted file path for deletion:', filePath);
 
-                                          if (filePath) {
-                                            await DocumentService.deleteDocument(filePath);
-                                            console.log('Document deleted from storage successfully');
-                                          } else {
-                                            console.warn('Could not extract file path from URL, skipping storage deletion:', docUrl);
+                                            if (filePath) {
+                                              await DocumentService.deleteDocument(filePath);
+                                              console.log('Document deleted from storage successfully');
+                                            } else {
+                                              console.warn('Could not extract file path from URL, skipping storage deletion:', docUrl);
+                                            }
                                           }
+
+                                          // 2. Remove from Machine State - Handle both array types safely
+                                          const currentDocs = viewingMachine.documents || [];
+                                          const updatedDocuments = currentDocs.filter((_, i) => i !== idx);
+
+                                          // 3. Prepare updated machine object
+                                          const updatedMachine = {
+                                            ...viewingMachine,
+                                            documents: updatedDocuments
+                                          };
+
+                                          console.log('Updating machine state with new documents list:', updatedDocuments);
+
+                                          // 4. Update Database
+                                          await updateMachine(updatedMachine);
+                                          console.log('Database updated successfully');
+
+                                          // 5. Update Viewing State
+                                          // Ensure we don't set to null if the component is still mounted
+                                          setViewingMachine(prev => prev ? ({ ...prev, documents: updatedDocuments }) : null);
+
+                                        } catch (error: any) {
+                                          console.error('Error deleting document:', error);
+                                          // Still try to update UI if it was just a storage error? Maybe risky.
+                                          alert(`Error al eliminar el documento: ${error.message || 'Error desconocido'}`);
                                         }
-
-                                        // 2. Remove from Machine State - Handle both array types safely
-                                        const currentDocs = viewingMachine.documents || [];
-                                        const updatedDocuments = currentDocs.filter((_, i) => i !== idx);
-
-                                        // 3. Prepare updated machine object
-                                        const updatedMachine = {
-                                          ...viewingMachine,
-                                          documents: updatedDocuments
-                                        };
-
-                                        console.log('Updating machine state with new documents list:', updatedDocuments);
-
-                                        // 4. Update Database
-                                        await updateMachine(updatedMachine);
-                                        console.log('Database updated successfully');
-
-                                        // 5. Update Viewing State
-                                        // Ensure we don't set to null if the component is still mounted
-                                        setViewingMachine(prev => prev ? ({ ...prev, documents: updatedDocuments }) : null);
-
-                                      } catch (error: any) {
-                                        console.error('Error deleting document:', error);
-                                        // Still try to update UI if it was just a storage error? Maybe risky.
-                                        alert(`Error al eliminar el documento: ${error.message || 'Error desconocido'}`);
-                                      }
-                                    }}
-                                    type="button" // Prevent form submission
-                                    className="p-2 bg-red-900/50 hover:bg-red-900 text-red-200 rounded transition-colors"
-                                    title="Eliminar"
-                                  >
-                                    <Trash2 size={16} />
-                                  </button>
+                                      }}
+                                      type="button" // Prevent form submission
+                                      className="p-2 bg-red-900/50 hover:bg-red-900 text-red-200 rounded transition-colors"
+                                      title="Eliminar"
+                                    >
+                                      <Trash2 size={16} />
+                                    </button>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -872,20 +885,18 @@ export const MachinesList: React.FC = () => {
                 {/* Footer Actions */}
                 <div className="p-4 border-t border-industrial-700 bg-industrial-900/50 flex justify-between items-center">
                   <div>
-                    <button
-                      onClick={() => handleToggleActive(viewingMachine)}
-                      disabled={!canManage}
-                      className={`px-4 py-2 rounded text-sm font-bold border transition-colors flex items-center gap-2 ${
-                        !canManage
-                          ? 'bg-industrial-800/50 opacity-50 cursor-not-allowed text-industrial-500 border-industrial-700'
-                          : viewingMachine.isActive === false
+                    {canManage && (
+                      <button
+                        onClick={() => handleToggleActive(viewingMachine)}
+                        className={`px-4 py-2 rounded text-sm font-bold border transition-colors flex items-center gap-2 ${
+                          viewingMachine.isActive === false
                             ? 'bg-emerald-900/40 text-emerald-400 border-emerald-500/50 hover:bg-emerald-900/60 shadow-lg'
                             : 'bg-red-900/40 text-red-400 border-red-500/50 hover:bg-red-900/60 shadow-lg'
-                      }`}
-                      title={!canManage ? "No tiene permisos para modificar equipos" : ""}
-                    >
-                      {viewingMachine.isActive === false ? 'Activar Equipo' : 'Inactivar Equipo'}
-                    </button>
+                        }`}
+                      >
+                        {viewingMachine.isActive === false ? 'Activar Equipo' : 'Inactivar Equipo'}
+                      </button>
+                    )}
                   </div>
                   <div className="flex gap-3">
                     <button
@@ -894,14 +905,14 @@ export const MachinesList: React.FC = () => {
                     >
                       Cerrar
                     </button>
-                    <button
-                      onClick={() => handleEditFromDetail(viewingMachine)}
-                      disabled={!canManage}
-                      className={`px-4 py-2 ${canManage ? 'bg-industrial-600 hover:bg-industrial-500' : 'bg-industrial-700/50 opacity-50 cursor-not-allowed'} text-white rounded text-sm font-bold shadow flex items-center gap-2`}
-                      title={!canManage ? "No tiene permisos para editar equipos" : ""}
-                    >
-                      {canManage ? <Pencil size={14} /> : <Lock size={14} />} Editar Equipo
-                    </button>
+                    {canManage && (
+                      <button
+                        onClick={() => handleEditFromDetail(viewingMachine)}
+                        className="px-4 py-2 bg-industrial-600 hover:bg-industrial-500 text-white rounded text-sm font-bold shadow flex items-center gap-2"
+                      >
+                        <Pencil size={14} /> Editar Equipo
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

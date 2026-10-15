@@ -145,7 +145,7 @@ export const UserManagement: React.FC = () => {
                     </thead>
                     <tbody className="divide-y divide-industrial-700">
                         {visibleUsers.map(user => (
-                            <tr key={user.id} onClick={() => setEditingUser(user)} className="hover:bg-industrial-700/30 transition-colors group cursor-pointer">
+                            <tr key={user.id} onClick={() => canManage && setEditingUser(user)} className={`hover:bg-industrial-700/30 transition-colors group ${canManage ? 'cursor-pointer' : 'cursor-default'}`}>
                                 <td className="px-6 py-4">
                                     <div className="flex items-center gap-3">
                                         <div className="w-8 h-8 rounded-full bg-industrial-700 border border-industrial-600 flex items-center justify-center text-xs text-white font-bold shadow-sm">

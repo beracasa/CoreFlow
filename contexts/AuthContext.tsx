@@ -70,6 +70,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const appRole = Array.isArray(data.app_roles) ? data.app_roles[0] : data.app_roles;
     const roleId = data.role_id || appRole?.id || data.role;
     const roleName = appRole?.name || data.role;
+    const permissions = appRole?.permissions || data.permissions;
 
     return {
       id: data.id,
@@ -83,7 +84,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       specialties: data.specialties || [],
       tenant_id: data.tenant_id,
       avatar_url: data.avatar_url,
-      requires_password_change: data.requires_password_change
+      requires_password_change: data.requires_password_change,
+      permissions: permissions
     };
   };
 
@@ -355,52 +357,96 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return false;
   };
 
+  const IMPLICIT_PERMISSIONS_MAP: Record<string, string[]> = {
+    view_dashboard: ['edit_dashboard_map'],
+    view_kanban: ['edit_kanban', 'create_wo', 'execute_wo', 'supervise_order', 'edit_wo'],
+    view_calendar: ['manage_calendar'],
+    view_machines: ['manage_machines', 'manage_assets'],
+    view_inventory: ['manage_inventory', 'manage_assets'],
+    view_part_requests: ['manage_inventory', 'manage_assets'],
+    view_purchase_requests: ['manage_inventory', 'manage_assets'],
+    manage_machines: ['manage_assets'],
+    manage_inventory: ['manage_assets'],
+    create_wo: ['manage_assets'],
+    execute_wo: ['manage_assets'],
+    supervise_order: ['manage_assets'],
+    edit_wo: ['manage_assets'],
+    log_hours: ['manage_assets'],
+  };
+
   const hasPermission = (permissionId: string) => {
     if (!user) return false;
 
-    // 1. Super Admin Bypass (optional, but good for dev)
-    if (user.role === UserRole.ADMIN_SOLICITANTE) return true;
-
-    // 2. Check Dynamic Roles por ID o Nombre
+    // 1. Super Admin Bypass
     const userRoleStr = (user.role || '').toString().toLowerCase().trim();
     const userRoleNameStr = (user.roleName || '').toString().toLowerCase().trim();
 
+    if (
+      user.role === UserRole.ADMIN_SOLICITANTE ||
+      userRoleStr === 'admin_solicitante' ||
+      userRoleStr.includes('admin') ||
+      userRoleNameStr.includes('admin')
+    ) {
+      return true;
+    }
+
+    const validPerms = [permissionId, ...(IMPLICIT_PERMISSIONS_MAP[permissionId] || [])];
+
+    const checkContainer = (perms: any): boolean | null => {
+      if (!perms) return null;
+      let p = perms;
+      if (typeof p === 'string') {
+        try { p = JSON.parse(p); } catch { return null; }
+      }
+      if (Array.isArray(p)) {
+        if (validPerms.some(req => p.includes(req))) return true;
+        return false;
+      } else if (typeof p === 'object' && p !== null) {
+        if (validPerms.some(req => !!p[req])) return true;
+        return false;
+      }
+      return null;
+    };
+
+    // 2. Check direct user permissions if attached to profile
+    if (user.permissions) {
+      const userPermRes = checkContainer(user.permissions);
+      if (userPermRes === true) return true;
+    }
+
+    // 3. Check dynamic roles definition from store
     const userRoleDef = roles.find(r => {
       const rId = (r.id || '').toString().toLowerCase().trim();
       const rName = (r.name || '').toString().toLowerCase().trim();
       return rId === userRoleStr || rName === userRoleStr || (userRoleNameStr && rName === userRoleNameStr);
     });
 
-    if (!userRoleDef) {
+    if (userRoleDef) {
+      // Check if role name is an admin variant
+      if (userRoleDef.name?.toLowerCase().includes('admin')) {
+        return true;
+      }
+
+      // Check specific permission in role definition
+      const rolePermRes = checkContainer(userRoleDef.permissions);
+      if (rolePermRes === true) return true;
+
+      // Check parent role hierarchy if any
+      let currentParentId = userRoleDef.parentRoleId;
+      let depth = 0;
+      while (currentParentId && depth < 5) {
+        const parentRole = roles.find(r => r.id === currentParentId);
+        if (!parentRole) break;
+        if (parentRole.name?.toLowerCase().includes('admin')) return true;
+        const parentPermRes = checkContainer(parentRole.permissions);
+        if (parentPermRes === true) return true;
+        currentParentId = parentRole.parentRoleId;
+        depth++;
+      }
+    } else {
       if (roles.length === 0) {
         useUserStore.getState().fetchRoles().catch(console.error);
       }
-      return false;
-    }
-
-    // 2.5 New System Admin Bypass
-    if (userRoleDef.isSystem ||
-      userRoleDef.name?.toLowerCase().includes('admin') ||
-      userRoleDef.name?.toLowerCase().includes('manager')) {
-      return true;
-    }
-
-    // 3. Check specific permission
-    let perms = userRoleDef.permissions;
-    if (typeof perms === 'string') {
-      try {
-        perms = JSON.parse(perms);
-      } catch {
-        perms = {};
-      }
-    }
-
-    if (!perms) return false;
-
-    if (Array.isArray(perms)) {
-      return perms.includes(permissionId);
-    } else if (typeof perms === 'object') {
-      return !!(perms as Record<string, boolean>)[permissionId];
     }
 
     return false;

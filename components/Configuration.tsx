@@ -8,6 +8,7 @@ import { ProtocolBuilder } from './ProtocolBuilder';
 import { useMasterStore } from '../src/stores/useMasterStore';
 import { NotificationSettings } from './NotificationSettings';
 import { X, UserPlus, Mail, Briefcase, Clock, Calendar, Server, Cpu, Wifi, Plus, MapPin, Layout, Box, Settings, Shield, Pencil, Camera, FileText, Trash2, CornerDownRight, Edit2, Check, Scale, Bell, Lock, Truck } from 'lucide-react';
+import { ZoneModal, ZONE_COLOR_OPTIONS } from './modals/ZoneModal';
 
 interface ConfigurationProps {
   machines: Machine[];
@@ -66,7 +67,33 @@ export const Configuration: React.FC<ConfigurationProps> = ({
 
   } = useMasterStore();
 
-  const [activeTab, setActiveTab] = useState<Tab>('GENERAL');
+  const { hasRole, hasPermission } = useAuth();
+  const canManageConfig = hasRole([UserRole.ADMIN_SOLICITANTE]) || hasPermission('manage_config');
+  const canManageUsers = hasRole([UserRole.ADMIN_SOLICITANTE]) || hasPermission('manage_users');
+  const canManageRoles = hasRole([UserRole.ADMIN_SOLICITANTE]) || hasPermission('manage_roles');
+
+  const getDefaultTab = (): Tab => {
+    if (canManageConfig) return 'GENERAL';
+    if (canManageUsers) return 'WORKFORCE';
+    if (canManageRoles) return 'ROLES';
+    return 'GENERAL';
+  };
+
+  const [activeTab, setActiveTab] = useState<Tab>(getDefaultTab);
+
+  useEffect(() => {
+    const configTabs: Tab[] = ['GENERAL', 'ZONES', 'EQUIPMENT', 'INVENTORY', 'PROTOCOLS', 'NOTIFICATIONS'];
+    if (!canManageConfig && configTabs.includes(activeTab)) {
+      if (canManageUsers) setActiveTab('WORKFORCE');
+      else if (canManageRoles) setActiveTab('ROLES');
+    } else if (!canManageUsers && activeTab === 'WORKFORCE') {
+      if (canManageConfig) setActiveTab('GENERAL');
+      else if (canManageRoles) setActiveTab('ROLES');
+    } else if (!canManageRoles && activeTab === 'ROLES') {
+      if (canManageConfig) setActiveTab('GENERAL');
+      else if (canManageUsers) setActiveTab('WORKFORCE');
+    }
+  }, [canManageConfig, canManageUsers, canManageRoles]);
 
   // Local State for Settings Form
   const [settingsForm, setSettingsForm] = useState(settings || {
@@ -78,8 +105,6 @@ export const Configuration: React.FC<ConfigurationProps> = ({
     currency: 'DOP'
   });
 
-
-
   // Sync prop changes to local state (for initial load)
   React.useEffect(() => {
     if (settings) {
@@ -87,21 +112,15 @@ export const Configuration: React.FC<ConfigurationProps> = ({
     }
   }, [settings]);
 
-
   const { t } = useLanguage();
-
-  // const [settingsTab, setSettingsTab] = useState<'GENERAL' | 'ZONES' | 'EQUIPMENT' | 'SPARE_PARTS'>('GENERAL'); // Removed nested state
 
   // Protocol State (Machine -> Intervals -> Tasks)
   const [selectedProtocolMachineId, setSelectedProtocolMachineId] = useState<string | null>(null);
   const [activeIntervalTab, setActiveIntervalTab] = useState<string | null>(null);
 
-  // Removed local maintenancePlans state in favor of store
-
   const [machineToAssociate, setMachineToAssociate] = useState<string>('');
   const [machineSearchQuery, setMachineSearchQuery] = useState('');
   const [isMachineSearchOpen, setIsMachineSearchOpen] = useState(false);
-  const { hasRole, hasPermission } = useAuth();
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
   // Interval Addition State
@@ -255,9 +274,61 @@ export const Configuration: React.FC<ConfigurationProps> = ({
   // Editing State
 
 
-  // Zone Editing State
+  // Zone/Line Editing State
   const [editingZoneId, setEditingZoneId] = useState<string | null>(null);
   const [editingZoneName, setEditingZoneName] = useState('');
+  const [isLineModalOpen, setIsLineModalOpen] = useState(false);
+  const [selectedLineForModal, setSelectedLineForModal] = useState<ZoneStructure | null>(null);
+
+  const handleOpenCreateLineModal = () => {
+    setSelectedLineForModal(null);
+    setIsLineModalOpen(true);
+  };
+
+  const handleOpenEditLineModal = (zone: ZoneStructure) => {
+    setSelectedLineForModal(zone);
+    setIsLineModalOpen(true);
+  };
+
+  const handleSaveLineModal = async (zoneData: ZoneStructure) => {
+    if (selectedLineForModal) {
+      onUpdateZone(zoneData);
+    } else {
+      const startX = 5;
+      const startY = 15;
+      const cardWidth = 20;
+      const cardHeight = 30;
+      const gapX = 2;
+      const gapY = 5;
+
+      let x = startX;
+      let y = startY;
+
+      if (zoneStructures.length > 0) {
+        const lastZone = zoneStructures[zoneStructures.length - 1];
+        let nextX = (lastZone.x || startX) + (lastZone.width || cardWidth) + gapX;
+        let nextY = (lastZone.y || startY);
+
+        if (nextX + cardWidth > 98) {
+          nextX = startX;
+          nextY = nextY + (lastZone.height || cardHeight) + gapY;
+        }
+
+        x = nextX;
+        y = nextY;
+      }
+
+      onAddZone({
+        ...zoneData,
+        x,
+        y,
+        width: cardWidth,
+        height: cardHeight
+      });
+    }
+    setIsLineModalOpen(false);
+    setSelectedLineForModal(null);
+  };
 
   const startEditingZone = (zone: ZoneStructure) => {
     setEditingZoneId(zone.id);
@@ -321,7 +392,7 @@ export const Configuration: React.FC<ConfigurationProps> = ({
 
   const handleDeleteZone = (id: string) => {
     const zone = zoneStructures.find(z => z.id === id);
-    if (zone && confirm(`¿Está seguro de que desea eliminar por completo la zona "${zone.name}"? Esta acción no se puede deshacer.`)) {
+    if (zone && confirm(`¿Está seguro de que desea eliminar por completo la línea "${zone.name}"? Esta acción no se puede deshacer.`)) {
       onRemoveZone(id);
     }
   };
@@ -375,12 +446,30 @@ export const Configuration: React.FC<ConfigurationProps> = ({
     <div className="h-full bg-industrial-900 flex flex-col overflow-hidden relative" >
       {/* Module Header */}
       <div className="p-6 border-b border-industrial-800 bg-industrial-900">
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center flex-wrap gap-4">
           <div>
-            <h2 className="text-2xl font-bold text-white mb-1">{t('config.title')}</h2>
+            <div className="flex items-center gap-3 flex-wrap">
+              <h2 className="text-2xl font-bold text-white mb-1">{t('config.title')}</h2>
+              <div className="flex items-center gap-2 flex-wrap">
+                {canManageConfig && (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 shadow-sm">
+                    <Settings size={12} /> Configuración General
+                  </span>
+                )}
+                {canManageUsers && (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/30 shadow-sm">
+                    <UserPlus size={12} /> Gestión de Usuarios
+                  </span>
+                )}
+                {canManageRoles && (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-500/10 text-purple-400 border border-purple-500/30 shadow-sm">
+                    <Shield size={12} /> Gestión de Roles
+                  </span>
+                )}
+              </div>
+            </div>
             <p className="text-industrial-500 text-sm">{t('config.subtitle')}</p>
           </div>
-
         </div>
       </div>
 
@@ -388,90 +477,114 @@ export const Configuration: React.FC<ConfigurationProps> = ({
       {/* Tabs - Horizontal Scrollable List */}
       <div className="flex gap-2 px-6 pt-2 overflow-x-auto border-b border-industrial-700 bg-industrial-900 sticky top-0 z-10">
         <button
-          onClick={() => setActiveTab('GENERAL')}
-          className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === 'GENERAL'
-            ? 'text-white border-industrial-accent'
-            : 'text-industrial-500 border-transparent hover:text-industrial-300'
-            }`}
+          onClick={() => canManageConfig && setActiveTab('GENERAL')}
+          className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex items-center gap-1.5 ${
+            !canManageConfig
+              ? 'text-industrial-600 border-transparent cursor-not-allowed opacity-50'
+              : activeTab === 'GENERAL'
+                ? 'text-white border-industrial-accent'
+                : 'text-industrial-500 border-transparent hover:text-industrial-300'
+          }`}
         >
+          {!canManageConfig && <Lock size={12} />}
           {t('config.tab.settings')}
         </button>
 
         <button
-          onClick={() => setActiveTab('ZONES')}
-          className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === 'ZONES'
-            ? 'text-white border-industrial-accent'
-            : 'text-industrial-500 border-transparent hover:text-industrial-300'
-            }`}
+          onClick={() => canManageConfig && setActiveTab('ZONES')}
+          className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex items-center gap-1.5 ${
+            !canManageConfig
+              ? 'text-industrial-600 border-transparent cursor-not-allowed opacity-50'
+              : activeTab === 'ZONES'
+                ? 'text-white border-industrial-accent'
+                : 'text-industrial-500 border-transparent hover:text-industrial-300'
+          }`}
         >
+          {!canManageConfig && <Lock size={12} />}
           {t('config.tab.zones')}
         </button>
 
         <button
-          onClick={() => setActiveTab('EQUIPMENT')}
-          className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === 'EQUIPMENT'
-            ? 'text-white border-industrial-accent'
-            : 'text-industrial-500 border-transparent hover:text-industrial-300'
-            }`}
+          onClick={() => canManageConfig && setActiveTab('EQUIPMENT')}
+          className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex items-center gap-1.5 ${
+            !canManageConfig
+              ? 'text-industrial-600 border-transparent cursor-not-allowed opacity-50'
+              : activeTab === 'EQUIPMENT'
+                ? 'text-white border-industrial-accent'
+                : 'text-industrial-500 border-transparent hover:text-industrial-300'
+          }`}
         >
+          {!canManageConfig && <Lock size={12} />}
           {t('config.tab.equipment')}
         </button>
 
         <button
-          onClick={() => setActiveTab('INVENTORY')}
-          className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === 'INVENTORY'
-            ? 'text-white border-industrial-accent'
-            : 'text-industrial-500 border-transparent hover:text-industrial-300'
-            }`}
+          onClick={() => canManageConfig && setActiveTab('INVENTORY')}
+          className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex items-center gap-1.5 ${
+            !canManageConfig
+              ? 'text-industrial-600 border-transparent cursor-not-allowed opacity-50'
+              : activeTab === 'INVENTORY'
+                ? 'text-white border-industrial-accent'
+                : 'text-industrial-500 border-transparent hover:text-industrial-300'
+          }`}
         >
+          {!canManageConfig && <Lock size={12} />}
           {t('config.tab.inventory')}
         </button>
 
         <button
-          onClick={() => setActiveTab('PROTOCOLS')}
-          className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === 'PROTOCOLS'
-            ? 'text-white border-industrial-accent'
-            : 'text-industrial-500 border-transparent hover:text-industrial-300'
-            }`}
+          onClick={() => canManageConfig && setActiveTab('PROTOCOLS')}
+          className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex items-center gap-1.5 ${
+            !canManageConfig
+              ? 'text-industrial-600 border-transparent cursor-not-allowed opacity-50'
+              : activeTab === 'PROTOCOLS'
+                ? 'text-white border-industrial-accent'
+                : 'text-industrial-500 border-transparent hover:text-industrial-300'
+          }`}
         >
+          {!canManageConfig && <Lock size={12} />}
           Mantenimientos
         </button>
 
         <button
-          onClick={() => hasPermission('manage_users') && setActiveTab('WORKFORCE')}
+          onClick={() => canManageUsers && setActiveTab('WORKFORCE')}
           className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex items-center gap-1.5 ${
-            !hasPermission('manage_users') 
+            !canManageUsers 
               ? 'text-industrial-600 border-transparent cursor-not-allowed opacity-50' 
               : activeTab === 'WORKFORCE'
                 ? 'text-white border-industrial-accent'
                 : 'text-industrial-500 border-transparent hover:text-industrial-300'
           }`}
         >
-          {!hasPermission('manage_users') && <Lock size={12} />}
+          {!canManageUsers && <Lock size={12} />}
           {t('workforce.title')}
         </button>
 
         <button
-          onClick={() => hasPermission('manage_roles') && setActiveTab('ROLES')}
+          onClick={() => canManageRoles && setActiveTab('ROLES')}
           className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex items-center gap-1.5 ${
-            !hasPermission('manage_roles') 
+            !canManageRoles 
               ? 'text-industrial-600 border-transparent cursor-not-allowed opacity-50' 
               : activeTab === 'ROLES'
                 ? 'text-white border-industrial-accent'
                 : 'text-industrial-500 border-transparent hover:text-industrial-300'
           }`}
         >
-          {!hasPermission('manage_roles') && <Lock size={12} />}
+          {!canManageRoles && <Lock size={12} />}
           {t('config.tab.roles')}
         </button>
 
         <button
-          onClick={() => setActiveTab('NOTIFICATIONS')}
-          className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${activeTab === 'NOTIFICATIONS'
-            ? 'text-white border-industrial-accent'
-            : 'text-industrial-500 border-transparent hover:text-industrial-300'
-            }`}
+          onClick={() => canManageConfig && setActiveTab('NOTIFICATIONS')}
+          className={`pb-3 px-2 text-sm font-medium transition-colors border-b-2 whitespace-nowrap flex items-center gap-1.5 ${
+            !canManageConfig
+              ? 'text-industrial-600 border-transparent cursor-not-allowed opacity-50'
+              : activeTab === 'NOTIFICATIONS'
+                ? 'text-white border-industrial-accent'
+                : 'text-industrial-500 border-transparent hover:text-industrial-300'
+          }`}
         >
+          {!canManageConfig && <Lock size={12} />}
           Notificaciones
         </button>
       </div>
@@ -479,22 +592,28 @@ export const Configuration: React.FC<ConfigurationProps> = ({
       {/* Content Area */}
       <div className="flex-1 overflow-y-auto p-6 bg-industrial-900/50">
 
+        {/* Fallback for unauthorized config tabs */}
+        {!canManageConfig && ['GENERAL', 'ZONES', 'EQUIPMENT', 'INVENTORY', 'PROTOCOLS', 'NOTIFICATIONS'].includes(activeTab) && (
+          <div className="h-64 flex items-center justify-center bg-industrial-900/50 text-industrial-500 flex-col gap-4 border border-industrial-700/50 rounded-xl">
+            <Shield className="w-10 h-10 text-red-900" />
+            <span>Acceso Restringido: Se requiere el permiso de Gestionar Configuración.</span>
+          </div>
+        )}
 
-
-
-
-        {/* LOCATIONS TAB */}
-
-
-        {
-          activeTab === 'WORKFORCE' && (
+        {activeTab === 'WORKFORCE' && (
+          canManageUsers ? (
             <UserManagement />
+          ) : (
+            <div className="h-64 flex items-center justify-center bg-industrial-900/50 text-industrial-500 flex-col gap-4 border border-industrial-700/50 rounded-xl">
+              <Shield className="w-10 h-10 text-red-900" />
+              <span>Acceso Restringido: Se requiere el permiso de Gestionar Usuarios.</span>
+            </div>
           )
-        }
+        )}
 
         {/* PROTOCOLS TAB (Refined) */}
         {
-          activeTab === 'PROTOCOLS' && (
+          canManageConfig && activeTab === 'PROTOCOLS' && (
             <div className="h-full flex flex-col animate-fadeIn">
               {/* Header / Sub-nav */}
               <div className="bg-industrial-800 p-4 border-b border-industrial-700 flex justify-between items-center">
@@ -753,22 +872,29 @@ export const Configuration: React.FC<ConfigurationProps> = ({
         {/* ROLES TAB (NEW) */}
         {
           activeTab === 'ROLES' && (
-            <div className="h-full animate-fadeIn">
-              <RoleManagement />
-            </div>
+            canManageRoles ? (
+              <div className="h-full animate-fadeIn">
+                <RoleManagement />
+              </div>
+            ) : (
+              <div className="h-64 flex items-center justify-center bg-industrial-900/50 text-industrial-500 flex-col gap-4 border border-industrial-700/50 rounded-xl">
+                <Shield className="w-10 h-10 text-red-900" />
+                <span>Acceso Restringido: Se requiere el permiso de Gestionar Roles y Permisos.</span>
+              </div>
+            )
           )
         }
 
         {/* NOTIFICATIONS TAB */}
         {
-          activeTab === 'NOTIFICATIONS' && (
+          canManageConfig && activeTab === 'NOTIFICATIONS' && (
             <div className="h-full animate-fadeIn">
               <NotificationSettings />
             </div>
           )
         }
 
-        {activeTab === 'INVENTORY' && (
+        {canManageConfig && activeTab === 'INVENTORY' && (
           <div className="space-y-6 animate-fadeIn">
             <div className="flex justify-between items-center">
               <div>
@@ -1018,7 +1144,7 @@ export const Configuration: React.FC<ConfigurationProps> = ({
           </div>
         )}
 
-        {activeTab === 'GENERAL' && (
+        {canManageConfig && activeTab === 'GENERAL' && (
           <>
             <div className="bg-industrial-800 p-6 rounded-lg border border-industrial-700">
               <h3 className="text-white font-bold mb-4 flex items-center gap-2">
@@ -1185,143 +1311,165 @@ export const Configuration: React.FC<ConfigurationProps> = ({
           </>
         )}
 
-        {activeTab === 'ZONES' && (
+        {canManageConfig && activeTab === 'ZONES' && (
           <div className="space-y-6 animate-fadeIn">
             <div className="flex justify-between items-center">
               <div>
-                <h3 className="text-lg text-white font-medium">Zonas de Producción y Líneas</h3>
-                <p className="text-sm text-industrial-500">Defina la estructura de planta. Las líneas pertenecen a una zona específica.</p>
+                <h3 className="text-lg text-white font-medium">Líneas de Producción y Áreas</h3>
+                <p className="text-sm text-industrial-500">Defina la estructura de planta.</p>
               </div>
+              <button
+                onClick={handleOpenCreateLineModal}
+                className="bg-industrial-accent hover:bg-industrial-accent/80 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all shadow-lg shadow-industrial-accent/20"
+              >
+                <Plus size={16} />
+                <span>Crear Línea</span>
+              </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Zone List */}
+              {/* Lines List */}
               <div className="col-span-2 space-y-4">
-                {zoneStructures.map((zone) => (
-                  <div key={zone.id} className="bg-industrial-800 rounded-lg border border-industrial-700 p-4">
-                    <div className="flex justify-between items-start mb-3 border-b border-industrial-700 pb-2">
-                      {editingZoneId === zone.id ? (
-                        <div className="flex gap-2 items-center flex-1 mr-2">
-                          <input
-                            type="text"
-                            className="flex-1 bg-industrial-900 border border-blue-500 rounded p-1 text-sm text-white focus:outline-none"
-                            value={editingZoneName}
-                            onChange={(e) => setEditingZoneName(e.target.value)}
-                            autoFocus
-                          />
-                          <button onClick={() => saveZoneName(zone)} className="text-green-400 hover:text-green-300"><Check size={16} /></button>
-                          <button onClick={() => setEditingZoneId(null)} className="text-red-400 hover:text-red-300"><X size={16} /></button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <h5 className="font-bold text-white text-sm">{zone.name}</h5>
-                          <button onClick={() => startEditingZone(zone)} className="text-industrial-500 hover:text-blue-400 transition-colors">
-                            <Edit2 size={12} />
-                          </button>
-                        </div>
-                      )}
+                {zoneStructures.map((zone) => {
+                  const colorConfig = ZONE_COLOR_OPTIONS.find(c => c.id === zone.color) || ZONE_COLOR_OPTIONS[0];
+                  return (
+                    <div key={zone.id} className="bg-industrial-800 rounded-lg border border-industrial-700 p-4 shadow-sm hover:border-industrial-600 transition-colors">
+                      <div className="flex justify-between items-start mb-3 border-b border-industrial-700 pb-2">
+                        {editingZoneId === zone.id ? (
+                          <div className="flex gap-2 items-center flex-1 mr-2">
+                            <input
+                              type="text"
+                              className="flex-1 bg-industrial-900 border border-blue-500 rounded p-1 text-sm text-white focus:outline-none"
+                              value={editingZoneName}
+                              onChange={(e) => setEditingZoneName(e.target.value)}
+                              autoFocus
+                            />
+                            <button onClick={() => saveZoneName(zone)} className="text-green-400 hover:text-green-300"><Check size={16} /></button>
+                            <button onClick={() => setEditingZoneId(null)} className="text-red-400 hover:text-red-300"><X size={16} /></button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2.5">
+                            <span
+                              className="w-3.5 h-3.5 rounded-full shrink-0 shadow-sm border border-white/20"
+                              style={{ backgroundColor: colorConfig.hex }}
+                              title={`Color en mapa: ${colorConfig.label}`}
+                            />
+                            <h5 className="font-bold text-white text-sm">{zone.name}</h5>
+                            <button
+                              onClick={() => handleOpenEditLineModal(zone)}
+                              className="text-industrial-400 hover:text-industrial-accent transition-colors p-1"
+                              title="Editar Línea, Color y Áreas"
+                            >
+                              <Edit2 size={13} />
+                            </button>
+                          </div>
+                        )}
 
-                      <button
-                        onClick={() => handleDeleteZone(zone.id)}
-                        className="text-industrial-500 hover:text-red-500 transition-colors bg-industrial-900 p-1 rounded border border-industrial-800 hover:border-red-500/50"
-                        title="Eliminar Zona completa"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                      {/* Reorder Controls */}
-                      <div className="flex flex-col gap-0.5 ml-1">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleDeleteZone(zone.id)}
+                            className="text-industrial-500 hover:text-red-500 transition-colors bg-industrial-900 p-1 rounded border border-industrial-800 hover:border-red-500/50"
+                            title="Eliminar Línea completa"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                          {/* Reorder Controls */}
+                          <div className="flex flex-col gap-0.5 ml-1">
+                            <button
+                              onClick={() => handleMoveZone(zone.id, 'up')}
+                              className="text-industrial-500 hover:text-white hover:bg-industrial-700 rounded p-0.5"
+                              title="Mover Arriba"
+                            >
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+                            </button>
+                            <button
+                              onClick={() => handleMoveZone(zone.id, 'down')}
+                              className="text-industrial-500 hover:text-white hover:bg-industrial-700 rounded p-0.5"
+                              title="Mover Abajo"
+                            >
+                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2 pl-4 border-l-2 border-industrial-800 ml-1">
+                        {(zone.lines || []).map((line, idx) => (
+                          <div key={idx} className="flex justify-between items-center group py-1">
+                            <span className="text-industrial-300 text-sm font-mono flex items-center gap-2">
+                              <CornerDownRight size={12} className="text-industrial-600" />
+                              {line}
+                            </span>
+                            <button
+                              onClick={() => handleDeleteLine(zone.id, line)}
+                              className="text-industrial-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                              title="Eliminar Área"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        ))}
+                        {(!zone.lines || zone.lines.length === 0) && (
+                          <p className="text-xs text-industrial-600 italic py-1">No hay áreas registradas</p>
+                        )}
+                      </div>
+
+                      {/* Add Area Input */}
+                      <div className="mt-4 flex gap-2 pl-4">
+                        <input
+                          type="text"
+                          className="flex-1 bg-industrial-900 border border-industrial-600 rounded p-1.5 text-xs text-white placeholder-industrial-500"
+                          placeholder="Agregar Área (ej. Producción)"
+                          value={newLineInputs[zone.id] || ''}
+                          onChange={(e) => setNewLineInputs({ ...newLineInputs, [zone.id]: e.target.value })}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAddLine(zone.id);
+                            }
+                          }}
+                        />
                         <button
-                          onClick={() => handleMoveZone(zone.id, 'up')}
-                          className="text-industrial-500 hover:text-white hover:bg-industrial-700 rounded p-0.5"
-                          title="Mover Arriba"
+                          onClick={() => handleAddLine(zone.id)}
+                          className="bg-industrial-700 hover:bg-industrial-600 text-white px-3 rounded text-xs font-bold"
+                          title="Agregar Área"
                         >
-                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
-                        </button>
-                        <button
-                          onClick={() => handleMoveZone(zone.id, 'down')}
-                          className="text-industrial-500 hover:text-white hover:bg-industrial-700 rounded p-0.5"
-                          title="Mover Abajo"
-                        >
-                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                          <Plus size={14} />
                         </button>
                       </div>
                     </div>
-
-                    <div className="space-y-2 pl-4 border-l-2 border-industrial-800 ml-1">
-                      {(zone.lines || []).map((line, idx) => (
-                        <div key={idx} className="flex justify-between items-center group py-1">
-                          <span className="text-industrial-300 text-sm font-mono flex items-center gap-2">
-                            <CornerDownRight size={12} className="text-industrial-600" />
-                            {line}
-                          </span>
-                          <button
-                            onClick={() => handleDeleteLine(zone.id, line)}
-                            className="text-industrial-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                            title="Eliminar Línea"
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                        </div>
-                      ))}
-                      {(!zone.lines || zone.lines.length === 0) && (
-                        <p className="text-xs text-industrial-600 italic py-1">No hay líneas registradas</p>
-                      )}
-                    </div>
-
-                    {/* Add Line Input */}
-                    <div className="mt-4 flex gap-2 pl-4">
-                      <input
-                        type="text"
-                        className="flex-1 bg-industrial-900 border border-industrial-600 rounded p-1.5 text-xs text-white placeholder-industrial-500"
-                        placeholder="Agregar Línea (ej. Línea 1)"
-                        value={newLineInputs[zone.id] || ''}
-                        onChange={(e) => setNewLineInputs({ ...newLineInputs, [zone.id]: e.target.value })}
-                      />
-                      <button
-                        onClick={() => handleAddLine(zone.id)}
-                        className="bg-industrial-700 hover:bg-industrial-600 text-white px-2 rounded text-xs"
-                      >
-                        <Plus size={14} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
 
                 {zoneStructures.length === 0 && (
                   <div className="bg-industrial-800/50 rounded-lg border border-industrial-700 p-8 text-center">
                     <Layout size={32} className="mx-auto text-industrial-600 mb-2" />
-                    <p className="text-industrial-400 text-sm">No hay zonas configuradas</p>
+                    <p className="text-industrial-400 text-sm">No hay líneas configuradas</p>
                   </div>
                 )}
               </div>
 
-              {/* Add Zone Card */}
-              <div className="bg-industrial-800 rounded-lg border border-industrial-700 p-4 h-fit sticky top-6">
-                <h4 className="text-sm font-bold text-white mb-4 flex items-center gap-2"><Plus size={14} /> Agregar Nueva Zona</h4>
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <label className="text-xs text-industrial-400">Nombre de Zona</label>
-                    <input
-                      type="text"
-                      className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm"
-                      placeholder="e.g. Producción"
-                      value={newZoneName}
-                      onChange={(e) => setNewZoneName(e.target.value)}
-                    />
-                  </div>
-                  <button
-                    onClick={handleAddZoneStructure}
-                    className="w-full bg-industrial-700 hover:bg-industrial-600 text-white py-2 rounded text-sm transition-colors border border-industrial-600"
-                  >
-                    Crear Zona
-                  </button>
-                </div>
+              {/* Add Line Card */}
+              <div className="bg-industrial-800 rounded-lg border border-industrial-700 p-5 h-fit sticky top-6">
+                <h4 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
+                  <Plus size={16} className="text-industrial-accent" /> Agregar Nueva Línea
+                </h4>
+                <p className="text-xs text-industrial-400 mb-4">
+                  Crea una nueva línea y asígnale su color y áreas de producción para visualizarla en el mapa de planta.
+                </p>
+                <button
+                  onClick={handleOpenCreateLineModal}
+                  className="w-full bg-industrial-accent hover:bg-industrial-accent/80 text-white py-2.5 rounded-lg text-sm font-bold transition-all shadow-md flex items-center justify-center gap-2"
+                >
+                  <Plus size={16} />
+                  <span>Crear Línea con Formato</span>
+                </button>
               </div>
             </div>
           </div>
         )}
 
-        {activeTab === 'EQUIPMENT' && (
+        {canManageConfig && activeTab === 'EQUIPMENT' && (
           <div className="space-y-6 animate-fadeIn">
             <div className="flex justify-between items-center">
               <div>
@@ -1533,7 +1681,7 @@ export const Configuration: React.FC<ConfigurationProps> = ({
                   Tramos (Solo Lectura)
                 </h4>
                 <p className="text-xs text-industrial-500 mb-3">
-                  Los tramos se gestionan en la pestaña "Zonas - Líneas". Aquí se muestran los disponibles para referencia.
+                  Los tramos se gestionan en la pestaña "Líneas y Áreas". Aquí se muestran los disponibles para referencia.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {zones.map((item, idx) => (
@@ -1548,9 +1696,17 @@ export const Configuration: React.FC<ConfigurationProps> = ({
           </div>
         )}
 
-
-
       </div>
+
+      <ZoneModal
+        isOpen={isLineModalOpen}
+        onClose={() => {
+          setIsLineModalOpen(false);
+          setSelectedLineForModal(null);
+        }}
+        onSave={handleSaveLineModal}
+        zone={selectedLineForModal}
+      />
 
     </div>
   );

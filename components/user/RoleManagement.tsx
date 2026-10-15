@@ -32,9 +32,9 @@ const SYSTEM_PERMISSIONS: Permission[] = [
     { id: 'view_purchase_requests', category: 'ADMINISTRATIVE', label: 'Ver Solicitudes a Compras', description: 'Visualizar listado y detalle de solicitudes de compras.' },
     
     // Sistema
-    { id: 'manage_config', category: 'SYSTEM', label: 'Gestionar Configuración', description: 'Acceso al módulo de Configuración y gestión de submódulos.' },
-    { id: 'manage_users', category: 'SYSTEM', label: 'Gestionar Usuarios', description: 'Invitar usuarios y asignar roles.' },
-    { id: 'manage_roles', category: 'SYSTEM', label: 'Gestionar Roles y Permisos', description: 'Configurar este módulo RBAC.' },
+    { id: 'manage_config', category: 'SYSTEM', label: 'Gestionar Configuración', description: 'Acceso al módulo de Configuración y submódulos (excepto Usuarios y Roles).' },
+    { id: 'manage_users', category: 'SYSTEM', label: 'Gestionar Usuarios', description: 'Gestión independiente de Usuarios y Directorio de Personal.' },
+    { id: 'manage_roles', category: 'SYSTEM', label: 'Gestionar Roles y Permisos', description: 'Gestión independiente de Roles del Sistema y Permisos RBAC.' },
 ];
 
 // Componente recursivo para mostrar árbol de roles
@@ -174,14 +174,45 @@ export const RoleManagement: React.FC = () => {
         }
     };
 
+    const VIEW_EDIT_PAIRS: { view: string; edit: string }[] = [
+        { view: 'view_dashboard', edit: 'edit_dashboard_map' },
+        { view: 'view_kanban', edit: 'edit_kanban' },
+        { view: 'view_calendar', edit: 'manage_calendar' },
+        { view: 'view_machines', edit: 'manage_machines' },
+        { view: 'view_inventory', edit: 'manage_inventory' },
+    ];
+
     const togglePermission = (permId: string) => {
         if (!canManage) return;
         if (formData.name?.includes('Admin')) return;
         const currentPerms = formData.permissions as Record<string, boolean> || {};
+        const willBeEnabled = !currentPerms[permId];
         const newPerms = {
             ...currentPerms,
-            [permId]: !currentPerms[permId]
+            [permId]: willBeEnabled
         };
+
+        // Regla general de Ver y Editar:
+        // 1. Si se activa un permiso de Edición/Gestión, activar automáticamente el de Ver.
+        if (willBeEnabled) {
+            const pair = VIEW_EDIT_PAIRS.find(p => p.edit === permId);
+            if (pair) {
+                newPerms[pair.view] = true;
+            }
+            // Caso especial: Gestionar Repuestos habilita todos los submódulos de repuestos
+            if (permId === 'manage_inventory') {
+                newPerms['view_inventory'] = true;
+                newPerms['view_part_requests'] = true;
+                newPerms['view_purchase_requests'] = true;
+            }
+        } else {
+            // 2. Si se desactiva un permiso de Ver, desactivar automáticamente el de Edición/Gestión.
+            const pair = VIEW_EDIT_PAIRS.find(p => p.view === permId);
+            if (pair) {
+                newPerms[pair.edit] = false;
+            }
+        }
+
         setFormData({ ...formData, permissions: newPerms });
         setIsEditing(true);
     };
@@ -310,7 +341,8 @@ export const RoleManagement: React.FC = () => {
                                     <label className="block text-xs font-medium text-industrial-400 mb-1">Nombre del Rol</label>
                                     <input 
                                         type="text" 
-                                        className="w-full bg-industrial-900 border border-industrial-600 rounded px-3 py-2 text-white text-lg font-bold outline-none focus:border-industrial-accent transition-colors"
+                                        disabled={!canManage || formData.name?.includes('Admin')}
+                                        className="w-full bg-industrial-900 border border-industrial-600 rounded px-3 py-2 text-white text-lg font-bold outline-none focus:border-industrial-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                         placeholder="Ingrese un nombre para este rol"
                                         value={formData.name || ''}
                                         onChange={(e) => {
@@ -330,7 +362,7 @@ export const RoleManagement: React.FC = () => {
                                             setFormData({...formData, parentRoleId: e.target.value || null});
                                             setIsEditing(true);
                                         }}
-                                        disabled={formData.name?.includes('Admin')}
+                                        disabled={!canManage || formData.name?.includes('Admin')}
                                     >
                                         <option value="">-- Sin Jefe Directo (Rol Raíz) --</option>
                                         {getAvailableParentRoles().map(r => (
@@ -343,7 +375,8 @@ export const RoleManagement: React.FC = () => {
                                 <div>
                                     <label className="block text-xs font-medium text-industrial-400 mb-1">Descripción</label>
                                     <textarea 
-                                        className="w-full bg-industrial-900 border border-industrial-600 rounded px-3 py-2 text-white text-sm outline-none focus:border-industrial-accent transition-colors resize-none"
+                                        disabled={!canManage || formData.name?.includes('Admin')}
+                                        className="w-full bg-industrial-900 border border-industrial-600 rounded px-3 py-2 text-white text-sm outline-none focus:border-industrial-accent transition-colors resize-none disabled:opacity-50 disabled:cursor-not-allowed"
                                         placeholder="Ingrese una descripción para este rol"
                                         rows={2}
                                         value={formData.description || ''}
@@ -403,11 +436,12 @@ export const RoleManagement: React.FC = () => {
                                                 const permsObj = formData.permissions as Record<string, boolean> || {};
                                                 const isEnabled = permsObj[perm.id] || false;
                                                 const isAdmin = formData.name?.includes('Admin');
+                                                const isReadOnly = isAdmin || !canManage;
                                                 return (
                                                     <div 
                                                         key={perm.id} 
                                                         onClick={() => togglePermission(perm.id)}
-                                                        className={`flex items-start gap-3 p-2 rounded ${isAdmin ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'} transition-colors ${isEnabled ? 'bg-industrial-800' : (isAdmin ? '' : 'hover:bg-industrial-800/50')}`}
+                                                        className={`flex items-start gap-3 p-2 rounded ${isReadOnly ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'} transition-colors ${isEnabled ? 'bg-industrial-800' : (isReadOnly ? '' : 'hover:bg-industrial-800/50')}`}
                                                     >
                                                         <div className={`mt-0.5 ${isEnabled ? 'text-emerald-500' : 'text-industrial-600'}`}>
                                                             {isEnabled ? <CheckSquare size={16} /> : <Square size={16} />}
