@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Activity, Box, Calendar, Clock, AlertTriangle, Gauge } from 'lucide-react';
-import { Machine, MachineStatus } from '../../types';
+import { Machine, MachineStatus, WorkOrderStatus } from '../../types';
 import { PredictiveAnalysis } from '../../services/geminiService';
 import { useMasterStore } from '../../src/stores/useMasterStore';
 import { useWorkOrderStore } from '../../src/stores/useWorkOrderStore';
@@ -35,6 +35,69 @@ export const AssetDrawer: React.FC<AssetDrawerProps> = ({ machine, onClose, anal
   const mttr = calculateMachineMTTR(machine.id, allOrders || []);
   const mtbf = calculateMachineMTBF(machine.id, allOrders || []);
 
+  const hasActiveMaint = (allOrders || []).some(
+    wo => wo.machineId === machine.id && wo.status !== WorkOrderStatus.DONE
+  );
+
+  const getStatusInfo = () => {
+    if (hasActiveMaint) {
+      return {
+        label: 'En Mantenimiento',
+        dotClass: 'bg-amber-500 animate-pulse',
+        textClass: 'text-amber-400'
+      };
+    }
+    const status = String(machine.status || '').toUpperCase();
+    if (status === MachineStatus.RUNNING || status === 'RUNNING') {
+      return {
+        label: 'Operativo',
+        dotClass: 'bg-emerald-500',
+        textClass: 'text-emerald-400'
+      };
+    }
+    if (status === MachineStatus.WARNING || status === 'WARNING') {
+      return {
+        label: 'Advertencia',
+        dotClass: 'bg-amber-500',
+        textClass: 'text-amber-400'
+      };
+    }
+    if (status === MachineStatus.CRITICAL || status === 'CRITICAL') {
+      return {
+        label: 'Crítico',
+        dotClass: 'bg-red-500 animate-pulse',
+        textClass: 'text-red-400'
+      };
+    }
+    if (status === MachineStatus.OFFLINE || status === 'OFFLINE') {
+      return {
+        label: 'Detenido',
+        dotClass: 'bg-red-500',
+        textClass: 'text-red-400'
+      };
+    }
+    if (machine.isActive !== false) {
+      return {
+        label: 'Operativo',
+        dotClass: 'bg-emerald-500',
+        textClass: 'text-emerald-400'
+      };
+    }
+    return {
+      label: 'Inactivo',
+      dotClass: 'bg-industrial-500',
+      textClass: 'text-industrial-400'
+    };
+  };
+
+  const statusInfo = getStatusInfo();
+  const subtitleParts = [
+    machine.code || machine.alias,
+    machine.plate ? `Placa: ${machine.plate}` : null,
+    [machine.brand, machine.model].filter(Boolean).join(' ')
+  ].filter(Boolean);
+  const headerSubtitle = subtitleParts.length > 0 ? subtitleParts.join(' • ') : 'Sin datos adicionales';
+
   // Real Kardex Data mapped from machine's `criticalParts`
   const actualCriticalParts = (machine.criticalParts || [])
     .map(partId => parts.find(p => p.id === partId))
@@ -52,13 +115,27 @@ export const AssetDrawer: React.FC<AssetDrawerProps> = ({ machine, onClose, anal
         {/* Header */}
         <div className="p-6 border-b border-industrial-700 flex justify-between items-start bg-industrial-900/50">
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className={`w-2 h-2 rounded-full ${machine.status === 'RUNNING' ? 'bg-green-500' : 'bg-red-500'}`}></span>
-              <span className="text-xs font-mono text-industrial-400">{machine.id.toUpperCase()}</span>
+            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+              <span className={`w-2 h-2 rounded-full ${statusInfo.dotClass}`}></span>
+              <span className={`text-xs font-bold uppercase tracking-wider ${statusInfo.textClass}`}>
+                {statusInfo.label}
+              </span>
+              {machine.zone && (
+                <>
+                  <span className="text-industrial-600 text-xs">•</span>
+                  <span className="text-xs text-industrial-400 font-medium">{machine.zone}</span>
+                </>
+              )}
+              {machine.category && (
+                <>
+                  <span className="text-industrial-600 text-xs">•</span>
+                  <span className="text-xs text-industrial-400 font-medium">{machine.category}</span>
+                </>
+              )}
             </div>
             <h2 className="text-2xl font-bold text-white font-sans">{machine.name}</h2>
-            <p className="text-sm text-white font-medium mt-1">
-              {machine.alias || 'Sin Alias'} • {machine.plate || 'Sin Matrícula'}
+            <p className="text-sm text-industrial-300 font-medium mt-1">
+              {headerSubtitle}
             </p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-industrial-700 rounded-full text-industrial-400 hover:text-white transition-colors">
