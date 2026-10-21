@@ -294,9 +294,11 @@ export interface WorkOrder {
   closingDate?: string; // Date/Time when the work was accepted/closed
 
   // Signatures
-  signatureExecutor?: string; // Name of executor
+  signatureExecutor?: string; // Name of executor (Section 2)
   signatureExecutorDate?: string;
-  signatureSupervisor?: string; // Name of supervisor
+  signatureExecutionSupervisor?: string; // Name of supervisor approving Section 2 Intervention
+  signatureExecutionSupervisorDate?: string;
+  signatureSupervisor?: string; // Name of supervisor for final closure (Section 3)
   signatureSupervisorDate?: string;
   tasks?: any[];
   branch?: string;

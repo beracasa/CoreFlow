@@ -472,14 +472,189 @@ export const generateRMant02PDF = (order: WorkOrder, machine?: Machine, logoUrl?
 
   currentY += 13;
 
-  // --- BLOQUE 6: SECCIÓN 5 - CHECKLIST DE ENTREGA DE ÁREA/EQUIPO ---
+  // --- BLOQUE 6: SECCIÓN 5 - VALIDACIÓN DE LA INTERVENCIÓN Y EVIDENCIAS ---
+  if (currentY > pageHeight - 90) {
+    doc.addPage();
+    currentY = 25;
+    drawContinuationHeader(doc.getNumberOfPages());
+  }
+
+  drawSectionHeader("5. Validación de la Intervención y Evidencias", currentY);
+  currentY += 7;
+
+  // Evidencias (Imagen y Documento Adjunto)
+  const colEvidenceW = (usableWidth - 6) / 2;
+  const evidenceH = 34;
+
+  // 1. Evidencia Fotográfica
+  doc.setLineWidth(0.15);
+  doc.setDrawColor(borderCol[0], borderCol[1], borderCol[2]);
+  doc.setFillColor(248, 250, 248);
+  doc.roundedRect(margin, currentY, colEvidenceW, evidenceH, 1.5, 1.5, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.text("EVIDENCIA FOTOGRÁFICA (IMAGEN)", margin + 4, currentY + 5);
+
+  if (order.closingImage && (order.closingImage.startsWith('data:image') || order.closingImage.startsWith('http') || order.closingImage.startsWith('blob'))) {
+    try {
+      doc.addImage(order.closingImage, 'JPEG', margin + 4, currentY + 7, colEvidenceW - 8, 24);
+    } catch (e) {
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(7.5);
+      doc.setTextColor(140, 140, 140);
+      doc.text("Imagen adjunta registrada", margin + (colEvidenceW / 2), currentY + 19, { align: 'center' });
+    }
+  } else {
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(7.5);
+    doc.setTextColor(140, 140, 140);
+    doc.text("Sin evidencia fotográfica adjunta", margin + (colEvidenceW / 2), currentY + 19, { align: 'center' });
+  }
+
+  // 2. Archivo Adjunto
+  doc.setDrawColor(borderCol[0], borderCol[1], borderCol[2]);
+  doc.setFillColor(248, 250, 248);
+  doc.roundedRect(margin + colEvidenceW + 6, currentY, colEvidenceW, evidenceH, 1.5, 1.5, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.text("ARCHIVO ADJUNTO (PDF / DOC)", margin + colEvidenceW + 10, currentY + 5);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(textDark[0], textDark[1], textDark[2]);
+  if (order.closingFile) {
+    doc.text("Documento digital registrado en la orden", margin + colEvidenceW + 10, currentY + 16);
+    doc.setFontSize(7);
+    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+    const fileLabel = order.closingFile.length > 38 ? order.closingFile.substring(0, 35) + '...' : order.closingFile;
+    doc.text(fileLabel, margin + colEvidenceW + 10, currentY + 22);
+  } else {
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor(140, 140, 140);
+    doc.text("Sin archivo digital adjunto", margin + colEvidenceW + 6 + (colEvidenceW / 2), currentY + 19, { align: 'center' });
+  }
+
+  currentY += evidenceH + 5;
+
+  // Firmas de la Intervención
+  if (currentY > pageHeight - 55) {
+    doc.addPage();
+    currentY = 25;
+    drawContinuationHeader(doc.getNumberOfPages());
+  }
+
+  const sigY = currentY;
+  const colSigW = (usableWidth - 6) / 2;
+
+  // Caja Ejecutante (Izquierda)
+  doc.setLineWidth(0.15);
+  doc.setDrawColor(borderCol[0], borderCol[1], borderCol[2]);
+  doc.setFillColor(248, 250, 248);
+  doc.roundedRect(margin, sigY, colSigW, 42, 2, 2, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.text("FIRMA EJECUTANTE / MECÁNICO", margin + 4, sigY + 5.5);
+
+  doc.setDrawColor(220, 225, 220);
+  doc.setFillColor(255, 255, 255);
+  doc.rect(margin + 4, sigY + 8, colSigW - 8, 18, 'FD');
+
+  if (order.signatureExecutor && order.signatureExecutor.startsWith('data:image')) {
+    try {
+      doc.addImage(order.signatureExecutor, 'PNG', margin + 6, sigY + 9, colSigW - 12, 16);
+    } catch (e) {
+      console.warn("Fallo agregando firma ejecutante", e);
+    }
+  } else {
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(8.5);
+    doc.setTextColor(140, 140, 140);
+    doc.text(order.signatureExecutor || 'PENDIENTE DE FIRMA', margin + (colSigW / 2), sigY + 18, { align: 'center' });
+  }
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7);
+  doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+  doc.text("NOMBRE:", margin + 4, sigY + 31);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(textDark[0], textDark[1], textDark[2]);
+  const execDisplayName = order.signatureExecutor && !order.signatureExecutor.startsWith('data:image')
+    ? order.signatureExecutor
+    : executorName;
+  doc.text(execDisplayName, margin + 18, sigY + 31);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7);
+  doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+  doc.text("FECHA:", margin + 4, sigY + 37);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+  doc.text(formatDateTime(order.signatureExecutorDate, 'Pendiente'), margin + 18, sigY + 37);
+
+  // Caja Supervisor Intervención (Derecha)
+  doc.setDrawColor(borderCol[0], borderCol[1], borderCol[2]);
+  doc.setFillColor(248, 250, 248);
+  doc.roundedRect(margin + colSigW + 6, sigY, colSigW, 42, 2, 2, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.text("FIRMA SUPERVISOR (CONFORMIDAD INTERVENCIÓN)", margin + colSigW + 10, sigY + 5.5);
+
+  doc.setDrawColor(220, 225, 220);
+  doc.setFillColor(255, 255, 255);
+  doc.rect(margin + colSigW + 10, sigY + 8, colSigW - 8, 18, 'FD');
+
+  if (order.signatureExecutionSupervisor && order.signatureExecutionSupervisor.startsWith('data:image')) {
+    try {
+      doc.addImage(order.signatureExecutionSupervisor, 'PNG', margin + colSigW + 12, sigY + 9, colSigW - 12, 16);
+    } catch (e) {
+      console.warn("Fallo agregando firma supervisor de intervencion", e);
+    }
+  } else {
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(8.5);
+    doc.setTextColor(140, 140, 140);
+    doc.text(order.signatureExecutionSupervisor || 'PENDIENTE DE CONFORMIDAD', margin + colSigW + 6 + (colSigW / 2), sigY + 18, { align: 'center' });
+  }
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7);
+  doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+  doc.text("NOMBRE:", margin + colSigW + 10, sigY + 31);
+  doc.setFont('helvetica', 'normal');
+  const supervisorExecDisplayName = order.signatureExecutionSupervisor && !order.signatureExecutionSupervisor.startsWith('data:image')
+    ? order.signatureExecutionSupervisor
+    : 'Supervisor de Intervención';
+  doc.text(supervisorExecDisplayName, margin + colSigW + 24, sigY + 31);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7);
+  doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+  doc.text("FECHA:", margin + colSigW + 10, sigY + 37);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+  doc.text(formatDateTime(order.signatureExecutionSupervisorDate, 'Pendiente'), margin + colSigW + 24, sigY + 37);
+
+  currentY += 48;
+
+  // --- BLOQUE 7: SECCIÓN 6 - CHECKLIST DE ENTREGA DE ÁREA/EQUIPO ---
   if (currentY > pageHeight - 75) {
     doc.addPage();
     currentY = 25;
     drawContinuationHeader(doc.getNumberOfPages());
   }
 
-  drawSectionHeader("5. Entrega del Área o Equipo Donde se Realizó el Trabajo Preventivo", currentY);
+  drawSectionHeader("6. Entrega del Área o Equipo Donde se Realizó el Trabajo Preventivo", currentY);
   currentY += 7;
 
   const cardY = currentY;
@@ -533,14 +708,14 @@ export const generateRMant02PDF = (order: WorkOrder, machine?: Machine, logoUrl?
 
   currentY = cardY + cardHeight + 5;
 
-  // --- BLOQUE 7: SECCIÓN 6 - ACEPTACIÓN, OBSERVACIONES Y FIRMAS ---
-  if (currentY > pageHeight - 75) {
+  // --- BLOQUE 8: SECCIÓN 7 - ACEPTACIÓN DEL TRABAJO Y CIERRE ---
+  if (currentY > pageHeight - 80) {
     doc.addPage();
     currentY = 25;
     drawContinuationHeader(doc.getNumberOfPages());
   }
 
-  drawSectionHeader("6. Conformidad y Cierre de Orden", currentY);
+  drawSectionHeader("7. Aceptación del Trabajo y Cierre de Orden", currentY);
   currentY += 7;
 
   // Cuadro de Observaciones (enmarcado)
@@ -556,126 +731,90 @@ export const generateRMant02PDF = (order: WorkOrder, machine?: Machine, logoUrl?
   doc.roundedRect(margin, currentY, usableWidth, 14, 1.5, 1.5, 'FD');
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8.5);
+  doc.setFontSize(8);
   doc.setTextColor(textDark[0], textDark[1], textDark[2]);
   const obsText = order.observations || 'Sin observaciones adicionales registradas en esta intervención preventiva.';
   const obsLines = doc.splitTextToSize(obsText, usableWidth - 8);
   doc.text(obsLines, margin + 4, currentY + 4.5);
 
-  currentY += 20;
+  currentY += 18;
 
+  // Bloque Aceptación del Trabajo (Recibido Por, Fecha/Hora, Firma Supervisor Cierre)
   if (currentY > pageHeight - 55) {
     doc.addPage();
     currentY = 25;
     drawContinuationHeader(doc.getNumberOfPages());
   }
 
-  const sigY = currentY;
-  const colSigW = 92;
+  const closeBoxY = currentY;
+  const colAcceptW = (usableWidth - 6) / 2;
 
-  // Caja Ejecutante (Izquierda)
+  // Tarjeta de Recepción (Izquierda)
   doc.setLineWidth(0.15);
   doc.setDrawColor(borderCol[0], borderCol[1], borderCol[2]);
   doc.setFillColor(248, 250, 248);
-  doc.roundedRect(margin, sigY, colSigW, 44, 2, 2, 'FD');
+  doc.roundedRect(margin, closeBoxY, colAcceptW, 42, 2, 2, 'FD');
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7.5);
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  doc.text("FIRMA EJECUTANTE / MECÁNICO", margin + 4, sigY + 5.5);
+  doc.text("RECEPCIÓN DE TRABAJO (SUPERVISOR)", margin + 4, closeBoxY + 5.5);
 
-  // Recuadro blanco firma ejecutante
-  doc.setDrawColor(220, 225, 220);
-  doc.setFillColor(255, 255, 255);
-  doc.rect(margin + 4, sigY + 8, colSigW - 8, 20, 'FD');
+  const supervisorReceiving = order.supervisorId
+    ? getUserFullName(order.supervisorId)
+    : getUserFullName(order.supervisor);
 
-  if (order.signatureExecutor && order.signatureExecutor.startsWith('data:image')) {
-    try {
-      doc.addImage(order.signatureExecutor, 'PNG', margin + 6, sigY + 9, colSigW - 12, 18);
-    } catch (e) {
-      console.warn("Fallo agregando firma ejecutante como imagen", e);
-    }
-  } else {
-    doc.setFont('helvetica', 'italic');
-    doc.setFontSize(9);
-    doc.setTextColor(140, 140, 140);
-    doc.text(order.signatureExecutor || 'PENDIENTE DE FIRMA', margin + (colSigW / 2), sigY + 19, { align: 'center' });
-  }
+  drawField("Recibido Por (Supervisor)", supervisorReceiving, margin + 4, closeBoxY + 12);
+  drawField("Fecha y Hora de Recepción", formatDateTime(order.closingDate, 'Pendiente'), margin + 4, closeBoxY + 26);
 
-  // Nombre y fecha Ejecutante
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
-  doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
-  doc.text("NOMBRE:", margin + 4, sigY + 33.5);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-  const executorDisplayName = order.signatureExecutor && !order.signatureExecutor.startsWith('data:image')
-    ? order.signatureExecutor
-    : executorName;
-  doc.text(executorDisplayName, margin + 18, sigY + 33.5);
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
-  doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
-  doc.text("FECHA:", margin + 4, sigY + 39.5);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
-  doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-  const execDateStr = formatDateTime(order.signatureExecutorDate, 'Pendiente');
-  doc.text(execDateStr, margin + 18, sigY + 39.5);
-
-
-  // Caja Supervisor (Derecha)
+  // Tarjeta de Firma Supervisor Cierre (Derecha)
   doc.setDrawColor(borderCol[0], borderCol[1], borderCol[2]);
   doc.setFillColor(248, 250, 248);
-  doc.roundedRect(pageWidth - margin - colSigW, sigY, colSigW, 44, 2, 2, 'FD');
+  doc.roundedRect(margin + colAcceptW + 6, closeBoxY, colAcceptW, 42, 2, 2, 'FD');
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7.5);
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  doc.text("FIRMA DE CONFORMIDAD SUPERVISOR", pageWidth - margin - colSigW + 4, sigY + 5.5);
+  doc.text("FIRMA SUPERVISOR (CONFORMIDAD DE CIERRE)", margin + colAcceptW + 10, closeBoxY + 5.5);
 
-  // Recuadro blanco firma supervisor
   doc.setDrawColor(220, 225, 220);
   doc.setFillColor(255, 255, 255);
-  doc.rect(pageWidth - margin - colSigW + 4, sigY + 8, colSigW - 8, 20, 'FD');
+  doc.rect(margin + colAcceptW + 10, closeBoxY + 8, colAcceptW - 8, 18, 'FD');
 
   if (order.signatureSupervisor && order.signatureSupervisor.startsWith('data:image')) {
     try {
-      doc.addImage(order.signatureSupervisor, 'PNG', pageWidth - margin - colSigW + 6, sigY + 9, colSigW - 12, 18);
+      doc.addImage(order.signatureSupervisor, 'PNG', margin + colAcceptW + 12, closeBoxY + 9, colAcceptW - 12, 16);
     } catch (e) {
-      console.warn("Fallo agregando firma supervisor como imagen", e);
+      console.warn("Fallo agregando firma supervisor de cierre", e);
     }
   } else {
     doc.setFont('helvetica', 'italic');
-    doc.setFontSize(9);
+    doc.setFontSize(8.5);
     doc.setTextColor(140, 140, 140);
-    doc.text(order.signatureSupervisor || 'PENDIENTE DE CONFORMIDAD', pageWidth - margin - (colSigW / 2), sigY + 19, { align: 'center' });
+    doc.text(order.signatureSupervisor || 'PENDIENTE DE CONFORMIDAD', margin + colAcceptW + 6 + (colAcceptW / 2), closeBoxY + 18, { align: 'center' });
   }
 
-  // Nombre y fecha Supervisor
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
+  doc.setFontSize(7);
   doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
-  doc.text("NOMBRE:", pageWidth - margin - colSigW + 4, sigY + 33.5);
+  doc.text("NOMBRE:", margin + colAcceptW + 10, closeBoxY + 31);
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.setTextColor(textDark[0], textDark[1], textDark[2]);
   const supervisorDisplayName = order.signatureSupervisor && !order.signatureSupervisor.startsWith('data:image')
     ? order.signatureSupervisor
-    : getUserFullName(order.supervisor);
-  doc.text(supervisorDisplayName, pageWidth - margin - colSigW + 18, sigY + 33.5);
+    : supervisorReceiving;
+  doc.text(supervisorDisplayName, margin + colAcceptW + 24, closeBoxY + 31);
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
+  doc.setFontSize(7);
   doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
-  doc.text("FECHA:", pageWidth - margin - colSigW + 4, sigY + 39.5);
+  doc.text("FECHA:", margin + colAcceptW + 10, closeBoxY + 37);
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
+  doc.setFontSize(7);
   doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
   const superDateStr = formatDateTime(order.signatureSupervisorDate || order.closingDate, 'Pendiente');
-  doc.text(superDateStr, pageWidth - margin - colSigW + 18, sigY + 39.5);
+  doc.text(superDateStr, margin + colAcceptW + 24, closeBoxY + 37);
 
 
   // --- PIE DE PÁGINA RECURRENTE DINÁMICO ---
@@ -751,6 +890,24 @@ export const generateRMant05PDF = (order: WorkOrder, machine?: Machine, logoUrl?
     doc.setFontSize(9.5);
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.text(title.toUpperCase(), margin, y + 4);
+  };
+
+  // --- FUNCIÓN HELPER PARA CABECERA DE PÁGINAS CONTINUADAS ---
+  const drawContinuationHeader = (pageNumber: number) => {
+    if (pageNumber > 1) {
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      doc.setFontSize(10);
+      doc.text("R-MANT-05 | REGISTRO DE TRABAJOS Y CIERRE CORRECTIVO", margin, 15);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+      doc.text(`ORDEN: ${order.displayId || order.id.substring(0, 8)}`, pageWidth - margin, 15, { align: 'right' });
+      
+      doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      doc.setLineWidth(0.3);
+      doc.line(margin, 18, pageWidth - margin, 18);
+    }
   };
 
   // ==========================================
@@ -949,36 +1106,11 @@ export const generateRMant05PDF = (order: WorkOrder, machine?: Machine, logoUrl?
   drawField("Fecha y Hora Recibido", receivedDateStr, xCol2, 211);
   drawField("Personal Asignado / Ejecutante", getUserFullName(order.assignedMechanic || order.assignedTo), xCol3, 211);
 
-  // --- PIE DE PÁGINA 1 ---
-  doc.setDrawColor(220, 225, 220);
-  doc.setLineWidth(0.15);
-  doc.line(margin, 264, pageWidth - margin, 264);
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
-  doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
-  doc.text("CoreFlow CMMS • Registro de Calidad • R-MANT-05 Correctivo", margin, 269);
-  doc.text("Página 1 de 2", pageWidth - margin, 269, { align: 'right' });
-
-
   // ==========================================
-  // PÁGINA 2: ACTIVIDADES, REPUESTOS Y CIERRE
+  // PÁGINA 2+: ACTIVIDADES, REPUESTOS Y CIERRE
   // ==========================================
   doc.addPage();
-
-  // --- ENCABEZADO SIMPLIFICADO DE CONTINUACIÓN ---
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  doc.setFontSize(10);
-  doc.text("R-MANT-05 | REGISTRO DE TRABAJOS Y CIERRE CORRECTIVO", margin, 15);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
-  doc.text(`ORDEN: ${order.displayId || order.id.substring(0, 8)}`, pageWidth - margin, 15, { align: 'right' });
-  
-  doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  doc.setLineWidth(0.3);
-  doc.line(margin, 18, pageWidth - margin, 18);
+  drawContinuationHeader(doc.getNumberOfPages());
 
   // --- BLOQUE 5: SECCIÓN 4 - REGISTRO DE ACTIVIDADES (y = 24) ---
   drawSectionHeader("4. Registro de Averías y Actividades Realizadas", 24);
@@ -1021,6 +1153,12 @@ export const generateRMant05PDF = (order: WorkOrder, machine?: Machine, logoUrl?
   let currentY = (doc as any).lastAutoTable.finalY + 6;
 
   // --- BLOQUE 6: SECCIÓN 5 - REPUESTOS UTILIZADOS ---
+  if (currentY > pageHeight - 65) {
+    doc.addPage();
+    currentY = 25;
+    drawContinuationHeader(doc.getNumberOfPages());
+  }
+
   drawSectionHeader("5. Repuestos y Materiales Utilizados", currentY);
 
   const partsData = (order.consumedParts || []).map(p => [
@@ -1081,10 +1219,194 @@ export const generateRMant05PDF = (order: WorkOrder, machine?: Machine, logoUrl?
   doc.setTextColor(30, 30, 30);
   doc.text(formattedTotal, pageWidth - margin - 4, currentY + 5.2, { align: 'right' });
 
-  // --- BLOQUE 7: SECCIÓN 6 - CHECKLIST DE ENTREGA DE ÁREA/EQUIPO ---
-  drawSectionHeader("6. Entrega del Área o Equipo Donde se Realizó el Trabajo Correctivo", currentY + 13);
+  currentY += 13;
 
-  const cardY = currentY + 20;
+  // --- BLOQUE 7: SECCIÓN 6 - VALIDACIÓN DE LA INTERVENCIÓN Y EVIDENCIAS ---
+  if (currentY > pageHeight - 90) {
+    doc.addPage();
+    currentY = 25;
+    drawContinuationHeader(doc.getNumberOfPages());
+  }
+
+  drawSectionHeader("6. Validación de la Intervención y Evidencias", currentY);
+  currentY += 7;
+
+  // Evidencias (Imagen y Documento Adjunto)
+  const colEvidenceW = (usableWidth - 6) / 2;
+  const evidenceH = 34;
+
+  // 1. Evidencia Fotográfica
+  doc.setLineWidth(0.15);
+  doc.setDrawColor(borderCol[0], borderCol[1], borderCol[2]);
+  doc.setFillColor(248, 250, 248);
+  doc.roundedRect(margin, currentY, colEvidenceW, evidenceH, 1.5, 1.5, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.text("EVIDENCIA FOTOGRÁFICA (IMAGEN)", margin + 4, currentY + 5);
+
+  if (order.closingImage && (order.closingImage.startsWith('data:image') || order.closingImage.startsWith('http') || order.closingImage.startsWith('blob'))) {
+    try {
+      doc.addImage(order.closingImage, 'JPEG', margin + 4, currentY + 7, colEvidenceW - 8, 24);
+    } catch (e) {
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(7.5);
+      doc.setTextColor(140, 140, 140);
+      doc.text("Imagen adjunta registrada", margin + (colEvidenceW / 2), currentY + 19, { align: 'center' });
+    }
+  } else {
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(7.5);
+    doc.setTextColor(140, 140, 140);
+    doc.text("Sin evidencia fotográfica adjunta", margin + (colEvidenceW / 2), currentY + 19, { align: 'center' });
+  }
+
+  // 2. Archivo Adjunto
+  doc.setDrawColor(borderCol[0], borderCol[1], borderCol[2]);
+  doc.setFillColor(248, 250, 248);
+  doc.roundedRect(margin + colEvidenceW + 6, currentY, colEvidenceW, evidenceH, 1.5, 1.5, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.text("ARCHIVO ADJUNTO (PDF / DOC)", margin + colEvidenceW + 10, currentY + 5);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(textDark[0], textDark[1], textDark[2]);
+  if (order.closingFile) {
+    doc.text("Documento digital registrado en la orden", margin + colEvidenceW + 10, currentY + 16);
+    doc.setFontSize(7);
+    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+    const fileLabel = order.closingFile.length > 38 ? order.closingFile.substring(0, 35) + '...' : order.closingFile;
+    doc.text(fileLabel, margin + colEvidenceW + 10, currentY + 22);
+  } else {
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor(140, 140, 140);
+    doc.text("Sin archivo digital adjunto", margin + colEvidenceW + 6 + (colEvidenceW / 2), currentY + 19, { align: 'center' });
+  }
+
+  currentY += evidenceH + 5;
+
+  // Firmas de la Intervención
+  if (currentY > pageHeight - 55) {
+    doc.addPage();
+    currentY = 25;
+    drawContinuationHeader(doc.getNumberOfPages());
+  }
+
+  const sigY = currentY;
+  const colSigW = (usableWidth - 6) / 2;
+
+  // Caja Ejecutante (Izquierda)
+  doc.setLineWidth(0.15);
+  doc.setDrawColor(borderCol[0], borderCol[1], borderCol[2]);
+  doc.setFillColor(248, 250, 248);
+  doc.roundedRect(margin, sigY, colSigW, 42, 2, 2, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.text("FIRMA EJECUTANTE / MECÁNICO", margin + 4, sigY + 5.5);
+
+  doc.setDrawColor(220, 225, 220);
+  doc.setFillColor(255, 255, 255);
+  doc.rect(margin + 4, sigY + 8, colSigW - 8, 18, 'FD');
+
+  if (order.signatureExecutor && order.signatureExecutor.startsWith('data:image')) {
+    try {
+      doc.addImage(order.signatureExecutor, 'PNG', margin + 6, sigY + 9, colSigW - 12, 16);
+    } catch (e) {
+      console.warn("Fallo agregando firma ejecutante", e);
+    }
+  } else {
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(8.5);
+    doc.setTextColor(140, 140, 140);
+    doc.text(order.signatureExecutor || 'PENDIENTE DE FIRMA', margin + (colSigW / 2), sigY + 18, { align: 'center' });
+  }
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7);
+  doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+  doc.text("NOMBRE:", margin + 4, sigY + 31);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.setTextColor(textDark[0], textDark[1], textDark[2]);
+  const execDisplayName = order.signatureExecutor && !order.signatureExecutor.startsWith('data:image')
+    ? order.signatureExecutor
+    : getUserFullName(order.assignedMechanic || order.assignedTo);
+  doc.text(execDisplayName, margin + 18, sigY + 31);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7);
+  doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+  doc.text("FECHA:", margin + 4, sigY + 37);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+  doc.text(formatDateTime(order.signatureExecutorDate, 'Pendiente'), margin + 18, sigY + 37);
+
+  // Caja Supervisor Intervención (Derecha)
+  doc.setDrawColor(borderCol[0], borderCol[1], borderCol[2]);
+  doc.setFillColor(248, 250, 248);
+  doc.roundedRect(margin + colSigW + 6, sigY, colSigW, 42, 2, 2, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.text("FIRMA SUPERVISOR (CONFORMIDAD INTERVENCIÓN)", margin + colSigW + 10, sigY + 5.5);
+
+  doc.setDrawColor(220, 225, 220);
+  doc.setFillColor(255, 255, 255);
+  doc.rect(margin + colSigW + 10, sigY + 8, colSigW - 8, 18, 'FD');
+
+  if (order.signatureExecutionSupervisor && order.signatureExecutionSupervisor.startsWith('data:image')) {
+    try {
+      doc.addImage(order.signatureExecutionSupervisor, 'PNG', margin + colSigW + 12, sigY + 9, colSigW - 12, 16);
+    } catch (e) {
+      console.warn("Fallo agregando firma supervisor de intervencion", e);
+    }
+  } else {
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(8.5);
+    doc.setTextColor(140, 140, 140);
+    doc.text(order.signatureExecutionSupervisor || 'PENDIENTE DE CONFORMIDAD', margin + colSigW + 6 + (colSigW / 2), sigY + 18, { align: 'center' });
+  }
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7);
+  doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+  doc.text("NOMBRE:", margin + colSigW + 10, sigY + 31);
+  doc.setFont('helvetica', 'normal');
+  const supervisorExecDisplayName = order.signatureExecutionSupervisor && !order.signatureExecutionSupervisor.startsWith('data:image')
+    ? order.signatureExecutionSupervisor
+    : 'Supervisor de Intervención';
+  doc.text(supervisorExecDisplayName, margin + colSigW + 24, sigY + 31);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7);
+  doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+  doc.text("FECHA:", margin + colSigW + 10, sigY + 37);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+  doc.text(formatDateTime(order.signatureExecutionSupervisorDate, 'Pendiente'), margin + colSigW + 24, sigY + 37);
+
+  currentY += 48;
+
+  // --- BLOQUE 8: SECCIÓN 7 - CHECKLIST DE ENTREGA DE ÁREA/EQUIPO ---
+  if (currentY > pageHeight - 75) {
+    doc.addPage();
+    currentY = 25;
+    drawContinuationHeader(doc.getNumberOfPages());
+  }
+
+  drawSectionHeader("7. Entrega del Área o Equipo Donde se Realizó el Trabajo Correctivo", currentY);
+  currentY += 7;
+
+  const cardY = currentY;
   const cardHeight = 49;
   doc.setLineWidth(0.15);
   doc.setDrawColor(borderCol[0], borderCol[1], borderCol[2]);
@@ -1092,7 +1414,6 @@ export const generateRMant05PDF = (order: WorkOrder, machine?: Machine, logoUrl?
   doc.roundedRect(margin, cardY, usableWidth, cardHeight, 2, 2, 'FD');
 
   const cl = order.checklist || {};
-
   const checklistItems = [
     { text: "Punto específico de intervención limpio libre de contaminantes (grasas u otros químicos)", val: cl.pointClean },
     { text: "Área o punto de intervención limpio", val: cl.areaClean },
@@ -1105,13 +1426,11 @@ export const generateRMant05PDF = (order: WorkOrder, machine?: Machine, logoUrl?
   checklistItems.forEach((item, idx) => {
     const itemY = cardY + 6 + idx * 7.2;
     
-    // Texto completo e idéntico al formulario
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
     doc.setTextColor(textDark[0], textDark[1], textDark[2]);
     doc.text(item.text, margin + 4, itemY);
 
-    // Posicionamiento de casillas de verificación
     const checkX = margin + usableWidth - 26;
     
     doc.setFont('helvetica', 'normal');
@@ -1120,148 +1439,148 @@ export const generateRMant05PDF = (order: WorkOrder, machine?: Machine, logoUrl?
     doc.text("SÍ", checkX, itemY);
     doc.text("NO", checkX + 14, itemY);
 
-    // Dibujo de casillas (rectángulos pequeños)
     doc.setLineWidth(0.2);
     doc.setDrawColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-    doc.rect(checkX - 5, itemY - 2.5, 3, 3); // Casilla SÍ
-    doc.rect(checkX + 9, itemY - 2.5, 3, 3); // Casilla NO
+    doc.rect(checkX - 5, itemY - 2.5, 3, 3);
+    doc.rect(checkX + 9, itemY - 2.5, 3, 3);
 
-    // Marca de selección X (completamente compatible y legible)
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(7.5);
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     if (item.val === true) {
       doc.text("X", checkX - 4.2, itemY - 0.2);
     } else if (item.val === false) {
-      doc.setTextColor(180, 50, 50); // Rojo si es NO
+      doc.setTextColor(180, 50, 50);
       doc.text("X", checkX + 9.8, itemY - 0.2);
     }
   });
 
   currentY = cardY + cardHeight + 5;
 
-  // --- BLOQUE 8: SECCIÓN 7 - ACEPTACIÓN, EVIDENCIAS Y FIRMAS ---
-  drawSectionHeader("7. Conformidad y Cierre de Orden", currentY);
-
-  const sigY = currentY + 7;
-  const colSigW = 92;
-
-  // Caja Ejecutante (Izquierda)
-  doc.setLineWidth(0.15);
-  doc.setDrawColor(borderCol[0], borderCol[1], borderCol[2]);
-  doc.setFillColor(248, 250, 248);
-  doc.roundedRect(margin, sigY, colSigW, 44, 2, 2, 'FD');
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
-  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  doc.text("FIRMA EJECUTANTE / MECÁNICO", margin + 4, sigY + 5.5);
-
-  // Recuadro blanco firma ejecutante
-  doc.setDrawColor(220, 225, 220);
-  doc.setFillColor(255, 255, 255);
-  doc.rect(margin + 4, sigY + 8, colSigW - 8, 20, 'FD');
-
-  if (order.signatureExecutor && order.signatureExecutor.startsWith('data:image')) {
-    try {
-      doc.addImage(order.signatureExecutor, 'PNG', margin + 6, sigY + 9, colSigW - 12, 18);
-    } catch (e) {
-      console.warn("Fallo agregando firma ejecutante como imagen", e);
-    }
-  } else {
-    doc.setFont('helvetica', 'italic');
-    doc.setFontSize(9);
-    doc.setTextColor(140, 140, 140);
-    doc.text(order.signatureExecutor || 'PENDIENTE DE FIRMA', margin + (colSigW / 2), sigY + 19, { align: 'center' });
+  // --- BLOQUE 9: SECCIÓN 8 - ACEPTACIÓN DEL TRABAJO Y CIERRE ---
+  if (currentY > pageHeight - 80) {
+    doc.addPage();
+    currentY = 25;
+    drawContinuationHeader(doc.getNumberOfPages());
   }
 
-  // Nombre y fecha Ejecutante
+  drawSectionHeader("8. Aceptación del Trabajo y Cierre de Orden", currentY);
+  currentY += 7;
+
+  // Cuadro de Observaciones (enmarcado)
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7.5);
   doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
-  doc.text("NOMBRE:", margin + 4, sigY + 33.5);
+  doc.text("OBSERVACIONES / DIAGNÓSTICO FINAL DE MANTENIMIENTO", margin + 2, currentY);
+  currentY += 3;
+
+  doc.setLineWidth(0.15);
+  doc.setDrawColor(borderCol[0], borderCol[1], borderCol[2]);
+  doc.setFillColor(252, 252, 252);
+  doc.roundedRect(margin, currentY, usableWidth, 14, 1.5, 1.5, 'FD');
+
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-  const executorDisplayName = order.signatureExecutor && !order.signatureExecutor.startsWith('data:image')
-    ? order.signatureExecutor
-    : getUserFullName(order.assignedMechanic || order.assignedTo);
-  doc.text(executorDisplayName, margin + 18, sigY + 33.5);
+  const obsText = order.observations || 'Sin observaciones adicionales registradas en esta intervención correctiva.';
+  const obsLines = doc.splitTextToSize(obsText, usableWidth - 8);
+  doc.text(obsLines, margin + 4, currentY + 4.5);
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
-  doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
-  doc.text("FECHA:", margin + 4, sigY + 39.5);
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
-  doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-  const execDateStr = formatDateTime(order.signatureExecutorDate, 'Pendiente');
-  doc.text(execDateStr, margin + 18, sigY + 39.5);
+  currentY += 18;
 
+  // Bloque Aceptación del Trabajo (Recibido Por, Fecha/Hora, Firma Supervisor Cierre)
+  if (currentY > pageHeight - 55) {
+    doc.addPage();
+    currentY = 25;
+    drawContinuationHeader(doc.getNumberOfPages());
+  }
 
-  // Caja Supervisor (Derecha)
+  const closeBoxY = currentY;
+  const colAcceptW = (usableWidth - 6) / 2;
+
+  // Tarjeta de Recepción (Izquierda)
+  doc.setLineWidth(0.15);
   doc.setDrawColor(borderCol[0], borderCol[1], borderCol[2]);
   doc.setFillColor(248, 250, 248);
-  doc.roundedRect(pageWidth - margin - colSigW, sigY, colSigW, 44, 2, 2, 'FD');
+  doc.roundedRect(margin, closeBoxY, colAcceptW, 42, 2, 2, 'FD');
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7.5);
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  doc.text("FIRMA DE CONFORMIDAD SUPERVISOR", pageWidth - margin - colSigW + 4, sigY + 5.5);
+  doc.text("RECEPCIÓN DE TRABAJO (SUPERVISOR)", margin + 4, closeBoxY + 5.5);
 
-  // Recuadro blanco firma supervisor
+  const supervisorReceiving = order.supervisorId
+    ? getUserFullName(order.supervisorId)
+    : getUserFullName(order.supervisor);
+
+  drawField("Recibido Por (Supervisor)", supervisorReceiving, margin + 4, closeBoxY + 12);
+  drawField("Fecha y Hora de Recepción", formatDateTime(order.closingDate, 'Pendiente'), margin + 4, closeBoxY + 26);
+
+  // Tarjeta de Firma Supervisor Cierre (Derecha)
+  doc.setDrawColor(borderCol[0], borderCol[1], borderCol[2]);
+  doc.setFillColor(248, 250, 248);
+  doc.roundedRect(margin + colAcceptW + 6, closeBoxY, colAcceptW, 42, 2, 2, 'FD');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+  doc.text("FIRMA SUPERVISOR (CONFORMIDAD DE CIERRE)", margin + colAcceptW + 10, closeBoxY + 5.5);
+
   doc.setDrawColor(220, 225, 220);
   doc.setFillColor(255, 255, 255);
-  doc.rect(pageWidth - margin - colSigW + 4, sigY + 8, colSigW - 8, 20, 'FD');
+  doc.rect(margin + colAcceptW + 10, closeBoxY + 8, colAcceptW - 8, 18, 'FD');
 
   if (order.signatureSupervisor && order.signatureSupervisor.startsWith('data:image')) {
     try {
-      doc.addImage(order.signatureSupervisor, 'PNG', pageWidth - margin - colSigW + 6, sigY + 9, colSigW - 12, 18);
+      doc.addImage(order.signatureSupervisor, 'PNG', margin + colAcceptW + 12, closeBoxY + 9, colAcceptW - 12, 16);
     } catch (e) {
-      console.warn("Fallo agregando firma supervisor como imagen", e);
+      console.warn("Fallo agregando firma supervisor de cierre", e);
     }
   } else {
     doc.setFont('helvetica', 'italic');
-    doc.setFontSize(9);
+    doc.setFontSize(8.5);
     doc.setTextColor(140, 140, 140);
-    doc.text(order.signatureSupervisor || 'PENDIENTE DE CONFORMIDAD', pageWidth - margin - (colSigW / 2), sigY + 19, { align: 'center' });
+    doc.text(order.signatureSupervisor || 'PENDIENTE DE CONFORMIDAD', margin + colAcceptW + 6 + (colAcceptW / 2), closeBoxY + 18, { align: 'center' });
   }
 
-  // Nombre y fecha Supervisor
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
+  doc.setFontSize(7);
   doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
-  doc.text("NOMBRE:", pageWidth - margin - colSigW + 4, sigY + 33.5);
+  doc.text("NOMBRE:", margin + colAcceptW + 10, closeBoxY + 31);
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
+  doc.setFontSize(7.5);
   doc.setTextColor(textDark[0], textDark[1], textDark[2]);
   const supervisorDisplayName = order.signatureSupervisor && !order.signatureSupervisor.startsWith('data:image')
     ? order.signatureSupervisor
-    : getUserFullName(order.supervisor);
-  doc.text(supervisorDisplayName, pageWidth - margin - colSigW + 18, sigY + 33.5);
+    : supervisorReceiving;
+  doc.text(supervisorDisplayName, margin + colAcceptW + 24, closeBoxY + 31);
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
+  doc.setFontSize(7);
   doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
-  doc.text("FECHA:", pageWidth - margin - colSigW + 4, sigY + 39.5);
+  doc.text("FECHA:", margin + colAcceptW + 10, closeBoxY + 37);
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
+  doc.setFontSize(7);
   doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
   const superDateStr = formatDateTime(order.signatureSupervisorDate || order.closingDate, 'Pendiente');
-  doc.text(superDateStr, pageWidth - margin - colSigW + 18, sigY + 39.5);
+  doc.text(superDateStr, margin + colAcceptW + 24, closeBoxY + 37);
 
 
-  // --- PIE DE PÁGINA 2 ---
-  doc.setDrawColor(220, 225, 220);
-  doc.setLineWidth(0.15);
-  doc.line(margin, 264, pageWidth - margin, 264);
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.5);
-  doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
-  doc.text("CoreFlow CMMS • Registro de Calidad • R-MANT-05 Correctivo", margin, 269);
-  doc.text("Página 2 de 2", pageWidth - margin, 269, { align: 'right' });
-
+  // --- PIE DE PÁGINA RECURRENTE DINÁMICO ---
+  const totalPages = doc.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);
+    
+    doc.setDrawColor(220, 225, 220);
+    doc.setLineWidth(0.15);
+    doc.line(margin, 264, pageWidth - margin, 264);
+    
+    doc.text("CoreFlow CMMS • Registro de Calidad • R-MANT-05 Correctivo", margin, 269);
+    doc.text(`Página ${i} de ${totalPages}`, pageWidth - margin, 269, { align: 'right' });
+  }
 
   // --- GUARDADO ---
   const fileName = `R-MANT-05-${order.displayId || order.id}.pdf`;

@@ -68,6 +68,8 @@ export class WorkOrderSupabaseService implements IWorkOrderService {
             // Signatures
             signatureExecutor: record.signature_executor,
             signatureExecutorDate: record.signature_executor_date,
+            signatureExecutionSupervisor: record.signature_execution_supervisor || (record.checklist as any)?._executionSupervisorSignature,
+            signatureExecutionSupervisorDate: record.signature_execution_supervisor_date || (record.checklist as any)?._executionSupervisorSignatureDate,
             signatureSupervisor: record.signature_supervisor,
             signatureSupervisorDate: record.signature_supervisor_date,
         } as WorkOrder;
@@ -105,7 +107,16 @@ export class WorkOrderSupabaseService implements IWorkOrderService {
             total_maintenance_cost: order.totalMaintenanceCost,
 
             // JSON fields
-            checklist: order.checklist,
+            checklist: order.checklist ? {
+                ...order.checklist,
+                ...(order.signatureExecutionSupervisor ? {
+                    _executionSupervisorSignature: order.signatureExecutionSupervisor,
+                    _executionSupervisorSignatureDate: order.signatureExecutionSupervisorDate
+                } : {})
+            } : (order.signatureExecutionSupervisor ? {
+                _executionSupervisorSignature: order.signatureExecutionSupervisor,
+                _executionSupervisorSignatureDate: order.signatureExecutionSupervisorDate
+            } : undefined),
             consumed_parts: order.consumedParts,
             executors: order.executors,
             tasks: order.tasks,
