@@ -89,6 +89,8 @@ const INITIAL_ORDERS: WorkOrder[] = [
         closingDate: '2023-10-19T16:18:00Z',
         signatureExecutor: 'Juan Perez',
         signatureExecutorDate: '2023-10-19T16:15:00Z',
+        signatureExecutionSupervisor: 'Carlos Rodriguez',
+        signatureExecutionSupervisorDate: '2023-10-19T16:16:00Z',
         signatureSupervisor: 'Maria Garcia',
         signatureSupervisorDate: '2023-10-19T16:18:00Z'
     },

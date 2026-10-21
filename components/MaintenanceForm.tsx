@@ -623,18 +623,22 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
          fields.add('closingDate');
          errors.push("Debe registrar la fecha y hora de recepción.");
       }
-      if (!formData.signatureExecutor || formData.signatureExecutor === 'false') {
-         fields.add('signatureExecutor');
-         errors.push("Falta la firma del ejecutante.");
-      }
       if (!formData.signatureSupervisor || formData.signatureSupervisor === 'false') {
          fields.add('signatureSupervisor');
-         errors.push("Falta la firma del supervisor.");
+         errors.push("Falta la firma del supervisor de cierre.");
+      }
+      if (!formData.signatureExecutor || formData.signatureExecutor === 'false') {
+         fields.add('signatureExecutor');
+         errors.push("Falta la firma del ejecutante en la Sección 2.");
+      }
+      if (!formData.signatureExecutionSupervisor || formData.signatureExecutionSupervisor === 'false') {
+         fields.add('signatureExecutionSupervisor');
+         errors.push("Falta la firma del supervisor de intervención en la Sección 2.");
       }
 
       if (fields.size > 0) {
          setInvalidFields(fields);
-         setValidationError("Existen campos obligatorios pendientes en la sección de Supervisión.");
+         setValidationError("Existen campos obligatorios pendientes de validación o firma.");
          
          // Scroll to first error? For now just show the banner.
          return;
@@ -651,6 +655,34 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
       setValidationError(null);
       setInvalidFields(new Set());
       handleInternalSave(newOrder);
+   };
+
+   const signExecutor = () => {
+      if (!isSection2Editable) return;
+      if (formData.signatureExecutor && formData.signatureExecutor !== 'false') return;
+
+      const techName = formData.assignedMechanic
+         ? (users.find(u => u.id === formData.assignedMechanic)?.full_name || formData.assignedMechanic)
+         : (formData.executors && formData.executors[0]?.name ? formData.executors[0].name : (user?.full_name || user?.name || 'Ejecutante'));
+
+      setFormData(prev => ({
+         ...prev,
+         signatureExecutor: user?.full_name || techName || 'Ejecutante',
+         signatureExecutorDate: new Date().toISOString()
+      }));
+      clearInvalidField('signatureExecutor');
+   };
+
+   const signExecutionSupervisor = () => {
+      if (!isSection2Editable) return;
+      if (formData.signatureExecutionSupervisor && formData.signatureExecutionSupervisor !== 'false') return;
+
+      setFormData(prev => ({
+         ...prev,
+         signatureExecutionSupervisor: user?.full_name || user?.name || 'Supervisor',
+         signatureExecutionSupervisorDate: new Date().toISOString()
+      }));
+      clearInvalidField('signatureExecutionSupervisor');
    };
 
    const signSupervisor = () => {
@@ -1801,6 +1833,162 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                            </div>
                         </>
                      )}
+
+                     {/* Evidencias y Firmas de la Intervención */}
+                     <div className="border-t border-industrial-700 pt-6 mt-6 space-y-6">
+                        <h4 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                           <FileText size={16} className="text-pink-500" />
+                           Evidencias y Validación de la Intervención
+                        </h4>
+
+                        {/* Uploads (Image & File) */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                           {/* Evidencia Fotográfica (Imagen) */}
+                           <div className="space-y-2">
+                              <label className="text-xs text-industrial-400 font-bold flex items-center gap-2">
+                                 <Image size={14} /> Evidencia Fotográfica (Imagen)
+                              </label>
+                              <div className={`relative overflow-hidden border-2 border-dashed rounded-lg p-4 flex flex-col items-center justify-center gap-2 ${isSection2Editable ? 'border-industrial-600 hover:border-pink-500 cursor-pointer bg-industrial-900' : 'border-industrial-700 bg-industrial-900/50'}`}>
+                                 {formData.closingImage ? (
+                                    <div className="relative w-full h-36 bg-black rounded overflow-hidden flex items-center justify-center group">
+                                       <img src={formData.closingImage} alt="Evidencia de Intervención" className="h-full object-contain" />
+                                       {isSection2Editable && (
+                                          <button
+                                             type="button"
+                                             onClick={() => setFormData({ ...formData, closingImage: undefined })}
+                                             className="absolute top-1 right-1 bg-red-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                                             title="Eliminar imagen"
+                                          >
+                                             <X size={12} />
+                                          </button>
+                                       )}
+                                    </div>
+                                 ) : (
+                                    <>
+                                       <UploadCloud size={24} className="text-industrial-500" />
+                                       <span className="text-xs text-industrial-500 text-center">
+                                          {isSection2Editable ? 'Haga clic para subir imagen o arrastre aquí' : 'Sin imagen adjunta'}
+                                       </span>
+                                       {isSection2Editable && (
+                                          <input
+                                             type="file"
+                                             accept="image/*"
+                                             className="absolute inset-0 opacity-0 cursor-pointer"
+                                             onChange={(e) => {
+                                                if (e.target.files?.[0]) {
+                                                   const file = e.target.files[0];
+                                                   const reader = new FileReader();
+                                                   reader.onload = (uploadEvent) => {
+                                                      setFormData({ ...formData, closingImage: uploadEvent.target?.result as string });
+                                                   };
+                                                   reader.readAsDataURL(file);
+                                                }
+                                             }}
+                                          />
+                                       )}
+                                    </>
+                                 )}
+                              </div>
+                           </div>
+
+                           {/* Archivo Adjunto (PDF/Doc) */}
+                           <div className="space-y-2">
+                              <label className="text-xs text-industrial-400 font-bold flex items-center gap-2">
+                                 <FileText size={14} /> Archivo Adjunto (PDF/Doc)
+                              </label>
+                              <div className={`relative overflow-hidden border-2 border-dashed rounded-lg p-4 flex flex-col items-center justify-center gap-2 ${isSection2Editable ? 'border-industrial-600 hover:border-pink-500 cursor-pointer bg-industrial-900' : 'border-industrial-700 bg-industrial-900/50'}`}>
+                                 {formData.closingFile ? (
+                                    <div className="relative w-full flex items-center justify-between bg-industrial-800 p-2 rounded border border-industrial-700 z-10">
+                                       <div className="flex items-center gap-2 overflow-hidden">
+                                          <FileText size={16} className="text-blue-400 flex-shrink-0" />
+                                          <span className="text-xs text-industrial-300 truncate">Documento Adjunto</span>
+                                       </div>
+                                       {isSection2Editable ? (
+                                          <button
+                                             type="button"
+                                             onClick={() => setFormData({ ...formData, closingFile: undefined })}
+                                             className="text-industrial-500 hover:text-red-400"
+                                             title="Eliminar archivo"
+                                          >
+                                             <X size={14} />
+                                          </button>
+                                       ) : (
+                                          <a href={formData.closingFile} target="_blank" rel="noreferrer" className="text-pink-400 hover:text-pink-300">
+                                             <Download size={14} />
+                                          </a>
+                                       )}
+                                    </div>
+                                 ) : (
+                                    <>
+                                       <Paperclip size={24} className="text-industrial-500" />
+                                       <span className="text-xs text-industrial-500 text-center">
+                                          {isSection2Editable ? 'Haga clic para adjuntar archivo' : 'Sin archivo adjunto'}
+                                       </span>
+                                       {isSection2Editable && (
+                                          <input
+                                             type="file"
+                                             className="absolute inset-0 opacity-0 cursor-pointer"
+                                             onChange={(e) => {
+                                                if (e.target.files?.[0]) {
+                                                   const file = e.target.files[0];
+                                                   const reader = new FileReader();
+                                                   reader.onload = (uploadEvent) => {
+                                                      setFormData({ ...formData, closingFile: uploadEvent.target?.result as string });
+                                                   };
+                                                   reader.readAsDataURL(file);
+                                                }
+                                             }}
+                                          />
+                                       )}
+                                    </>
+                                 )}
+                              </div>
+                           </div>
+                        </div>
+
+                        {/* Firmas de Intervención: Ejecutante y Supervisor */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                           {/* Firma Ejecutante */}
+                           <div>
+                              <label className="text-xs text-industrial-400 font-bold mb-2 block">Firma Ejecutante</label>
+                              <div
+                                 onClick={signExecutor}
+                                 className={`h-24 bg-white/5 rounded border-2 border-dashed ${isSection2Editable && (!formData.signatureExecutor || formData.signatureExecutor === 'false') ? (invalidFields.has('signatureExecutor') ? 'border-red-500 bg-red-900/10' : 'border-pink-500/50 cursor-pointer hover:bg-white/10') : 'border-industrial-600'} flex items-center justify-center flex-col gap-1 transition-colors`}
+                              >
+                                 {formData.signatureExecutor && formData.signatureExecutor !== 'false' ? (
+                                    <>
+                                       <span className="text-pink-400 font-script text-xl">{formData.signatureExecutor}</span>
+                                       <span className="text-xs text-industrial-500">{formData.signatureExecutorDate ? formatDate(formData.signatureExecutorDate) : ''}</span>
+                                    </>
+                                 ) : (
+                                    <span className={`text-xs ${invalidFields.has('signatureExecutor') ? 'text-red-400 font-bold' : 'text-industrial-500'}`}>
+                                       {isSection2Editable ? 'Click para Firmar (Ejecutante)' : 'Firma Pendiente'}
+                                    </span>
+                                 )}
+                              </div>
+                           </div>
+
+                           {/* Firma Supervisor (Conformidad) */}
+                           <div>
+                              <label className="text-xs text-industrial-400 font-bold mb-2 block">Firma Supervisor (Conformidad)</label>
+                              <div
+                                 onClick={signExecutionSupervisor}
+                                 className={`h-24 bg-white/5 rounded border-2 border-dashed ${isSection2Editable && (!formData.signatureExecutionSupervisor || formData.signatureExecutionSupervisor === 'false') ? (invalidFields.has('signatureExecutionSupervisor') ? 'border-red-500 bg-red-900/10' : 'border-pink-500/50 cursor-pointer hover:bg-white/10') : 'border-industrial-600'} flex items-center justify-center flex-col gap-1 transition-colors`}
+                              >
+                                 {formData.signatureExecutionSupervisor && formData.signatureExecutionSupervisor !== 'false' ? (
+                                    <>
+                                       <span className="text-pink-400 font-script text-xl">{formData.signatureExecutionSupervisor}</span>
+                                       <span className="text-xs text-industrial-500">{formData.signatureExecutionSupervisorDate ? formatDate(formData.signatureExecutionSupervisorDate) : ''}</span>
+                                    </>
+                                 ) : (
+                                    <span className={`text-xs ${invalidFields.has('signatureExecutionSupervisor') ? 'text-red-400 font-bold' : 'text-industrial-500'}`}>
+                                       {isSection2Editable ? 'Click para Firmar (Supervisor)' : 'Firma Pendiente'}
+                                    </span>
+                                 )}
+                              </div>
+                           </div>
+                        </div>
+                     </div>
                   </div>
 
                   {isSection2Editable && formData.currentStage === WorkOrderStage.EXECUTION && (
@@ -1908,92 +2096,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                         </div>
                      </div>
 
-                     {/* 2. Uploads (Image & File) */}
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Image Upload */}
-                        <div className="space-y-2">
-                           <label className="text-xs text-industrial-400 font-bold flex items-center gap-2"><Image size={14} /> Evidencia Fotográfica (Imagen)</label>
-                           <div className={`relative overflow-hidden border-2 border-dashed rounded-lg p-4 flex flex-col items-center justify-center gap-2 ${isSection3Editable ? 'border-industrial-600 hover:border-emerald-500 cursor-pointer bg-industrial-900' : 'border-industrial-700 bg-industrial-900/50'}`}>
-                              {formData.closingImage ? (
-                                 <div className="relative w-full h-32 bg-black rounded overflow-hidden flex items-center justify-center group">
-                                    <img src={formData.closingImage} alt="Evidence" className="h-full object-contain" />
-                                    {isSection3Editable && (
-                                       <button
-                                          onClick={() => setFormData({ ...formData, closingImage: undefined })}
-                                          className="absolute top-1 right-1 bg-red-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity z-10"
-                                       >
-                                          <X size={12} />
-                                       </button>
-                                    )}
-                                 </div>
-                              ) : (
-                                 <>
-                                    <UploadCloud size={24} className="text-industrial-500" />
-                                    <span className="text-xs text-industrial-500 text-center">
-                                       {isSection3Editable ? 'Click to upload or drag image' : 'No image attached'}
-                                    </span>
-                                    {isSection3Editable && (
-                                       <input
-                                          type="file"
-                                          accept="image/*"
-                                          className="absolute inset-0 opacity-0 cursor-pointer"
-                                          onChange={(e) => {
-                                             // Mock upload - in real app, upload to storage and get URL
-                                             if (e.target.files?.[0]) {
-                                                const url = URL.createObjectURL(e.target.files[0]);
-                                                setFormData({ ...formData, closingImage: url });
-                                             }
-                                          }}
-                                       />
-                                    )}
-                                 </>
-                              )}
-                           </div>
-                        </div>
 
-                        {/* File Upload */}
-                        <div className="space-y-2">
-                           <label className="text-xs text-industrial-400 font-bold flex items-center gap-2"><FileText size={14} /> Archivo Adjunto (PDF/Doc)</label>
-                           <div className={`relative overflow-hidden border-2 border-dashed rounded-lg p-4 flex flex-col items-center justify-center gap-2 ${isSection3Editable ? 'border-industrial-600 hover:border-emerald-500 cursor-pointer bg-industrial-900' : 'border-industrial-700 bg-industrial-900/50'}`}>
-                              {formData.closingFile ? (
-                                 <div className="relative w-full flex items-center justify-between bg-industrial-800 p-2 rounded border border-industrial-700 z-10">
-                                    <div className="flex items-center gap-2 overflow-hidden">
-                                       <FileText size={16} className="text-blue-400 flex-shrink-0" />
-                                       <span className="text-xs text-industrial-300 truncate">Attached File</span>
-                                    </div>
-                                    {isSection3Editable ? (
-                                       <button onClick={() => setFormData({ ...formData, closingFile: undefined })} className="text-industrial-500 hover:text-red-400">
-                                          <X size={14} />
-                                       </button>
-                                    ) : (
-                                       <a href={formData.closingFile} target="_blank" rel="noreferrer" className="text-emerald-400 hover:text-emerald-300">
-                                          <Download size={14} />
-                                       </a>
-                                    )}
-                                 </div>
-                              ) : (
-                                 <>
-                                    <Paperclip size={24} className="text-industrial-500" />
-                                    <span className="text-xs text-industrial-500 text-center">
-                                       {isSection3Editable ? 'Click to attach file' : 'No file attached'}
-                                    </span>
-                                    {isSection3Editable && (
-                                       <input
-                                          type="file"
-                                          className="absolute inset-0 opacity-0 cursor-pointer"
-                                          onChange={(e) => {
-                                             if (e.target.files?.[0]) {
-                                                const url = URL.createObjectURL(e.target.files[0]);
-                                                setFormData({ ...formData, closingFile: url });
-                                             }
-                                          }}
-                                       />
-                                    )}
-                                 </>
-                              )}
-                           </div>
-                        </div>
-                      </div>
                       <div className="border-t border-industrial-700 pt-6">
                         <h4 className="text-sm font-bold text-white mb-4">Aceptación del Trabajo</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -2052,40 +2155,14 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                            </div>
                         </div>
 
-                        {/* Signatures Row */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-6">
-                           {/* Executor Signature */}
-                           <div>
-                              <label className="text-xs text-industrial-400 font-bold mb-2 block">Firma Ejecutante</label>
-                              <div
-                                 onClick={() => {
-                                    if (isSection3Editable && (!formData.signatureExecutor || formData.signatureExecutor === 'false')) {
-                                       setFormData({
-                                          ...formData,
-                                          signatureExecutor: user?.full_name || user?.name || 'Executor Name',
-                                          signatureExecutorDate: new Date().toISOString()
-                                       });
-                                       clearInvalidField('signatureExecutor');
-                                    }
-                                 }}
-                                 className={`h-24 bg-white/5 rounded border-2 border-dashed ${isSection3Editable && (!formData.signatureExecutor || formData.signatureExecutor === 'false') ? (invalidFields.has('signatureExecutor') ? 'border-red-500 bg-red-900/10' : 'border-pink-500/50 cursor-pointer hover:bg-white/10') : 'border-industrial-600'} flex items-center justify-center flex-col gap-1 transition-colors`}
-                              >
-                                 {formData.signatureExecutor && formData.signatureExecutor !== 'false' ? (
-                                    <>
-                                       <span className="text-pink-400 font-script text-xl">{formData.signatureExecutor}</span>
-                                       <span className="text-xs text-industrial-500">{formData.signatureExecutorDate ? formatDate(formData.signatureExecutorDate) : ''}</span>
-                                    </>
-                                 ) : (
-                                    <span className={`text-xs ${invalidFields.has('signatureExecutor') ? 'text-red-400 font-bold' : 'text-industrial-500'}`}>
-                                       {isSection3Editable ? 'Click to Sign (Executor)' : 'Pending Signature'}
-                                    </span>
-                                 )}
-                              </div>
-                           </div>
+                        {/* Supervisor Signature */}
+                        <div className="mt-6 max-w-md">
 
-                           {/* Supervisor Signature */}
                            <div>
-                              <label className="text-xs text-industrial-400 font-bold mb-2 block">Firma Supervisor (Conformidad)</label>
+                              <label className="text-xs text-industrial-400 font-bold mb-2 block">
+                                 Firma Supervisor (Conformidad)
+                                 <span className="text-[10px] text-industrial-500 font-normal ml-2">Recepción total del trabajo y cierre</span>
+                              </label>
                               <div
                                  onClick={() => {
                                     signSupervisor();

@@ -17,10 +17,24 @@ export const AssetSelectionModal: React.FC<AssetSelectionModalProps> = ({ isOpen
 
     if (!isOpen) return null;
 
-    const filteredItems = items.filter(item =>
-        item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (type === 'MACHINE' && (item as Machine).id?.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
+    const filteredItems = items.filter(item => {
+        const term = searchTerm.toLowerCase();
+        if (item.name?.toLowerCase().includes(term)) return true;
+        if (type === 'MACHINE') {
+            const m = item as Machine;
+            return (
+                m.code?.toLowerCase().includes(term) ||
+                m.alias?.toLowerCase().includes(term) ||
+                m.plate?.toLowerCase().includes(term) ||
+                m.serialNumber?.toLowerCase().includes(term) ||
+                m.category?.toLowerCase().includes(term) ||
+                m.brand?.toLowerCase().includes(term) ||
+                m.model?.toLowerCase().includes(term) ||
+                m.type?.toLowerCase().includes(term)
+            );
+        }
+        return false;
+    });
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -83,11 +97,27 @@ export const AssetSelectionModal: React.FC<AssetSelectionModalProps> = ({ isOpen
                                     <div className="font-bold text-white group-hover:text-industrial-accent transition-colors">
                                         {item.name}
                                     </div>
-                                    {type === 'MACHINE' && (
-                                        <div className="text-xs text-industrial-400">
-                                            Código: {(item as Machine).id || 'N/A'} • Placa: {(item as Machine).plate || 'N/A'}
-                                        </div>
-                                    )}
+                                    {type === 'MACHINE' && (() => {
+                                        const m = item as Machine;
+                                        const code = m.code || m.alias;
+                                        const details: string[] = [];
+
+                                        if (code && code.trim().toLowerCase() !== m.name.trim().toLowerCase()) {
+                                            details.push(code);
+                                        }
+                                        if (m.plate) details.push(`Placa: ${m.plate}`);
+                                        if (m.category) details.push(m.category);
+                                        else if (m.type && m.type !== 'GENERIC') details.push(m.type);
+                                        if (m.brand || m.model) {
+                                            details.push([m.brand, m.model].filter(Boolean).join(' '));
+                                        }
+
+                                        return (
+                                            <div className="text-xs text-industrial-400">
+                                                {details.length > 0 ? details.join(' • ') : 'Sin datos adicionales'}
+                                            </div>
+                                        );
+                                    })()}
                                     {type === 'ZONE' && (
                                         <div className="text-xs text-industrial-400">
                                             Áreas: {(item as ZoneStructure).lines?.length || 0}
