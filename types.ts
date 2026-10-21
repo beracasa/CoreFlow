@@ -1,29 +1,34 @@
-
 export enum MachineStatus {
-  RUNNING = 'RUNNING',
-  IDLE = 'IDLE',
-  WARNING = 'WARNING',
-  CRITICAL = 'CRITICAL',
-  OFFLINE = 'OFFLINE'
+  RUNNING = "RUNNING",
+  IDLE = "IDLE",
+  WARNING = "WARNING",
+  CRITICAL = "CRITICAL",
+  OFFLINE = "OFFLINE",
 }
 
 export enum PlanTier {
-  LIGHT = 'LIGHT',
-  PROFESSIONAL = 'PROFESSIONAL',
-  BUSINESS = 'BUSINESS'
+  LIGHT = "LIGHT",
+  PROFESSIONAL = "PROFESSIONAL",
+  BUSINESS = "BUSINESS",
 }
 
 // --- SECURITY & AUTH TYPES ---
 export enum UserRole {
-  ADMIN_SOLICITANTE = 'ADMIN_SOLICITANTE', // Full Access
-  TECNICO_MANT = 'TECNICO_MANT',           // Execution & Readings
-  AUDITOR = 'AUDITOR'                      // Read Only
+  ADMIN_SOLICITANTE = "ADMIN_SOLICITANTE", // Full Access
+  TECNICO_MANT = "TECNICO_MANT", // Execution & Readings
+  AUDITOR = "AUDITOR", // Read Only
 }
 
 // NEW: Dynamic Role Definitions
 export interface Permission {
   id: string;
-  category: 'INFORMATIVE' | 'OPERATIONAL' | 'ADMINISTRATIVE' | 'FINANCIAL' | 'SYSTEM' | string;
+  category:
+    | "INFORMATIVE"
+    | "OPERATIONAL"
+    | "ADMINISTRATIVE"
+    | "FINANCIAL"
+    | "SYSTEM"
+    | string;
   label: string;
   description: string;
 }
@@ -60,7 +65,7 @@ export interface UserProfile {
   avatar_url?: string;
   signature_url?: string; // Base64 or URL from Storage
   specialties?: string[]; // Array of tags e.g. ["SACMI", "Hydraulics"]
-  status: 'ACTIVE' | 'INVITED' | 'INACTIVE';
+  status: "ACTIVE" | "INVITED" | "INACTIVE";
   company_code?: string; // New field: Código de Empresa
   notification_preferences?: {
     alerts_rmant02: boolean;
@@ -84,7 +89,7 @@ export interface Machine {
   id: string;
   name: string;
   plate: string;
-  type: 'SACMI' | 'MOSS' | 'PMV' | 'GENERIC' | string; // Loosened type for dynamic input
+  type: "SACMI" | "MOSS" | "PMV" | "GENERIC" | string; // Loosened type for dynamic input
   status: MachineStatus;
   isActive: boolean; // Administrative status (Active/Inactive)
   location: { x: number; y: number };
@@ -98,24 +103,24 @@ export interface Machine {
   history: TelemetryData[];
 
   // New Fields
-  branch?: string;        // Empresa - Sucursal
-  category?: string;      // Categoría
-  alias?: string;         // Alias del Equipo
-  brand?: string;         // Marca
-  model?: string;         // Modelo
-  year?: number;          // Año de Fabricación
-  capacity?: string;      // Capacidad
+  branch?: string; // Empresa - Sucursal
+  category?: string; // Categoría
+  alias?: string; // Alias del Equipo
+  brand?: string; // Marca
+  model?: string; // Modelo
+  year?: number; // Año de Fabricación
+  capacity?: string; // Capacidad
   currentRating?: number; // In (A)
-  frequency?: number;     // f (hz)
-  voltage?: number;       // V. 3PH (VAC)
-  power?: number;         // P (KVA)
-  imageUrl?: string;      // Imagen del Equipo
+  frequency?: number; // f (hz)
+  voltage?: number; // V. 3PH (VAC)
+  power?: number; // P (KVA)
+  imageUrl?: string; // Imagen del Equipo
 
   // Phase 3 Master ID Relationships
   brandId?: string;
   typeId?: string;
 
-  documents?: MachineDocument[] | string[];   // Documentos adjuntos (soporta ambos formatos)
+  documents?: MachineDocument[] | string[]; // Documentos adjuntos (soporta ambos formatos)
   maintenancePlans?: MaintenancePlan[]; // R-MANT-02 Protocols inside JSONB
   criticalParts?: string[]; // IDs of critical spare parts for this machine
   specifications?: any;
@@ -136,26 +141,26 @@ export interface MachineDocument {
 }
 
 export enum WorkOrderStatus {
-  BACKLOG = 'BACKLOG',
-  IN_PROGRESS = 'IN_PROGRESS',
-  REVIEW = 'REVIEW',
-  DONE = 'DONE'
+  BACKLOG = "BACKLOG",
+  IN_PROGRESS = "IN_PROGRESS",
+  REVIEW = "REVIEW",
+  DONE = "DONE",
 }
 
 // Stages for the visual workflow (Green -> Pink -> Green)
 export enum WorkOrderStage {
-  DRAFT = 'DRAFT',           // Section 1 Editable
-  REQUESTED = 'REQUESTED',   // Section 1 Locked, Section 2 Available
-  EXECUTION = 'EXECUTION',   // Section 2 Active
-  HANDOVER = 'HANDOVER',     // Section 2 Locked, Section 3 Active
-  CLOSED = 'CLOSED'          // All Locked
+  DRAFT = "DRAFT", // Section 1 Editable
+  REQUESTED = "REQUESTED", // Section 1 Locked, Section 2 Available
+  EXECUTION = "EXECUTION", // Section 2 Active
+  HANDOVER = "HANDOVER", // Section 2 Locked, Section 3 Active
+  CLOSED = "CLOSED", // All Locked
 }
 
 export enum Priority {
-  LOW = 'LOW',
-  MEDIUM = 'MEDIUM',
-  HIGH = 'HIGH',
-  CRITICAL = 'CRITICAL'
+  LOW = "LOW",
+  MEDIUM = "MEDIUM",
+  HIGH = "HIGH",
+  CRITICAL = "CRITICAL",
 }
 
 export interface ConsumedPart {
@@ -189,35 +194,35 @@ export interface MaintenanceInterval {
 
 export interface MaintenanceTask {
   id: string;
-  sequence: number;          // Columna: Nº
-  group: string;             // Columna: Grupo (ej: "Extrusor")
-  component: string;         // Columna: Punto de intervencion
-  activity: string;          // Columna: Tipo de intervencion
+  sequence: number; // Columna: Nº
+  group: string; // Columna: Grupo (ej: "Extrusor")
+  component: string; // Columna: Punto de intervencion
+  activity: string; // Columna: Tipo de intervencion
 
   // Datos Técnicos / Materiales & Repuestos
-  referenceCode?: string;    // Columna: Ref de interv.
-  lubricantType?: string;    // Columna: Tipo de Lub.
-  lubricantName?: string;    // Columna: Nombre (Nuevo)
-  lubricantCode?: string;    // Columna: Codigo
+  referenceCode?: string; // Columna: Ref de interv.
+  lubricantType?: string; // Columna: Tipo de Lub.
+  lubricantName?: string; // Columna: Nombre (Nuevo)
+  lubricantCode?: string; // Columna: Codigo
   lubricantQuantity?: string; // Columna: Cantidad (Nuevo)
-  estimatedTime: number;     // Columna: Tiem. Estim min
+  estimatedTime: number; // Columna: Tiem. Estim min
 
   // Compatibility fields
-  intervalOrigin?: string;   // Keeping for compatibility
-  completed?: boolean;       // Keeping for state
+  intervalOrigin?: string; // Keeping for compatibility
+  completed?: boolean; // Keeping for state
   checks?: Record<string, boolean>; // Granular completion tracking (clean, inspect, etc.)
   notes?: string;
 
   // Matriz de Acciones
   actionFlags: {
-    disassemble: boolean;  // Desmontaje
-    clean: boolean;        // Limpieza
-    inspect: boolean;      // Controlar/Verificar
-    lubricate: boolean;    // Lubricación
-    replace: boolean;      // Sustitución/Cambio (Cambio)
-    mount: boolean;        // Desmontaje/Montaje (Montaje)
-    adjust: boolean;       // Regulación/Ajuste (Ajuste-Calibración)
-    refill: boolean;       // Llenado/Recarga
+    disassemble: boolean; // Desmontaje
+    clean: boolean; // Limpieza
+    inspect: boolean; // Controlar/Verificar
+    lubricate: boolean; // Lubricación
+    replace: boolean; // Sustitución/Cambio (Cambio)
+    mount: boolean; // Desmontaje/Montaje (Montaje)
+    adjust: boolean; // Regulación/Ajuste (Ajuste-Calibración)
+    refill: boolean; // Llenado/Recarga
   };
 }
 
@@ -233,18 +238,18 @@ export interface WorkOrder {
   description: string;
   createdDate: string;
   completedDate?: string;
-  type: 'PREVENTIVE' | 'CORRECTIVE' | 'PREDICTIVE' | 'PROGRAMMED' | 'OTHER';
-  formType: 'R-MANT-02' | 'R-MANT-05' | 'R-INOC-07';
+  type: "PREVENTIVE" | "CORRECTIVE" | "PREDICTIVE" | "PROGRAMMED" | "OTHER";
+  formType: "R-MANT-02" | "R-MANT-05" | "R-INOC-07";
 
   // R-MANT-02 Specifics (Image 2)
-  maintenanceType?: 'Preventive' | 'Programmed' | 'Other';
+  maintenanceType?: "Preventive" | "Programmed" | "Other";
   machinePlate?: string;
   interval?: string; // e.g. "360 Hours"
   startDate?: string;
   endDate?: string;
   startTime?: string;
   endTime?: string;
-  machineWorkHours?: number;   // Formatted in UI, number in generic
+  machineWorkHours?: number; // Formatted in UI, number in generic
   nextMaintenanceHours?: number;
   electromechanicalGroup?: string; // "Electromecánicos" select
   executors?: ExecutorInfo[];
@@ -269,12 +274,20 @@ export interface WorkOrder {
   receivedBy?: string;
 
   // R-MANT-05 Specifics
-  department?: 'Mantenimiento' | 'Almacén' | 'Calidad' | 'Producción' | 'Servicios Generales' | 'Administración';
-  equipmentType?: 'Mantenimiento Maquinaria' | 'Mantenimiento Elemento Auxiliar';
-  failureType?: 'Mecánica' | 'Eléctrica' | 'Electrónica' | 'Plomería';
-  condition?: 'Crítica' | 'Media' | 'Normal';
-  frequency?: 'Primera vez' | 'Ocasional' | 'Frecuente' | 'Muy frecuente';
-  consequence?: 'Ninguna' | 'Bajo Rendimiento' | 'Parada';
+  department?:
+    | "Mantenimiento"
+    | "Almacén"
+    | "Calidad"
+    | "Producción"
+    | "Servicios Generales"
+    | "Administración";
+  equipmentType?:
+    | "Mantenimiento Maquinaria"
+    | "Mantenimiento Elemento Auxiliar";
+  failureType?: "Mecánica" | "Eléctrica" | "Electrónica" | "Plomería";
+  condition?: "Crítica" | "Media" | "Normal";
+  frequency?: "Primera vez" | "Ocasional" | "Frecuente" | "Muy frecuente";
+  consequence?: "Ninguna" | "Bajo Rendimiento" | "Parada";
   actionTaken?: string; // Containment Action
   requestDescription?: string; // Detalles Solicitud - Avería
 
@@ -309,7 +322,7 @@ export interface MachineHourLog {
   machineId: string;
   date: string;
   hoursLogged: number;
-  unit: 'h' | 'km';
+  unit: "h" | "km";
   operator: string;
   comments?: string;
   createdAt?: string;
@@ -319,7 +332,15 @@ export interface SparePart {
   id: string;
   sku: string;
   name: string;
-  category?: 'MECHANICAL' | 'ELECTRICAL' | 'HYDRAULIC' | 'PNEUMATIC' | 'CONSUMABLE' | 'SENSOR' | 'PLC' | 'OTHER';
+  category?:
+    | "MECHANICAL"
+    | "ELECTRICAL"
+    | "HYDRAULIC"
+    | "PNEUMATIC"
+    | "CONSUMABLE"
+    | "SENSOR"
+    | "PLC"
+    | "OTHER";
   currentStock: number;
   minStock: number;
   reorderPoint?: number;
@@ -349,9 +370,9 @@ export interface SparePart {
 export interface Technician {
   id: string;
   name: string;
-  role: 'MECHANICAL' | 'ELECTRICAL' | 'SUPERVISOR' | 'AUDITOR';
-  shift: 'MORNING' | 'AFTERNOON' | 'NIGHT';
-  status: 'ACTIVE' | 'LEAVE' | 'INACTIVE';
+  role: "MECHANICAL" | "ELECTRICAL" | "SUPERVISOR" | "AUDITOR";
+  shift: "MORNING" | "AFTERNOON" | "NIGHT";
+  status: "ACTIVE" | "LEAVE" | "INACTIVE";
   email: string;
 }
 
@@ -360,7 +381,7 @@ export interface ZoneStructure {
   name: string;
   lines: string[];
   color?: string; // Optional for map visualization
-  x?: number;     // Optional layout (percent 0-100)
+  x?: number; // Optional layout (percent 0-100)
   y?: number;
   width?: number; // Optional layout (percent 0-100)
   height?: number;
@@ -368,15 +389,15 @@ export interface ZoneStructure {
 }
 
 export enum AppView {
-  LOGIN = 'LOGIN', // New Auth View
-  WIZARD = 'WIZARD',
-  DASHBOARD = 'DASHBOARD',
-  KANBAN = 'KANBAN',
-  MANT_02 = 'MANT_02',
-  MANT_05 = 'MANT_05',
-  MACHINE_HOURS = 'MACHINE_HOURS', // New Module
-  INVENTORY = 'INVENTORY',
-  ANALYTICS = 'ANALYTICS',
-  CONFIGURATION = 'CONFIGURATION',
-  PROFILE = 'PROFILE', // New User Profile View
+  LOGIN = "LOGIN", // New Auth View
+  WIZARD = "WIZARD",
+  DASHBOARD = "DASHBOARD",
+  KANBAN = "KANBAN",
+  MANT_02 = "MANT_02",
+  MANT_05 = "MANT_05",
+  MACHINE_HOURS = "MACHINE_HOURS", // New Module
+  INVENTORY = "INVENTORY",
+  ANALYTICS = "ANALYTICS",
+  CONFIGURATION = "CONFIGURATION",
+  PROFILE = "PROFILE", // New User Profile View
 }
