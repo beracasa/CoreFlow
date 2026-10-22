@@ -11,6 +11,7 @@ import { useUserStore } from '../src/stores/useUserStore';
 import { useWorkOrderStore } from '../src/stores/useWorkOrderStore';
 import { generateRMant02PDF, generateRMant05PDF } from '../src/utils/pdf/pdfGenerator';
 import { DateInput } from './shared/DateInput';
+import { PartSearchInput } from '../src/components/shared/PartSearchInput';
 import { formatDate } from '../src/utils/dateUtils';
 
 // --- 1. CONFIGURATION & MASTER DATA ENGINE ---
@@ -1469,73 +1470,38 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                        {(formData.consumedParts || []).map((part, idx) => (
                                           <tr key={idx} className="border-b border-industrial-800 last:border-0 hover:bg-industrial-800/30 transition-colors">
                                              <td className="p-2">
-                                                <div className="relative group">
-                                                   <input
-                                                      type="text"
-                                                      disabled={!isSection2Editable}
-                                                      className={`w-full bg-industrial-900 border ${!part.partId && part.partName ? 'border-pink-500' : 'border-industrial-600'} rounded p-1 text-white text-xs focus:border-pink-500 outline-none placeholder-industrial-600`}
-                                                      placeholder="Buscar repuesto..."
-                                                      value={part.partName || ''}
-                                                      onChange={(e) => {
-                                                         const val = e.target.value;
-                                                         const updated = [...(formData.consumedParts || [])];
-                                                         // Updates name for search, clears ID to show it's not selected yet
-                                                         updated[idx] = { ...updated[idx], partName: val, partId: '', unitCost: 0, totalCost: 0 };
-                                                         setFormData({ ...formData, consumedParts: updated });
-                                                      }}
-                                                   />
-                                                   {/* Custom Dropdown Results - connected to inventory */}
-                                                   {!part.partId && part.partName && (
-                                                      <div className="absolute left-0 top-full mt-1 w-[360px] z-50 bg-industrial-800 border border-industrial-600 rounded-md shadow-xl max-h-60 overflow-y-auto">
-                                                         {(spareParts || []).filter(p =>
-                                                            p.name.toLowerCase().includes(part.partName.toLowerCase()) ||
-                                                            p.partNumber.toLowerCase().includes(part.partName.toLowerCase())
-                                                         ).length > 0 ? (
-                                                            (spareParts || []).filter(p =>
-                                                               p.name.toLowerCase().includes(part.partName.toLowerCase()) ||
-                                                               p.partNumber.toLowerCase().includes(part.partName.toLowerCase())
-                                                            ).map(sp => (
-                                                               <div
-                                                                  key={sp.id}
-                                                                  className="p-2.5 hover:bg-industrial-700 cursor-pointer border-b border-industrial-700/50 last:border-0 flex justify-between items-center gap-3"
-                                                                  onClick={() => {
-                                                                     const updated = [...(formData.consumedParts || [])];
-                                                                     updated[idx] = {
-                                                                        ...updated[idx],
-                                                                        partId: sp.id,
-                                                                        partName: `${sp.partNumber} - ${sp.name}`,
-                                                                        sku: sp.partNumber,
-                                                                        unitCost: Math.max(0, sp.cost || 0),
-                                                                        totalCost: Math.max(0, (sp.cost || 0) * (updated[idx].quantity || 0)),
-                                                                        unit: sp.unitOfMeasure || 'Unidad'
-                                                                     };
-                                                                     const totalCost = updated.reduce((sum, p) => sum + (p.totalCost || 0), 0);
-                                                                     setFormData({ ...formData, consumedParts: updated, totalMaintenanceCost: totalCost });
-                                                                  }}
-                                                               >
-                                                                  <div className="flex flex-col flex-1 min-w-0">
-                                                                     <span className="text-white text-xs font-bold truncate">
-                                                                        <span className="text-pink-400 mr-1">{sp.partNumber}</span>
-                                                                        {sp.name}
-                                                                     </span>
-                                                                     <span className="text-industrial-400 text-[10px]">
-                                                                        {sp.unitOfMeasure || 'Unidad'} &bull; RD${(sp.cost || 0).toFixed(2)}
-                                                                     </span>
-                                                                  </div>
-                                                                  <div className={`flex-shrink-0 text-[10px] px-2 py-0.5 rounded font-bold ${sp.currentStock <= sp.minStock
-                                                                     ? 'bg-red-900/50 text-red-400 border border-red-500/30'
-                                                                     : 'bg-emerald-900/50 text-emerald-400 border border-emerald-500/30'
-                                                                     }`}>
-                                                                     Stock: {sp.currentStock}
-                                                                  </div>
-                                                               </div>
-                                                            ))
-                                                         ) : (
-                                                            <div className="p-3 text-industrial-500 text-xs italic text-center">No se encontraron repuestos</div>
-                                                         )}
-                                                      </div>
-                                                   )}
-                                                </div>
+                                                <PartSearchInput
+                                                   value={part.partName || ""}
+                                                   partId={part.partId}
+                                                   disabled={!isSection2Editable}
+                                                   accentColor="pink"
+                                                   placeholder="Buscar repuesto..."
+                                                   onChangeText={(val) => {
+                                                      const updated = [...(formData.consumedParts || [])];
+                                                      updated[idx] = { ...updated[idx], partName: val, partId: "", unitCost: 0, totalCost: 0 };
+                                                      setFormData({ ...formData, consumedParts: updated });
+                                                   }}
+                                                   onSelect={(sp) => {
+                                                      const updated = [...(formData.consumedParts || [])];
+                                                      updated[idx] = {
+                                                         ...updated[idx],
+                                                         partId: sp.id,
+                                                         partName: `${sp.partNumber} - ${sp.name}`,
+                                                         sku: sp.partNumber,
+                                                         unitCost: Math.max(0, sp.cost || 0),
+                                                         totalCost: Math.max(0, (sp.cost || 0) * (updated[idx].quantity || 0)),
+                                                         unit: sp.unitOfMeasure || "Unidad"
+                                                      };
+                                                      const totalCost = updated.reduce((sum, p) => sum + (p.totalCost || 0), 0);
+                                                      setFormData({ ...formData, consumedParts: updated, totalMaintenanceCost: totalCost });
+                                                   }}
+                                                   onClear={() => {
+                                                      const updated = [...(formData.consumedParts || [])];
+                                                      updated[idx] = { ...updated[idx], partName: "", partId: "", sku: "", unitCost: 0, totalCost: 0 };
+                                                      const totalCost = updated.reduce((sum, p) => sum + (p.totalCost || 0), 0);
+                                                      setFormData({ ...formData, consumedParts: updated, totalMaintenanceCost: totalCost });
+                                                   }}
+                                                />
                                              </td>
                                              <td className="p-2">
                                                 <input type="text" readOnly className="w-full bg-industrial-900/50 border border-industrial-800 rounded p-1 text-xs text-industrial-400" value={part.unit || 'Unidad'} />
@@ -1660,71 +1626,38 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                         {(formData.consumedParts || []).map((part, idx) => (
                                            <tr key={idx} className="border-b border-industrial-800 last:border-0 hover:bg-industrial-800/30 transition-colors">
                                               <td className="p-2">
-                                                 <div className="relative group">
-                                                    <input
-                                                       type="text"
-                                                       disabled={!isSection2Editable}
-                                                       className={`w-full bg-industrial-900 border ${!part.partId && part.partName ? 'border-pink-500' : 'border-industrial-600'} rounded p-1 text-white text-xs focus:border-pink-500 outline-none placeholder-industrial-600`}
-                                                       placeholder="Buscar repuesto..."
-                                                       value={part.partName || ''}
-                                                       onChange={(e) => {
-                                                          const val = e.target.value;
-                                                          const updated = [...(formData.consumedParts || [])];
-                                                          updated[idx] = { ...updated[idx], partName: val, partId: '', unitCost: 0, totalCost: 0 };
-                                                          setFormData({ ...formData, consumedParts: updated });
-                                                       }}
-                                                    />
-                                                    {!part.partId && part.partName && (
-                                                       <div className="absolute left-0 top-full mt-1 w-[360px] z-50 bg-industrial-800 border border-industrial-600 rounded-md shadow-xl max-h-60 overflow-y-auto">
-                                                          {(spareParts || []).filter(p =>
-                                                             p.name.toLowerCase().includes(part.partName.toLowerCase()) ||
-                                                             p.partNumber.toLowerCase().includes(part.partName.toLowerCase())
-                                                          ).length > 0 ? (
-                                                             (spareParts || []).filter(p =>
-                                                                p.name.toLowerCase().includes(part.partName.toLowerCase()) ||
-                                                                p.partNumber.toLowerCase().includes(part.partName.toLowerCase())
-                                                             ).map(sp => (
-                                                                <div
-                                                                   key={sp.id}
-                                                                   className="p-2.5 hover:bg-industrial-700 cursor-pointer border-b border-industrial-700/50 last:border-0 flex justify-between items-center gap-3"
-                                                                   onClick={() => {
-                                                                      const updated = [...(formData.consumedParts || [])];
-                                                                      updated[idx] = {
-                                                                         ...updated[idx],
-                                                                         partId: sp.id,
-                                                                         partName: `${sp.partNumber} - ${sp.name}`,
-                                                                         sku: sp.partNumber,
-                                                                         unitCost: Math.max(0, sp.cost || 0),
-                                                                         totalCost: Math.max(0, (sp.cost || 0) * (updated[idx].quantity || 0)),
-                                                                         unit: sp.unitOfMeasure || 'Unidad'
-                                                                      };
-                                                                      const totalCost = updated.reduce((sum, p) => sum + (p.totalCost || 0), 0);
-                                                                      setFormData({ ...formData, consumedParts: updated, totalMaintenanceCost: totalCost });
-                                                                   }}
-                                                                >
-                                                                   <div className="flex flex-col flex-1 min-w-0">
-                                                                      <span className="text-white text-xs font-bold truncate">
-                                                                         <span className="text-pink-400 mr-1">{sp.partNumber}</span>
-                                                                         {sp.name}
-                                                                      </span>
-                                                                      <span className="text-industrial-400 text-[10px]">
-                                                                         {sp.unitOfMeasure || 'Unidad'} &bull; RD${(sp.cost || 0).toFixed(2)}
-                                                                      </span>
-                                                                   </div>
-                                                                   <div className={`flex-shrink-0 text-[10px] px-2 py-0.5 rounded font-bold ${sp.currentStock <= sp.minStock
-                                                                      ? 'bg-red-900/50 text-red-400 border border-red-500/30'
-                                                                      : 'bg-emerald-900/50 text-emerald-400 border border-emerald-500/30'
-                                                                      }`}>
-                                                                      Stock: {sp.currentStock}
-                                                                   </div>
-                                                                </div>
-                                                             ))
-                                                          ) : (
-                                                             <div className="p-3 text-industrial-500 text-xs italic text-center">No se encontraron repuestos</div>
-                                                          )}
-                                                       </div>
-                                                    )}
-                                                 </div>
+                                                 <PartSearchInput
+                                                    value={part.partName || ''}
+                                                    partId={part.partId}
+                                                    disabled={!isSection2Editable}
+                                                    accentColor="pink"
+                                                    placeholder="Buscar repuesto..."
+                                                    onChangeText={(val) => {
+                                                       const updated = [...(formData.consumedParts || [])];
+                                                       updated[idx] = { ...updated[idx], partName: val, partId: '', unitCost: 0, totalCost: 0 };
+                                                       setFormData({ ...formData, consumedParts: updated });
+                                                    }}
+                                                    onSelect={(sp) => {
+                                                       const updated = [...(formData.consumedParts || [])];
+                                                       updated[idx] = {
+                                                          ...updated[idx],
+                                                          partId: sp.id,
+                                                          partName: `${sp.partNumber} - ${sp.name}`,
+                                                          sku: sp.partNumber,
+                                                          unitCost: Math.max(0, sp.cost || 0),
+                                                          totalCost: Math.max(0, (sp.cost || 0) * (updated[idx].quantity || 0)),
+                                                          unit: sp.unitOfMeasure || 'Unidad'
+                                                       };
+                                                       const totalCost = updated.reduce((sum, p) => sum + (p.totalCost || 0), 0);
+                                                       setFormData({ ...formData, consumedParts: updated, totalMaintenanceCost: totalCost });
+                                                    }}
+                                                    onClear={() => {
+                                                       const updated = [...(formData.consumedParts || [])];
+                                                       updated[idx] = { ...updated[idx], partName: '', partId: '', sku: '', unitCost: 0, totalCost: 0 };
+                                                       const totalCost = updated.reduce((sum, p) => sum + (p.totalCost || 0), 0);
+                                                       setFormData({ ...formData, consumedParts: updated, totalMaintenanceCost: totalCost });
+                                                    }}
+                                                 />
                                               </td>
                                               <td className="p-2">
                                                  <input type="text" readOnly className="w-full bg-industrial-900/50 border border-industrial-800 rounded p-1 text-xs text-industrial-400" value={part.unit || 'Unidad'} />

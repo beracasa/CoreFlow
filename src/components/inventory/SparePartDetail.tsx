@@ -51,8 +51,7 @@ export const SparePartDetail: React.FC<SparePartDetailProps> = ({ part, onClose 
             setCurrentPart(updatedPart);
         } else {
             // Fallback: reload from server
-            inventoryService.getAllParts(1, 1000).then(res => {
-                const updated = res.data.find(p => p.id === currentPart.id);
+            inventoryService.getPartById(currentPart.id).then(updated => {
                 if (updated) setCurrentPart(updated);
             });
         }

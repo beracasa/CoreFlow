@@ -171,13 +171,8 @@ export const NotificationSettings = () => {
     const loadData = async () => {
       try {
         const allUsers = await UserSupabaseService.getUsersWithPreferences();
-        // Ocultar al usuario administrador principal (Admin CoreFlow / beracasa@gmail.com)
-        const visibleUsers = allUsers.filter(u => 
-          u.email?.toLowerCase().trim() !== 'beracasa@gmail.com' &&
-          u.full_name?.toLowerCase().trim() !== 'admin coreflow'
-        );
-        setUsers(visibleUsers);
-        setInitialData(JSON.parse(JSON.stringify(visibleUsers))); // Clone for comparison
+        setUsers(allUsers);
+        setInitialData(JSON.parse(JSON.stringify(allUsers))); // Clone for comparison
 
         // Initialize selections from DB
         const newSelections = {
@@ -187,7 +182,7 @@ export const NotificationSettings = () => {
           pending_approvals: new Set<string>(),
         };
 
-        visibleUsers.forEach(u => {
+        allUsers.forEach(u => {
           if (u.notification_preferences?.alerts_rmant02) newSelections.alerts_rmant02.add(u.id);
           if (u.notification_preferences?.alerts_rmant05) newSelections.alerts_rmant05.add(u.id);
           if (u.notification_preferences?.low_stock) newSelections.low_stock.add(u.id);

@@ -189,6 +189,26 @@ export class InventoryMockService implements IInventoryService {
         return { data: pagedData, total };
     }
 
+    async searchParts(searchTerm: string = '', limit: number = 30): Promise<SparePart[]> {
+        let parts = this.getParts();
+        const s = (searchTerm || '').trim().toLowerCase();
+        if (s) {
+            parts = parts.filter(p =>
+                (p.name && p.name.toLowerCase().includes(s)) ||
+                (p.partNumber && p.partNumber.toLowerCase().includes(s)) ||
+                (p.supplierCode && p.supplierCode.toLowerCase().includes(s)) ||
+                (p.description && p.description.toLowerCase().includes(s))
+            );
+        }
+        return parts.slice(0, limit);
+    }
+
+    async getPartsByIds(ids: string[]): Promise<SparePart[]> {
+        const idSet = new Set((ids || []).filter(Boolean));
+        if (idSet.size === 0) return [];
+        return this.getParts().filter(p => idSet.has(p.id));
+    }
+
     async getPartById(id: string): Promise<SparePart | null> {
         const parts = this.getParts();
         return parts.find(p => p.id === id) || null;

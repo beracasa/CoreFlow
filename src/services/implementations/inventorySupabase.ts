@@ -84,8 +84,9 @@ export class InventorySupabaseService implements IInventoryService {
             .select('*', { count: 'exact' });
 
         if (filters) {
-            if (filters.search) {
-                query = query.or(`name.ilike.%${filters.search}%,sku.ilike.%${filters.search}%,description.ilike.%${filters.search}%`);
+            if (filters.search && filters.search.trim()) {
+                const escaped = filters.search.trim().replace(/"/g, '""');
+                query = query.or(`name.ilike."%${escaped}%",sku.ilike."%${escaped}%",description.ilike."%${escaped}%"`);
             }
             if (filters.category && filters.category !== 'all') {
                 query = query.eq('category', filters.category);
@@ -115,6 +116,44 @@ export class InventorySupabaseService implements IInventoryService {
             data: (data || []).map(this.mapDBToPart),
             total: count || 0
         };
+    }
+
+    async searchParts(searchTerm: string = '', limit: number = 30): Promise<SparePart[]> {
+        let query = supabase.from('spare_parts').select('*');
+
+        const trimmed = (searchTerm || '').trim();
+        if (trimmed) {
+            const escaped = trimmed.replace(/"/g, '""');
+            query = query.or(`name.ilike."%${escaped}%",sku.ilike."%${escaped}%",description.ilike."%${escaped}%"`);
+        }
+
+        const { data, error } = await query
+            .order('name', { ascending: true })
+            .limit(limit);
+
+        if (error) {
+            console.error('Error in searchParts:', error);
+            throw error;
+        }
+
+        return (data || []).map(this.mapDBToPart);
+    }
+
+    async getPartsByIds(ids: string[]): Promise<SparePart[]> {
+        const cleanIds = (ids || []).filter(Boolean);
+        if (cleanIds.length === 0) return [];
+
+        const { data, error } = await supabase
+            .from('spare_parts')
+            .select('*')
+            .in('id', cleanIds);
+
+        if (error) {
+            console.error('Error in getPartsByIds:', error);
+            throw error;
+        }
+
+        return (data || []).map(this.mapDBToPart);
     }
 
     async getPartById(id: string): Promise<SparePart | null> {

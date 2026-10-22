@@ -2,7 +2,9 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Activity, Box, Calendar, Clock, AlertTriangle, Gauge } from 'lucide-react';
 import { Machine, MachineStatus, WorkOrderStatus } from '../../types';
+import { SparePart } from '../../src/types/inventory';
 import { PredictiveAnalysis } from '../../services/geminiService';
+import { inventoryService } from '../../src/services';
 import { useMasterStore } from '../../src/stores/useMasterStore';
 import { useWorkOrderStore } from '../../src/stores/useWorkOrderStore';
 import { useAuth } from '../../contexts/AuthContext';
@@ -22,12 +24,28 @@ export const AssetDrawer: React.FC<AssetDrawerProps> = ({ machine, onClose, anal
   const { parts } = useMasterStore();
   const { allOrders, fetchOrders, isInitialized } = useWorkOrderStore();
   const { hasPermission } = useAuth();
+  const [loadedCriticalParts, setLoadedCriticalParts] = React.useState<SparePart[]>([]);
   
   React.useEffect(() => {
     if (!isInitialized || (allOrders && allOrders.length === 0)) {
       fetchOrders();
     }
   }, [allOrders, fetchOrders, isInitialized]);
+
+  React.useEffect(() => {
+    const criticalIds = machine?.criticalParts || [];
+    if (criticalIds.length === 0) {
+      setLoadedCriticalParts([]);
+      return;
+    }
+    const knownMap = new Map((parts || []).map(p => [p.id, p]));
+    const missingIds = criticalIds.filter(id => !knownMap.has(id));
+    if (missingIds.length > 0) {
+      inventoryService.getPartsByIds(missingIds).then(fetched => {
+        setLoadedCriticalParts(fetched);
+      }).catch(err => console.error('Error fetching critical parts for asset drawer:', err));
+    }
+  }, [machine?.criticalParts, parts]);
   
   if (!machine) return null;
 
@@ -99,9 +117,14 @@ export const AssetDrawer: React.FC<AssetDrawerProps> = ({ machine, onClose, anal
   const headerSubtitle = subtitleParts.length > 0 ? subtitleParts.join(' • ') : 'Sin datos adicionales';
 
   // Real Kardex Data mapped from machine's `criticalParts`
-  const actualCriticalParts = (machine.criticalParts || [])
-    .map(partId => parts.find(p => p.id === partId))
-    .filter(p => p !== undefined) as typeof parts;
+  const actualCriticalParts = React.useMemo(() => {
+    const allKnown = new Map<string, SparePart>();
+    (parts || []).forEach(p => allKnown.set(p.id, p));
+    loadedCriticalParts.forEach(p => allKnown.set(p.id, p));
+    return (machine.criticalParts || [])
+      .map(partId => allKnown.get(partId))
+      .filter((p): p is SparePart => p !== undefined);
+  }, [machine.criticalParts, parts, loadedCriticalParts]);
 
   return (
     <AnimatePresence>

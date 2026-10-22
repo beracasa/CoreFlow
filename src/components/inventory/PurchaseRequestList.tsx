@@ -4,6 +4,7 @@ import { ExtendedPurchaseRequest, SparePart } from '../../types/inventory';
 import { Search, FileText, Clock, ChevronDown, ChevronRight, Plus, Download, Eye, X, Package } from 'lucide-react';
 import { exportPurchaseRequestPDF } from '../../utils/pdfExport';
 import { TablePagination } from '../shared/TablePagination';
+import { PartSearchInput } from '../shared/PartSearchInput';
 import { formatDate } from '../../utils/dateUtils';
 
 import { useAuth } from '../../../contexts/AuthContext';
@@ -394,65 +395,32 @@ export const PurchaseRequestList: React.FC = () => {
                                 <div key={index} className="flex gap-4 items-end bg-industrial-900/50 p-4 rounded-lg border border-industrial-700/50">
                                     <div className="flex-1">
                                         <label className="block text-xs font-bold text-industrial-500 uppercase mb-2">Repuesto</label>
-                                        <div className="relative group">
-                                            <input
-                                                type="text"
-                                                className={`w-full bg-industrial-800 border ${!item.partId && item.partName ? 'border-blue-500' : 'border-industrial-600'} rounded py-2 px-3 text-white text-sm focus:outline-none focus:border-industrial-accent`}
-                                                placeholder="Buscar repuesto por nombre o código..."
-                                                value={item.partName}
-                                                onChange={(e) => {
-                                                    const val = e.target.value;
-                                                    const newItems = [...selectedItems];
-                                                    newItems[index] = { ...newItems[index], partName: val, partId: '' }; // Clear ID while typing
-                                                    setSelectedItems(newItems);
-                                                }}
-                                            />
-                                            {/* Custom Dropdown Results */}
-                                            {!item.partId && item.partName && (
-                                                <div className="absolute left-0 top-full mt-1 w-full z-[100] bg-industrial-800 border border-industrial-600 rounded-md shadow-xl max-h-60 overflow-y-auto">
-                                                    {availableParts.filter(p =>
-                                                        p.name.toLowerCase().includes(item.partName.toLowerCase()) ||
-                                                        p.partNumber.toLowerCase().includes(item.partName.toLowerCase())
-                                                    ).length > 0 ? (
-                                                        availableParts.filter(p =>
-                                                            p.name.toLowerCase().includes(item.partName.toLowerCase()) ||
-                                                            p.partNumber.toLowerCase().includes(item.partName.toLowerCase())
-                                                        ).map(sp => (
-                                                            <div
-                                                                key={sp.id}
-                                                                className="p-3 hover:bg-industrial-700 cursor-pointer border-b border-industrial-700/50 last:border-0 flex justify-between items-center gap-3 transition-colors"
-                                                                onClick={() => {
-                                                                    const newItems = [...selectedItems];
-                                                                    newItems[index] = {
-                                                                        ...newItems[index],
-                                                                        partId: sp.id,
-                                                                        partName: `${sp.name} (${sp.partNumber})`,
-                                                                    };
-                                                                    setSelectedItems(newItems);
-                                                                }}
-                                                            >
-                                                                <div className="flex flex-col flex-1 min-w-0">
-                                                                    <span className="text-white text-sm font-bold truncate">
-                                                                        {sp.name}
-                                                                    </span>
-                                                                    <span className="text-industrial-400 text-[10px] mt-0.5">
-                                                                        Código: <span className="text-blue-400 font-mono">{sp.partNumber}</span>
-                                                                    </span>
-                                                                </div>
-                                                                <div className={`flex-shrink-0 text-[10px] px-2 py-1 rounded font-bold ${sp.currentStock <= sp.minStock
-                                                                    ? 'bg-red-900/50 text-red-400 border border-red-500/30'
-                                                                    : 'bg-emerald-900/50 text-emerald-400 border border-emerald-500/30'
-                                                                    }`}>
-                                                                    Stock: {sp.currentStock}
-                                                                </div>
-                                                            </div>
-                                                        ))
-                                                    ) : (
-                                                        <div className="p-4 text-industrial-500 text-sm italic text-center">No se encontraron repuestos</div>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
+                                        <PartSearchInput
+                                            value={item.partName || ''}
+                                            partId={item.partId}
+                                            accentColor="blue"
+                                            placeholder="Buscar repuesto por nombre o código..."
+                                            dropdownWidth="w-full"
+                                            onChangeText={(val) => {
+                                                const newItems = [...selectedItems];
+                                                newItems[index] = { ...newItems[index], partName: val, partId: '' };
+                                                setSelectedItems(newItems);
+                                            }}
+                                            onSelect={(sp) => {
+                                                const newItems = [...selectedItems];
+                                                newItems[index] = {
+                                                    ...newItems[index],
+                                                    partId: sp.id,
+                                                    partName: `${sp.name} (${sp.partNumber})`,
+                                                };
+                                                setSelectedItems(newItems);
+                                            }}
+                                            onClear={() => {
+                                                const newItems = [...selectedItems];
+                                                newItems[index] = { ...newItems[index], partName: '', partId: '' };
+                                                setSelectedItems(newItems);
+                                            }}
+                                        />
                                     </div>
                                     <div className="w-24">
                                         <label className="block text-xs font-bold text-industrial-500 uppercase mb-2">Cantidad</label>
