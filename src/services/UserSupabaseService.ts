@@ -27,7 +27,7 @@ export const UserSupabaseService = {
 
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, email, full_name, job_title, role, tenant_id, status, notification_preferences')
+      .select('id, email, full_name, job_title, role, tenant_id, status, notification_preferences, app_roles(name)')
       .order('full_name');
 
     if (error) throw error;
@@ -37,14 +37,15 @@ export const UserSupabaseService = {
       email: p.email,
       full_name: p.full_name || '',
       role: p.role,
+      roleName: (Array.isArray(p.app_roles) ? p.app_roles[0]?.name : p.app_roles?.name) || p.role,
       job_title: p.job_title || '',
       tenant_id: p.tenant_id,
       status: p.status,
-      notification_preferences: p.notification_preferences || {
-        alerts_rmant02: false,
-        alerts_rmant05: false,
-        low_stock: false,
-        pending_approvals: false
+      notification_preferences: {
+        alerts_rmant02: p.notification_preferences?.alerts_rmant02 ?? false,
+        alerts_rmant05: p.notification_preferences?.alerts_rmant05 ?? false,
+        low_stock: p.notification_preferences?.low_stock ?? false,
+        pending_approvals: p.notification_preferences?.pending_approvals ?? false
       }
     }));
   },
