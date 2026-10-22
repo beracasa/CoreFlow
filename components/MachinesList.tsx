@@ -6,6 +6,7 @@ import { DocumentService } from '../src/services/documentService';
 import { supabase } from '../src/services/supabaseClient';
 import { Box, Wifi, Plus, X, Camera, FileText, Server, Clock, Calendar, Pencil, Eye, Download, Trash2, Lock, AlertCircle, Loader2, Shield, Edit3 } from 'lucide-react';
 import { TablePagination } from './shared/TablePagination';
+import { PartSearchInput } from '../src/components/shared/PartSearchInput';
 import { useAuth } from '../contexts/AuthContext';
 import { formatDate } from '../src/utils/dateUtils';
 
@@ -1111,46 +1112,25 @@ export const MachinesList: React.FC = () => {
                   <div className="flex gap-2 items-end relative">
                     <div className="flex-1 space-y-1">
                       <label className="text-xs text-industrial-400 font-medium">Buscar y Seleccionar Repuesto</label>
-                      <input 
-                        type="text"
-                        placeholder="Buscar por nombre o SKU..."
-                        className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm focus:border-industrial-400 focus:outline-none"
+                      <PartSearchInput
                         value={searchKardexPartIot}
-                        onChange={(e) => {
-                          setSearchKardexPartIot(e.target.value);
-                          setIsKardexDropdownOpenIot(true);
-                          if (!e.target.value) setSelectedKardexPartIot('');
+                        partId={selectedKardexPartIot}
+                        accentColor="blue"
+                        placeholder="Buscar por nombre o SKU..."
+                        dropdownWidth="w-full"
+                        onChangeText={(val) => {
+                          setSearchKardexPartIot(val);
+                          if (!val) setSelectedKardexPartIot('');
                         }}
-                        onFocus={() => setIsKardexDropdownOpenIot(true)}
-                        onBlur={() => setTimeout(() => setIsKardexDropdownOpenIot(false), 200)}
+                        onSelect={(p) => {
+                          setSelectedKardexPartIot(p.id);
+                          setSearchKardexPartIot(p.partNumber ? `${p.partNumber} - ${p.name}` : p.name);
+                        }}
+                        onClear={() => {
+                          setSelectedKardexPartIot('');
+                          setSearchKardexPartIot('');
+                        }}
                       />
-                      {isKardexDropdownOpenIot && (
-                        <ul className="absolute z-50 w-[calc(100%-46px)] bg-industrial-800 border border-industrial-600 rounded mt-1 max-h-48 overflow-y-auto shadow-xl">
-                          {parts.filter(p => (p.name || '').toLowerCase().includes((searchKardexPartIot || '').toLowerCase()) || (p.partNumber || '').toLowerCase().includes((searchKardexPartIot || '').toLowerCase())).length === 0 ? (
-                            <li className="p-2 text-sm text-industrial-500 italic">No se encontraron repuestos</li>
-                          ) : (
-                            parts
-                              .filter(p => (p.name || '').toLowerCase().includes((searchKardexPartIot || '').toLowerCase()) || (p.partNumber || '').toLowerCase().includes((searchKardexPartIot || '').toLowerCase()))
-                              .map(p => (
-                                <li 
-                                  key={p.id} 
-                                  className={`p-2 text-sm cursor-pointer border-b border-industrial-700/50 last:border-0 hover:bg-industrial-700 ${selectedKardexPartIot === p.id ? 'bg-industrial-700 text-white' : 'text-industrial-300'}`}
-                                  onClick={() => {
-                                    setSelectedKardexPartIot(p.id);
-                                    setSearchKardexPartIot(p.partNumber ? `${p.partNumber} - ${p.name}` : p.name);
-                                    setIsKardexDropdownOpenIot(false);
-                                  }}
-                                >
-                                  <div className="font-medium text-white">{p.name}</div>
-                                  <div className="text-[10px] text-industrial-400 font-mono flex justify-between">
-                                    <span>{p.partNumber}</span>
-                                    <span className={p.currentStock > p.minStock ? 'text-emerald-400' : 'text-yellow-400'}>Stock: {p.currentStock}</span>
-                                  </div>
-                                </li>
-                              ))
-                          )}
-                        </ul>
-                      )}
                     </div>
                     <button
                       type="button"
@@ -1483,46 +1463,25 @@ export const MachinesList: React.FC = () => {
                   <div className="flex gap-2 items-end relative">
                     <div className="flex-1 space-y-1">
                       <label className="text-xs text-industrial-400 font-medium">Buscar y Seleccionar Repuesto</label>
-                      <input 
-                        type="text"
-                        placeholder="Buscar por nombre o SKU..."
-                        className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm focus:border-industrial-400 focus:outline-none"
+                      <PartSearchInput
                         value={searchKardexPartManual}
-                        onChange={(e) => {
-                          setSearchKardexPartManual(e.target.value);
-                          setIsKardexDropdownOpenManual(true);
-                          if (!e.target.value) setSelectedKardexPartManual('');
+                        partId={selectedKardexPartManual}
+                        accentColor="blue"
+                        placeholder="Buscar por nombre o SKU..."
+                        dropdownWidth="w-full"
+                        onChangeText={(val) => {
+                          setSearchKardexPartManual(val);
+                          if (!val) setSelectedKardexPartManual('');
                         }}
-                        onFocus={() => setIsKardexDropdownOpenManual(true)}
-                        onBlur={() => setTimeout(() => setIsKardexDropdownOpenManual(false), 200)}
+                        onSelect={(p) => {
+                          setSelectedKardexPartManual(p.id);
+                          setSearchKardexPartManual(p.partNumber ? `${p.partNumber} - ${p.name}` : p.name);
+                        }}
+                        onClear={() => {
+                          setSelectedKardexPartManual('');
+                          setSearchKardexPartManual('');
+                        }}
                       />
-                      {isKardexDropdownOpenManual && (
-                        <ul className="absolute z-50 w-[calc(100%-46px)] bg-industrial-800 border border-industrial-600 rounded mt-1 max-h-48 overflow-y-auto shadow-xl">
-                          {parts.filter(p => (p.name || '').toLowerCase().includes((searchKardexPartManual || '').toLowerCase()) || (p.partNumber || '').toLowerCase().includes((searchKardexPartManual || '').toLowerCase())).length === 0 ? (
-                            <li className="p-2 text-sm text-industrial-500 italic">No se encontraron repuestos</li>
-                          ) : (
-                            parts
-                              .filter(p => (p.name || '').toLowerCase().includes((searchKardexPartManual || '').toLowerCase()) || (p.partNumber || '').toLowerCase().includes((searchKardexPartManual || '').toLowerCase()))
-                              .map(p => (
-                                <li 
-                                  key={p.id} 
-                                  className={`p-2 text-sm cursor-pointer border-b border-industrial-700/50 last:border-0 hover:bg-industrial-700 ${selectedKardexPartManual === p.id ? 'bg-industrial-700 text-white' : 'text-industrial-300'}`}
-                                  onClick={() => {
-                                    setSelectedKardexPartManual(p.id);
-                                    setSearchKardexPartManual(p.partNumber ? `${p.partNumber} - ${p.name}` : p.name);
-                                    setIsKardexDropdownOpenManual(false);
-                                  }}
-                                >
-                                  <div className="font-medium text-white">{p.name}</div>
-                                  <div className="text-[10px] text-industrial-400 font-mono flex justify-between">
-                                    <span>{p.partNumber}</span>
-                                    <span className={p.currentStock > p.minStock ? 'text-emerald-400' : 'text-yellow-400'}>Stock: {p.currentStock}</span>
-                                  </div>
-                                </li>
-                              ))
-                          )}
-                        </ul>
-                      )}
                     </div>
                     <button
                       type="button"

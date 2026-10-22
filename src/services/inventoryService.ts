@@ -10,6 +10,8 @@ export interface IInventoryService {
         company?: string;
         supplier?: string;
     }): Promise<{ data: SparePart[], total: number }>;
+    searchParts(query?: string, limit?: number): Promise<SparePart[]>;
+    getPartsByIds(ids: string[]): Promise<SparePart[]>;
     getPartById(id: string): Promise<SparePart | null>;
     getPartCompanies(): Promise<string[]>;
     checkPartNumberExists(partNumber: string, excludeId?: string): Promise<boolean>;

@@ -297,7 +297,7 @@ export const ReceptionForm: React.FC = () => {
             setQuantity(0);
             setSearchTerm('');
             setSelectedPartId('');
-            inventoryService.getAllParts(1, 1000).then(res => setParts(res.data));
+            inventoryService.getAllParts(1, 50).then(res => setParts(res.data));
         } catch (err) {
             console.error(err);
             setMessage({ type: 'error', text: 'Error al registrar la recepción.' });
