@@ -223,9 +223,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 1000));
 
           await Promise.race([fetchPromise, timeoutPromise]);
-
+          useUserStore.getState().fetchUsers().catch(console.error);
         } else {
           if (mounted) setUser(null);
+          useUserStore.getState().fetchUsers().catch(console.error);
         }
       } catch (err) {
         console.error("Auth state change error:", err);

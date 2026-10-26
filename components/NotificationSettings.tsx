@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { UserSupabaseService } from '../src/services/UserSupabaseService';
+import { useAuth } from '../contexts/AuthContext';
 import { UserProfile } from '../types';
 import { 
   Bell, 
@@ -148,6 +149,7 @@ const AlertSection = ({
 };
 
 export const NotificationSettings = () => {
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [initialData, setInitialData] = useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -171,8 +173,16 @@ export const NotificationSettings = () => {
     const loadData = async () => {
       try {
         const allUsers = await UserSupabaseService.getUsersWithPreferences();
-        setUsers(allUsers);
-        setInitialData(JSON.parse(JSON.stringify(allUsers))); // Clone for comparison
+        const isSuperAdmin = currentUser?.email?.toLowerCase().trim() === 'beracasa@gmail.com';
+        const visibleUsers = isSuperAdmin
+          ? allUsers
+          : allUsers.filter(u => 
+              u.email?.toLowerCase().trim() !== 'beracasa@gmail.com' &&
+              u.full_name?.toLowerCase().trim() !== 'admin coreflow'
+            );
+
+        setUsers(visibleUsers);
+        setInitialData(JSON.parse(JSON.stringify(visibleUsers))); // Clone for comparison
 
         // Initialize selections from DB
         const newSelections = {
@@ -182,7 +192,7 @@ export const NotificationSettings = () => {
           pending_approvals: new Set<string>(),
         };
 
-        allUsers.forEach(u => {
+        visibleUsers.forEach(u => {
           if (u.notification_preferences?.alerts_rmant02) newSelections.alerts_rmant02.add(u.id);
           if (u.notification_preferences?.alerts_rmant05) newSelections.alerts_rmant05.add(u.id);
           if (u.notification_preferences?.low_stock) newSelections.low_stock.add(u.id);
@@ -198,7 +208,7 @@ export const NotificationSettings = () => {
     };
 
     loadData();
-  }, []);
+  }, [currentUser?.email]);
 
   const handleToggleUser = (type: AlertType, userId: string) => {
     setSelections(prev => {
