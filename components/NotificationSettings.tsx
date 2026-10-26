@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { UserSupabaseService } from '../src/services/UserSupabaseService';
+import { useAuth } from '../contexts/AuthContext';
 import { UserProfile } from '../types';
 import { 
   Bell, 
@@ -148,6 +149,7 @@ const AlertSection = ({
 };
 
 export const NotificationSettings = () => {
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [initialData, setInitialData] = useState<UserProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -171,8 +173,16 @@ export const NotificationSettings = () => {
     const loadData = async () => {
       try {
         const allUsers = await UserSupabaseService.getUsersWithPreferences();
-        setUsers(allUsers);
-        setInitialData(JSON.parse(JSON.stringify(allUsers))); // Clone for comparison
+        const isSuperAdmin = currentUser?.email?.toLowerCase().trim() === 'beracasa@gmail.com';
+        const visibleUsers = isSuperAdmin
+          ? allUsers
+          : allUsers.filter(u => 
+              u.email?.toLowerCase().trim() !== 'beracasa@gmail.com' &&
+              u.full_name?.toLowerCase().trim() !== 'admin coreflow'
+            );
+
+        setUsers(visibleUsers);
+        setInitialData(JSON.parse(JSON.stringify(visibleUsers))); // Clone for comparison
 
         // Initialize selections from DB
         const newSelections = {
@@ -182,7 +192,7 @@ export const NotificationSettings = () => {
           pending_approvals: new Set<string>(),
         };
 
-        allUsers.forEach(u => {
+        visibleUsers.forEach(u => {
           if (u.notification_preferences?.alerts_rmant02) newSelections.alerts_rmant02.add(u.id);
           if (u.notification_preferences?.alerts_rmant05) newSelections.alerts_rmant05.add(u.id);
           if (u.notification_preferences?.low_stock) newSelections.low_stock.add(u.id);
@@ -198,7 +208,7 @@ export const NotificationSettings = () => {
     };
 
     loadData();
-  }, []);
+  }, [currentUser?.email]);
 
   const handleToggleUser = (type: AlertType, userId: string) => {
     setSelections(prev => {
@@ -284,7 +294,7 @@ export const NotificationSettings = () => {
             </div>
             <div>
               <h3 className="text-2xl font-black text-white tracking-tight">Gestión Administrativa de Alertas</h3>
-              <p className="text-industrial-400 mt-1">Asigna qué empleados recibirán cada tipo de notificación del sistema.</p>
+              <p className="text-industrial-400 mt-1">Asigna qué usuarios recibirán cada tipo de notificación del sistema.</p>
             </div>
           </div>
           
@@ -301,7 +311,7 @@ export const NotificationSettings = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <AlertSection
             title="Preventivo (R-MANT-02)"
-            description="Reciben una alerta cuando se programa o genera un mantenimiento preventivo. El personal asignado como ejecutante también recibirá la notificación."
+            description="Reciben una alerta cuando se programa o genera un mantenimiento preventivo."
             icon={<Wrench size={24} />}
             iconBg="bg-emerald-900/40"
             iconColor="text-emerald-400"
@@ -314,7 +324,7 @@ export const NotificationSettings = () => {
 
           <AlertSection
             title="Correctivo (R-MANT-05)"
-            description="Reciben una alerta cuando se genera una solicitud de un mantenimiento correctivo. El personal asignado como ejecutante también recibirá la notificación."
+            description="Reciben una alerta cuando se genera una solicitud de un mantenimiento correctivo."
             icon={<AlertTriangle size={24} />}
             iconBg="bg-red-900/40"
             iconColor="text-red-400"
@@ -327,7 +337,7 @@ export const NotificationSettings = () => {
 
           <AlertSection
             title="Bajo Stock"
-            description="Reciben avisos cuando un repuesto crítico está por debajo del mínimo."
+            description="Reciben avisos cuando un repuesto está por debajo del stock mínimo."
             icon={<Package size={24} />}
             iconBg="bg-orange-900/40"
             iconColor="text-orange-400"
@@ -339,8 +349,8 @@ export const NotificationSettings = () => {
           />
 
           <AlertSection
-            title="Firmas y Aprobaciones"
-            description="Reciben recordatorios de órdenes que esperan cierre o validación técnica."
+            title="Cierre Mantenimientos"
+            description="Reciben una notificación por correo con el resumen completo cuando se cierra una orden de mantenimiento preventivo (R-MANT-02) o correctivo (R-MANT-05)."
             icon={<CheckSquare size={24} />}
             iconBg="bg-blue-900/40"
             iconColor="text-blue-400"

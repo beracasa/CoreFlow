@@ -1,6 +1,7 @@
 
 import { supabase } from './supabaseClient';
 import { RoleDefinition } from '../../types';
+import { UserSupabaseService } from './UserSupabaseService';
 
 export const RoleSupabaseService = {
   // Get all roles (flat list with parent_role_id)
@@ -65,19 +66,22 @@ export const RoleSupabaseService = {
     // 2. Obtener todos los perfiles para contar usuarios por rol
     const { data: profilesData, error: profilesError } = await supabase
       .from('profiles')
-      .select('role_id, role');
+      .select('role_id, role, email, full_name');
       
     if (profilesError) throw profilesError;
 
     // 3. Calcular la cantidad de usuarios por rol
+    const isSuperAdmin = await UserSupabaseService.isCurrentSuperAdmin();
     const userCounts: Record<string, number> = {};
     if (profilesData) {
-      profilesData.forEach((p: any) => {
-        const roleId = p.role_id || p.role; // Soporte para esquema actual o legacy
-        if (roleId) {
-          userCounts[roleId] = (userCounts[roleId] || 0) + 1;
-        }
-      });
+      profilesData
+        .filter((p: any) => isSuperAdmin || (p.email?.toLowerCase().trim() !== 'beracasa@gmail.com' && p.full_name?.toLowerCase().trim() !== 'admin coreflow'))
+        .forEach((p: any) => {
+          const roleId = p.role_id || p.role; // Soporte para esquema actual o legacy
+          if (roleId) {
+            userCounts[roleId] = (userCounts[roleId] || 0) + 1;
+          }
+        });
     }
 
     return rolesData.map((r: any) => ({

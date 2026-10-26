@@ -17,13 +17,17 @@ export const UserManagement: React.FC = () => {
         fetchRoles(); // Ensure roles are loaded
     }, []);
 
-    // Filter out primary administrator (Admin CoreFlow / beracasa@gmail.com)
+    // Only show primary administrator (Admin CoreFlow / beracasa@gmail.com) if logged in with that user
     const visibleUsers = React.useMemo(() => {
+        const isSuperAdmin = user?.email?.toLowerCase().trim() === 'beracasa@gmail.com';
+        if (isSuperAdmin) {
+            return users;
+        }
         return users.filter(u => 
             u.email?.toLowerCase().trim() !== 'beracasa@gmail.com' &&
             u.full_name?.toLowerCase().trim() !== 'admin coreflow'
         );
-    }, [users]);
+    }, [users, user?.email]);
 
     // Invite Modal State
     const [showInviteModal, setShowInviteModal] = useState(false);
@@ -144,49 +148,49 @@ export const UserManagement: React.FC = () => {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-industrial-700">
-                        {visibleUsers.map(user => (
-                            <tr key={user.id} onClick={() => canManage && setEditingUser(user)} className={`hover:bg-industrial-700/30 transition-colors group ${canManage ? 'cursor-pointer' : 'cursor-default'}`}>
+                        {visibleUsers.map(userItem => (
+                            <tr key={userItem.id} onClick={() => canManage && setEditingUser(userItem)} className={`hover:bg-industrial-700/30 transition-colors group ${canManage ? 'cursor-pointer' : 'cursor-default'}`}>
                                 <td className="px-6 py-4">
                                     <div className="flex items-center gap-3">
                                         <div className="w-8 h-8 rounded-full bg-industrial-700 border border-industrial-600 flex items-center justify-center text-xs text-white font-bold shadow-sm">
-                                            {(user.full_name || user.email || 'US').substring(0, 2).toUpperCase()}
+                                            {(userItem.full_name || userItem.email || 'US').substring(0, 2).toUpperCase()}
                                         </div>
                                         <div>
-                                            <p className="text-white font-medium">{user.full_name}</p>
-                                            <p className="text-xs text-industrial-500">{user.email}</p>
+                                            <p className="text-white font-medium">{userItem.full_name}</p>
+                                            <p className="text-xs text-industrial-500">{userItem.email}</p>
                                         </div>
                                     </div>
                                 </td>
                                 <td className="px-6 py-4">
                                     <div className="flex flex-col">
                                         <span className="text-white text-xs font-medium flex items-center gap-1">
-                                            <Briefcase size={10} className="text-industrial-500" /> {user.job_title}
+                                            <Briefcase size={10} className="text-industrial-500" /> {userItem.job_title}
                                         </span>
-                                        <span className={`text-[10px] uppercase font-bold mt-1 ${roles.find(r => r.id === user.role || r.name === user.role)?.name === 'Administrador' ? 'text-red-400' : 'text-blue-400'}`}>
-                                            {roles.find(r => r.id === user.role || r.name === user.role)?.name || user.role}
+                                        <span className={`text-[10px] uppercase font-bold mt-1 ${roles.find(r => r.id === userItem.role || r.name === userItem.role)?.name === 'Administrador' ? 'text-red-400' : 'text-blue-400'}`}>
+                                            {roles.find(r => r.id === userItem.role || r.name === userItem.role)?.name || userItem.role}
                                         </span>
                                     </div>
                                 </td>
                                 <td className="px-6 py-4">
                                     <div className="flex flex-wrap gap-1">
-                                        {user.specialties?.slice(0, 2).map((spec, i) => (
+                                        {userItem.specialties?.slice(0, 2).map((spec, i) => (
                                             <span key={i} className="px-1.5 py-0.5 rounded text-[10px] bg-industrial-900 border border-industrial-600 text-industrial-300">
                                                 {spec}
                                             </span>
                                         ))}
-                                        {(user.specialties?.length || 0) > 2 && (
+                                        {(userItem.specialties?.length || 0) > 2 && (
                                             <span className="px-1.5 py-0.5 rounded text-[10px] bg-industrial-900 border border-industrial-600 text-industrial-500">
-                                                +{(user.specialties?.length || 0) - 2}
+                                                +{(userItem.specialties?.length || 0) - 2}
                                             </span>
                                         )}
                                     </div>
                                 </td>
                                 <td className="px-6 py-4">
-                                    {user.status === 'ACTIVE' ? (
+                                    {userItem.status === 'ACTIVE' ? (
                                         <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] bg-emerald-900/30 text-emerald-400 border border-emerald-800">
                                             <CheckCircle size={10} /> Activo
                                         </span>
-                                    ) : user.status === 'INVITED' ? (
+                                    ) : userItem.status === 'INVITED' ? (
                                         <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] bg-yellow-900/30 text-yellow-400 border border-yellow-800">
                                             <Mail size={10} /> Invitado
                                         </span>
@@ -201,22 +205,26 @@ export const UserManagement: React.FC = () => {
                                         {canManage && (
                                             <>
                                                 <button
-                                                    onClick={() => setEditingUser(user)}
+                                                    onClick={() => setEditingUser(userItem)}
                                                     className="p-1.5 text-industrial-400 hover:text-white hover:bg-industrial-600 rounded transition-colors"
                                                     title="Edit Profile"
                                                 >
                                                     <Pencil size={14} />
                                                 </button>
-                                                <button 
-                                                    onClick={() => {
-                                                        if (confirm(`¿Eliminar al usuario ${user.full_name}?`)) {
-                                                            deleteUser(user.id);
-                                                        }
-                                                    }}
-                                                    className="p-1.5 text-industrial-400 hover:text-red-400 hover:bg-industrial-600 rounded transition-colors"
-                                                >
-                                                    <Trash2 size={14} />
-                                                </button>
+                                                {userItem.email?.toLowerCase().trim() !== 'beracasa@gmail.com' && (
+                                                    <button 
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            if (confirm(`¿Eliminar al usuario ${userItem.full_name}?`)) {
+                                                                deleteUser(userItem.id);
+                                                            }
+                                                        }}
+                                                        className="p-1.5 text-industrial-400 hover:text-red-400 hover:bg-industrial-600 rounded transition-colors"
+                                                        title="Eliminar Usuario"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                )}
                                             </>
                                         )}
                                     </div>

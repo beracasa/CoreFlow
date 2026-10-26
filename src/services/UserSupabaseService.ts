@@ -19,11 +19,53 @@ async function parseEdgeFunctionError(error: any): Promise<Error> {
 }
 
 export const UserSupabaseService = {
+  // Helper to check if current logged in session is the super admin (beracasa@gmail.com)
+  async isCurrentSuperAdmin(): Promise<boolean> {
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      const stored = localStorage.getItem('coreflow_mock_session');
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          return parsed.email?.toLowerCase().trim() === 'beracasa@gmail.com';
+        } catch (_) {}
+      }
+      return false;
+    }
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user?.email?.toLowerCase().trim() === 'beracasa@gmail.com') {
+        return true;
+      }
+    } catch (_) {}
+
+    // Fallback: check localStorage supabase auth token keys
+    try {
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('sb-') || key.includes('auth-token'))) {
+          const val = localStorage.getItem(key);
+          if (val && val.includes('beracasa@gmail.com')) {
+            const parsed = JSON.parse(val);
+            const email = parsed?.user?.email || parsed?.currentUser?.email;
+            if (email?.toLowerCase().trim() === 'beracasa@gmail.com') {
+              return true;
+            }
+          }
+        }
+      }
+    } catch (_) {}
+
+    return false;
+  },
+
   // Get all users (profiles) with notification preferences
   async getUsersWithPreferences(): Promise<UserProfile[]> {
     if (import.meta.env.VITE_USE_MOCK === 'true') {
       return this.getUsers();
     }
+
+    const isSuperAdmin = await this.isCurrentSuperAdmin();
 
     const { data, error } = await supabase
       .from('profiles')
@@ -32,7 +74,14 @@ export const UserSupabaseService = {
 
     if (error) throw error;
 
-    return data.map((p: any) => ({
+    const filteredData = isSuperAdmin
+      ? data
+      : data.filter((p: any) => 
+          p.email?.toLowerCase().trim() !== 'beracasa@gmail.com' &&
+          p.full_name?.toLowerCase().trim() !== 'admin coreflow'
+        );
+
+    return filteredData.map((p: any) => ({
       id: p.id,
       email: p.email,
       full_name: p.full_name || '',
@@ -52,37 +101,49 @@ export const UserSupabaseService = {
 
   // Get all users (profiles)
   async getUsers(): Promise<UserProfile[]> {
+    const isSuperAdmin = await this.isCurrentSuperAdmin();
+
     if (import.meta.env.VITE_USE_MOCK === 'true') {
       const stored = localStorage.getItem('coreflow_mock_users');
+      let usersList: UserProfile[] = [];
       if (stored) {
-        return JSON.parse(stored);
+        usersList = JSON.parse(stored);
+      } else {
+        const initialUsers: UserProfile[] = [
+          {
+            id: 'mock-user-admin',
+            email: 'beracasa@gmail.com',
+            full_name: 'BERACASA',
+            role: 'ADMIN_SOLICITANTE',
+            job_title: 'Plant Manager',
+            tenant_id: 'default-tenant',
+            status: 'ACTIVE',
+            specialties: ['SACMI', 'Electrical'],
+            company_code: 'COMP-1'
+          },
+          {
+            id: 'mock-user-tech-1',
+            email: 'juan@example.com',
+            full_name: 'Juan Perez',
+            role: 'TECNICO_MANT',
+            job_title: 'Mechanic',
+            tenant_id: 'default-tenant',
+            status: 'ACTIVE',
+            specialties: ['Hydraulics'],
+            company_code: 'COMP-1'
+          }
+        ];
+        localStorage.setItem('coreflow_mock_users', JSON.stringify(initialUsers));
+        usersList = initialUsers;
       }
-      const initialUsers: UserProfile[] = [
-        {
-          id: 'mock-user-admin',
-          email: 'beracasa@gmail.com',
-          full_name: 'BERACASA',
-          role: 'ADMIN_SOLICITANTE',
-          job_title: 'Plant Manager',
-          tenant_id: 'default-tenant',
-          status: 'ACTIVE',
-          specialties: ['SACMI', 'Electrical'],
-          company_code: 'COMP-1'
-        },
-        {
-          id: 'mock-user-tech-1',
-          email: 'juan@example.com',
-          full_name: 'Juan Perez',
-          role: 'TECNICO_MANT',
-          job_title: 'Mechanic',
-          tenant_id: 'default-tenant',
-          status: 'ACTIVE',
-          specialties: ['Hydraulics'],
-          company_code: 'COMP-1'
-        }
-      ];
-      localStorage.setItem('coreflow_mock_users', JSON.stringify(initialUsers));
-      return initialUsers;
+
+      if (!isSuperAdmin) {
+        return usersList.filter(u => 
+          u.email?.toLowerCase().trim() !== 'beracasa@gmail.com' &&
+          u.full_name?.toLowerCase().trim() !== 'admin coreflow'
+        );
+      }
+      return usersList;
     }
 
     const { data, error } = await supabase
@@ -92,8 +153,15 @@ export const UserSupabaseService = {
 
     if (error) throw error;
 
+    const filteredData = isSuperAdmin
+      ? data
+      : data.filter((p: any) => 
+          p.email?.toLowerCase().trim() !== 'beracasa@gmail.com' &&
+          p.full_name?.toLowerCase().trim() !== 'admin coreflow'
+        );
+
     // Map snake_case DB to camelCase UI if needed, or keep as is if types match
-    return data.map((p: any) => ({
+    return filteredData.map((p: any) => ({
       id: p.id,
       email: p.email,
       full_name: p.full_name || '',

@@ -123,11 +123,20 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
    const [isSaving, setIsSaving] = useState(false);
 
    // Helper UI renderers - Defined early to avoid TDZ and usage in handlers
-   const isSection1Editable = (formData.currentStage === WorkOrderStage.DRAFT && hasPermission('create_wo')) || (editingSection === 1 && hasPermission('edit_wo'));
-   
-   const isSection2Editable = ((formData.currentStage === WorkOrderStage.DRAFT || formData.currentStage === WorkOrderStage.EXECUTION || formData.currentStage === WorkOrderStage.REQUESTED) && hasPermission('execute_wo')) || (editingSection === 2 && hasPermission('edit_wo'));
+   // The work order is formally created only once Section 1 has been submitted via 'Solicitar Mantenimiento'
+   const isOrderCreated = Boolean(formData.id && formData.currentStage !== WorkOrderStage.DRAFT);
 
-   const isSection3Editable = (formData.currentStage === WorkOrderStage.HANDOVER && hasPermission('supervise_order')) || (editingSection === 3 && hasPermission('edit_wo'));
+   const isSection1Editable = (!isOrderCreated && hasPermission('create_wo')) || (editingSection === 1 && hasPermission('edit_wo'));
+   
+   const isSection2Editable = isOrderCreated && (
+      ((formData.currentStage === WorkOrderStage.REQUESTED || formData.currentStage === WorkOrderStage.EXECUTION) && hasPermission('execute_wo')) || 
+      (editingSection === 2 && hasPermission('edit_wo'))
+   );
+
+   const isSection3Editable = isOrderCreated && (
+      (formData.currentStage === WorkOrderStage.HANDOVER && hasPermission('supervise_order')) || 
+      (editingSection === 3 && hasPermission('edit_wo'))
+   );
 
 
    // Access store
@@ -522,7 +531,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
 
    // -- STATE MACHINE TRANSITIONS --
 
-   const transitionToRequested = () => {
+   const transitionToRequested = async () => {
       // RBAC: Check permission
       if (!hasPermission('create_wo')) {
          setValidationError("Acceso denegado: No tiene permiso para crear órdenes de trabajo.");
@@ -553,8 +562,9 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
       };
       setFormData(updated);
       setValidationError(null);
+      setInvalidFields(new Set());
       // Auto save on transition
-      handleInternalSave({ ...updated, id: formData.id || `WO-${Date.now()}` } as WorkOrder, true);
+      await handleInternalSave({ ...updated, id: formData.id || `WO-${Date.now()}` } as WorkOrder, true);
    };
 
    const startExecution = () => {
@@ -578,27 +588,53 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
       handleInternalSave({ ...updated, id: formData.id || `WO-${now.getTime()}` } as WorkOrder, true);
    };
 
-   const finishExecution = () => {
+   const finishInterventions = async () => {
       // RBAC: Check permission
-      if (!hasPermission('execute_wo')) return;
+      if (!hasPermission('execute_wo') && !hasPermission('edit_wo')) {
+         setValidationError("Acceso denegado: No tiene permiso para finalizar intervenciones.");
+         return;
+      }
 
-      // REMOVED: Mandatory Task Completion Check
-      // Some tasks might not be completed/marked as per user request.
+      const errors: string[] = [];
+      const fields = new Set<string>();
+
+      // Validar firmas obligatorias de la Sección 2
+      if (!formData.signatureExecutor || formData.signatureExecutor === 'false') {
+         fields.add('signatureExecutor');
+         errors.push("Falta la firma del ejecutante en la Sección 2.");
+      }
+      if (!formData.signatureExecutionSupervisor || formData.signatureExecutionSupervisor === 'false') {
+         fields.add('signatureExecutionSupervisor');
+         errors.push("Falta la firma del supervisor de intervención en la Sección 2.");
+      }
+
+      if (fields.size > 0) {
+         setInvalidFields(fields);
+         setValidationError("Debe registrar la Firma del Ejecutante y la Firma del Supervisor en la Sección 2 antes de finalizar las intervenciones.");
+         return;
+      }
+
+      const now = new Date();
+      const currentTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
 
       const updated = {
          ...formData,
+         startTime: formData.startTime || currentTime,
+         endTime: formData.endTime || currentTime,
          currentStage: WorkOrderStage.HANDOVER,
-         status: WorkOrderStatus.REVIEW,
-         endTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+         status: WorkOrderStatus.REVIEW
       };
       setFormData(updated);
       setValidationError(null);
-      handleInternalSave({ ...updated, id: formData.id || `WO-${Date.now()}` } as WorkOrder, true);
+      setInvalidFields(new Set());
+      await handleInternalSave({ ...updated, id: formData.id || `WO-${Date.now()}` } as WorkOrder, true);
    };
 
-   const closeWorkOrder = () => {
+   const finishExecution = finishInterventions;
+
+   const closeWorkOrder = async () => {
       // RBAC: Check permission
-      if (!hasPermission('supervise_order')) {
+      if (!hasPermission('supervise_order') && !hasPermission('edit_wo')) {
          setValidationError("Acceso denegado: No tiene permiso para supervisar y cerrar órdenes.");
          return;
       }
@@ -655,7 +691,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
 
       setValidationError(null);
       setInvalidFields(new Set());
-      handleInternalSave(newOrder);
+      await handleInternalSave(newOrder);
    };
 
    const signExecutor = () => {
@@ -715,16 +751,16 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                </h2>
                {/* Status Pills */}
                <div className="flex gap-2 text-xs mt-1 items-center">
-                  <div className={`px-2 py-0.5 rounded transition-colors font-bold ${formData.currentStage === WorkOrderStage.DRAFT || formData.currentStage === WorkOrderStage.REQUESTED ? 'bg-emerald-500 text-white' : 'bg-industrial-800 text-industrial-500'}`}>
-                     1. Solicitud
+                  <div className={`px-2 py-0.5 rounded transition-colors font-bold ${formData.currentStage === WorkOrderStage.DRAFT ? 'bg-emerald-500 text-white' : 'bg-industrial-800 text-emerald-400'}`}>
+                     1. Solicitud {formData.currentStage !== WorkOrderStage.DRAFT && '✓'}
                   </div>
                   <span className="text-industrial-600">→</span>
-                  <div className={`px-2 py-0.5 rounded transition-colors font-bold ${formData.currentStage === WorkOrderStage.EXECUTION ? 'bg-pink-500 text-white' : 'bg-industrial-800 text-industrial-500'}`}>
-                     2. Ejecución
+                  <div className={`px-2 py-0.5 rounded transition-colors font-bold ${formData.currentStage === WorkOrderStage.REQUESTED || formData.currentStage === WorkOrderStage.EXECUTION ? 'bg-pink-500 text-white' : (formData.currentStage === WorkOrderStage.HANDOVER || formData.currentStage === WorkOrderStage.CLOSED ? 'bg-industrial-800 text-pink-400' : 'bg-industrial-800 text-industrial-500')}`}>
+                     2. Intervenciones {(formData.currentStage === WorkOrderStage.HANDOVER || formData.currentStage === WorkOrderStage.CLOSED) && '✓'}
                   </div>
                   <span className="text-industrial-600">→</span>
-                  <div className={`px-2 py-0.5 rounded transition-colors font-bold ${formData.currentStage === WorkOrderStage.HANDOVER ? 'bg-emerald-500 text-white' : 'bg-industrial-800 text-industrial-500'}`}>
-                     3. Supervisión
+                  <div className={`px-2 py-0.5 rounded transition-colors font-bold ${formData.currentStage === WorkOrderStage.HANDOVER ? 'bg-emerald-500 text-white' : (formData.currentStage === WorkOrderStage.CLOSED ? 'bg-industrial-800 text-emerald-400' : 'bg-industrial-800 text-industrial-500')}`}>
+                     3. Cierre y Entrega {formData.currentStage === WorkOrderStage.CLOSED && '✓'}
                   </div>
                   <span className="text-industrial-600">→</span>
                   <div className={`px-2 py-0.5 rounded transition-colors font-bold ${formData.currentStage === WorkOrderStage.CLOSED ? 'bg-emerald-600 text-white shadow-[0_0_10px_rgba(16,185,129,0.3)]' : 'bg-industrial-800 text-industrial-500'}`}>
@@ -1296,10 +1332,21 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                {isSaving ? 'Guardando...' : 'Guardar'}
                             </button>
                          )}
-                      </div>
+                     </div>
                   </div>
 
-                  <div className={`p-6`}>
+                  {!isSection2Editable && (
+                     <div className="mx-6 mt-4 p-3 rounded-lg bg-industrial-800/80 border border-industrial-700 flex items-center gap-2 text-xs text-industrial-400">
+                        <Lock size={14} className="text-amber-500 shrink-0" />
+                        <span>
+                           {!isOrderCreated
+                              ? 'Esta sección se habilitará una vez creada la solicitud de mantenimiento (haga clic en "Solicitar Mantenimiento" en la Sección 1).'
+                              : 'Esta sección se encuentra cerrada o no tiene permisos de ejecución.'}
+                        </span>
+                     </div>
+                  )}
+
+                  <div className={`p-6 ${!isSection2Editable ? 'opacity-50 pointer-events-none select-none filter grayscale-[30%]' : ''}`}>
                      {/* Common: Time & Duration */}
                      <div className="grid grid-cols-3 gap-4 mb-6">
                         <div className="bg-industrial-900 p-3 rounded border border-industrial-700">
@@ -1924,7 +1971,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                      </div>
                   </div>
 
-                  {isSection2Editable && formData.currentStage === WorkOrderStage.EXECUTION && (
+                  {isSection2Editable && (formData.currentStage === WorkOrderStage.REQUESTED || formData.currentStage === WorkOrderStage.EXECUTION) && (
                      <div className="p-4 border-t border-pink-500/30 flex justify-end gap-3">
                         <button 
                            type="button" 
@@ -1937,11 +1984,11 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                         <button 
                            type="button" 
                            disabled={isSaving}
-                           onClick={finishExecution} 
+                           onClick={finishInterventions} 
                            className="bg-pink-600 hover:bg-pink-500 text-white px-6 py-2 rounded font-bold shadow-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                            {isSaving && <Loader2 size={16} className="animate-spin" />}
-                           {isSaving ? 'Guardando...' : <>Finalizar Ejecución <CheckCircle size={16} /></>}
+                           {isSaving ? 'Finalizando...' : <>Finalizar Intervenciones <CheckCircle size={16} /></>}
                         </button>
                      </div>
                   )}
@@ -1979,7 +2026,18 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                      )}
                   </div>
 
-                  <div className={`p-6 space-y-8`}>
+                  {!isSection3Editable && (
+                     <div className="mx-6 mt-4 p-3 rounded-lg bg-industrial-800/80 border border-industrial-700 flex items-center gap-2 text-xs text-industrial-400">
+                        <Lock size={14} className="text-amber-500 shrink-0" />
+                        <span>
+                           {formData.currentStage === WorkOrderStage.CLOSED
+                              ? 'Esta orden de mantenimiento ya ha sido formalmente cerrada.'
+                              : 'Esta sección se habilitará una vez finalizadas las intervenciones de mantenimiento en la Sección 2 (haga clic en "Finalizar Intervenciones").'}
+                        </span>
+                     </div>
+                  )}
+
+                  <div className={`p-6 space-y-8 ${!isSection3Editable ? 'opacity-50 pointer-events-none select-none filter grayscale-[30%]' : ''}`}>
                      {/* 1. Checklist - R-MANT-05 Specific Options */}
                      <div>
                         <h4 className="text-sm font-bold text-white mb-4 uppercase border-b border-industrial-700 pb-2">Entrega del área o equipo donde se realizó el trabajo correctivo</h4>
@@ -2125,13 +2183,23 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                      isSection3Editable && formData.currentStage === WorkOrderStage.HANDOVER && (
                         <div className="p-4 border-t border-emerald-500/30 flex justify-end gap-4">
                            <button 
+                              type="button"
                               disabled={isSaving}
                               onClick={() => setFormData(p => ({ ...p, currentStage: WorkOrderStage.EXECUTION, status: WorkOrderStatus.IN_PROGRESS }))} 
                               className="text-industrial-400 hover:text-white text-sm underline disabled:opacity-50 disabled:cursor-not-allowed"
                            >
-                              Rechazar (Volver a Ejecución)
+                              Rechazar (Volver a Intervenciones)
                            </button>
                            <button 
+                              type="button"
+                              disabled={isSaving}
+                              onClick={saveProgress} 
+                              className="text-emerald-400 hover:text-white px-4 py-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                           >
+                              Guardar Progreso
+                           </button>
+                           <button 
+                              type="button"
                               disabled={isSaving}
                               onClick={closeWorkOrder} 
                               className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2 rounded font-bold shadow-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
