@@ -243,8 +243,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
   }, []);
 
-  // 3. Subscribe to roles for reactivity in hasRole/hasPermission
+  // 3. Subscribe to roles and users for reactivity in hasRole/hasPermission
   const roles = useUserStore(state => state.roles);
+  const storeUsers = useUserStore(state => state.users);
 
   const login = async (email: string, password: string) => {
     // Do not set global loading here. Let the UI handle its own loading state.
@@ -379,14 +380,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (!user) return false;
 
     // 1. Super Admin Bypass
-    const userRoleStr = (user.role || '').toString().toLowerCase().trim();
-    const userRoleNameStr = (user.roleName || '').toString().toLowerCase().trim();
+    const storeUser = storeUsers.find(
+      u => u.id === user.id || (user.email && u.email?.toLowerCase().trim() === user.email.toLowerCase().trim())
+    );
+    const userRoleStr = (storeUser?.role || user.role || '').toString().toLowerCase().trim();
+    const rawUserRoleStr = (user.role || '').toString().toLowerCase().trim();
+    const userRoleNameStr = (storeUser?.roleName || user.roleName || '').toString().toLowerCase().trim();
+    const userJobTitleStr = (storeUser?.job_title || user.job_title || '').toString().toLowerCase().trim();
 
     if (
       user.role === UserRole.ADMIN_SOLICITANTE ||
       userRoleStr === 'admin_solicitante' ||
-      userRoleStr.includes('admin') ||
-      userRoleNameStr.includes('admin')
+      rawUserRoleStr === 'admin_solicitante' ||
+      userRoleStr === 'admin' ||
+      userRoleStr === 'administrador' ||
+      userRoleNameStr === 'admin' ||
+      userRoleNameStr === 'administrador'
     ) {
       return true;
     }
@@ -409,45 +418,37 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       return null;
     };
 
-    // 2. Check direct user permissions if attached to profile
-    if (user.permissions) {
-      const userPermRes = checkContainer(user.permissions);
-      if (userPermRes === true) return true;
-    }
-
-    // 3. Check dynamic roles definition from store
+    // 2. Check dynamic roles definition from store (reactive source of truth)
     const userRoleDef = roles.find(r => {
       const rId = (r.id || '').toString().toLowerCase().trim();
       const rName = (r.name || '').toString().toLowerCase().trim();
-      return rId === userRoleStr || rName === userRoleStr || (userRoleNameStr && rName === userRoleNameStr);
+      return (
+        rId === userRoleStr ||
+        rId === rawUserRoleStr ||
+        rName === userRoleStr ||
+        rName === rawUserRoleStr ||
+        (userRoleNameStr && rName === userRoleNameStr) ||
+        (userJobTitleStr && rName === userJobTitleStr)
+      );
     });
 
     if (userRoleDef) {
-      // Check if role name is an admin variant
-      if (userRoleDef.name?.toLowerCase().includes('admin')) {
+      const rNameNorm = (userRoleDef.name || '').toLowerCase().trim();
+      if (userRoleDef.isSystem || rNameNorm === 'admin' || rNameNorm === 'administrador') {
         return true;
       }
 
       // Check specific permission in role definition
       const rolePermRes = checkContainer(userRoleDef.permissions);
       if (rolePermRes === true) return true;
+    } else if (roles.length === 0) {
+      useUserStore.getState().fetchRoles().catch(console.error);
+    }
 
-      // Check parent role hierarchy if any
-      let currentParentId = userRoleDef.parentRoleId;
-      let depth = 0;
-      while (currentParentId && depth < 5) {
-        const parentRole = roles.find(r => r.id === currentParentId);
-        if (!parentRole) break;
-        if (parentRole.name?.toLowerCase().includes('admin')) return true;
-        const parentPermRes = checkContainer(parentRole.permissions);
-        if (parentPermRes === true) return true;
-        currentParentId = parentRole.parentRoleId;
-        depth++;
-      }
-    } else {
-      if (roles.length === 0) {
-        useUserStore.getState().fetchRoles().catch(console.error);
-      }
+    // 3. Fallback: Check direct user permissions attached to profile at login
+    if (user.permissions) {
+      const userPermRes = checkContainer(user.permissions);
+      if (userPermRes === true) return true;
     }
 
     return false;
