@@ -123,8 +123,13 @@ export const RoleSupabaseService = {
       .select()
       .single();
 
-    if (error) throw error;
-    
+    if (error) {
+      if (error.code === '23505') {
+        throw new Error('Ya existe un rol con este nombre. Por favor ingrese un nombre diferente.');
+      }
+      throw error;
+    }
+
     return {
       id: data.id,
       name: data.name,
@@ -215,7 +220,12 @@ export const RoleSupabaseService = {
       .delete()
       .eq('id', id);
 
-    if (error) throw error;
+    if (error) {
+      if (error.code === '23503') {
+        throw new Error('No se puede eliminar un rol que tiene usuarios asignados. Primero reasigne los usuarios a otro rol.');
+      }
+      throw error;
+    }
   },
 
   // Get role hierarchy (retorna solo los roles raíz con sus hijos anidados)

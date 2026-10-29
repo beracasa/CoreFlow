@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { WorkOrderStatus, Priority, WorkOrder } from '../types';
+import { WorkOrderStatus, Priority, WorkOrder, WorkOrderStage } from '../types';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useWorkOrderStore } from '../src/stores/useWorkOrderStore';
@@ -43,6 +43,33 @@ export const MaintenanceKanban: React.FC = () => {
     { id: WorkOrderStatus.DONE, title: t('kanban.col.done') },
   ];
 
+  const validateOrderTransition = (order: WorkOrder, targetStatus: WorkOrderStatus): string | null => {
+    const hasSec2Signatures = Boolean(
+      order.signatureExecutor && order.signatureExecutor !== 'false' &&
+      order.signatureExecutionSupervisor && order.signatureExecutionSupervisor !== 'false'
+    );
+    const hasSec3Signature = Boolean(
+      order.signatureSupervisor && order.signatureSupervisor !== 'false'
+    );
+
+    if (targetStatus === WorkOrderStatus.REVIEW) {
+      if (!hasSec2Signatures) {
+        return 'No se puede avanzar a Supervisión / Revisión: Es obligatorio que el Ejecutante y el Supervisor firmen la intervención (Sección 2).';
+      }
+    }
+
+    if (targetStatus === WorkOrderStatus.DONE) {
+      if (!hasSec2Signatures) {
+        return 'No se puede cerrar el mantenimiento: Faltan las firmas de la intervención en la Sección 2 (Ejecutante y Supervisor).';
+      }
+      if (!hasSec3Signature) {
+        return 'No se puede cerrar el mantenimiento: Falta la firma de recepción y conformidad del Supervisor en la Sección 3 (Cierre y Entrega).';
+      }
+    }
+
+    return null;
+  };
+
   const handleMoveOrderColumn = async (order: WorkOrder, direction: number) => {
     if (!canEditKanban) return;
     const orderStatuses = [
@@ -55,8 +82,27 @@ export const MaintenanceKanban: React.FC = () => {
     if (currentIndex === -1) return;
     const newIndex = currentIndex + direction;
     if (newIndex >= 0 && newIndex < orderStatuses.length) {
+      const targetStatus = orderStatuses[newIndex];
+      const errorMsg = validateOrderTransition(order, targetStatus);
+      if (errorMsg) {
+        alert(`⚠️ ${errorMsg}`);
+        return;
+      }
+
+      const updates: Partial<WorkOrder> = { status: targetStatus };
+      if (targetStatus === WorkOrderStatus.REVIEW) {
+        updates.currentStage = WorkOrderStage.HANDOVER;
+      } else if (targetStatus === WorkOrderStatus.DONE) {
+        updates.currentStage = WorkOrderStage.CLOSED;
+        updates.completedDate = new Date().toISOString();
+      } else if (targetStatus === WorkOrderStatus.IN_PROGRESS) {
+        updates.currentStage = WorkOrderStage.EXECUTION;
+      } else if (targetStatus === WorkOrderStatus.BACKLOG) {
+        updates.currentStage = WorkOrderStage.REQUESTED;
+      }
+
       try {
-        await updateOrder(order.id, { status: orderStatuses[newIndex] });
+        await updateOrder(order.id, updates);
       } catch (err: any) {
         console.error('Error al actualizar estado:', err);
       }
@@ -165,8 +211,28 @@ export const MaintenanceKanban: React.FC = () => {
                 if (!orderId) return;
                 const order = workOrders.find(o => o.id === orderId);
                 if (order && order.status !== col.id) {
+                  const targetStatus = col.id as WorkOrderStatus;
+                  const errorMsg = validateOrderTransition(order, targetStatus);
+                  if (errorMsg) {
+                    alert(`⚠️ ${errorMsg}`);
+                    setDraggedOrderId(null);
+                    return;
+                  }
+
+                  const updates: Partial<WorkOrder> = { status: targetStatus };
+                  if (targetStatus === WorkOrderStatus.REVIEW) {
+                    updates.currentStage = WorkOrderStage.HANDOVER;
+                  } else if (targetStatus === WorkOrderStatus.DONE) {
+                    updates.currentStage = WorkOrderStage.CLOSED;
+                    updates.completedDate = new Date().toISOString();
+                  } else if (targetStatus === WorkOrderStatus.IN_PROGRESS) {
+                    updates.currentStage = WorkOrderStage.EXECUTION;
+                  } else if (targetStatus === WorkOrderStatus.BACKLOG) {
+                    updates.currentStage = WorkOrderStage.REQUESTED;
+                  }
+
                   try {
-                    await updateOrder(order.id, { status: col.id as WorkOrderStatus });
+                    await updateOrder(order.id, updates);
                   } catch (err: any) {
                     console.error('Error al soltar orden:', err);
                   }

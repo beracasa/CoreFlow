@@ -126,16 +126,32 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
    // The work order is formally created only once Section 1 has been submitted via 'Solicitar Mantenimiento'
    const isOrderCreated = Boolean(formData.id && formData.currentStage !== WorkOrderStage.DRAFT);
 
+   // Validar si las firmas requeridas de cada sección han sido registradas
+   const hasSection2Signatures = Boolean(
+      formData.signatureExecutor && formData.signatureExecutor !== 'false' &&
+      formData.signatureExecutionSupervisor && formData.signatureExecutionSupervisor !== 'false'
+   );
+
+   const hasSection3Signature = Boolean(
+      formData.signatureSupervisor && formData.signatureSupervisor !== 'false'
+   );
+
    const isSection1Editable = (!isOrderCreated && hasPermission('create_wo')) || (editingSection === 1 && hasPermission('edit_wo'));
    
    const isSection2Editable = isOrderCreated && (
       ((formData.currentStage === WorkOrderStage.REQUESTED || formData.currentStage === WorkOrderStage.EXECUTION) && hasPermission('execute_wo')) || 
+      (formData.currentStage === WorkOrderStage.HANDOVER && !hasSection2Signatures && (hasPermission('execute_wo') || hasPermission('supervise_order') || hasPermission('edit_wo'))) ||
       (editingSection === 2 && hasPermission('edit_wo'))
    );
 
-   const isSection3Editable = isOrderCreated && (
+   const isSection3Editable = isOrderCreated && hasSection2Signatures && (
       (formData.currentStage === WorkOrderStage.HANDOVER && hasPermission('supervise_order')) || 
       (editingSection === 3 && hasPermission('edit_wo'))
+   );
+
+   const canSignSection2 = Boolean(
+      isSection2Editable || 
+      (!hasSection2Signatures && (hasPermission('execute_wo') || hasPermission('supervise_order') || hasPermission('edit_wo')))
    );
 
 
@@ -590,7 +606,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
 
    const finishInterventions = async () => {
       // RBAC: Check permission
-      if (!hasPermission('execute_wo') && !hasPermission('edit_wo')) {
+      if (!hasPermission('execute_wo') && !hasPermission('edit_wo') && !hasPermission('supervise_order')) {
          setValidationError("Acceso denegado: No tiene permiso para finalizar intervenciones.");
          return;
       }
@@ -610,7 +626,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
 
       if (fields.size > 0) {
          setInvalidFields(fields);
-         setValidationError("Debe registrar la Firma del Ejecutante y la Firma del Supervisor en la Sección 2 antes de finalizar las intervenciones.");
+         setValidationError("Debe registrar la Firma del Ejecutante y la Firma del Supervisor en la Sección 2 antes de poder pasar a la próxima etapa.");
          return;
       }
 
@@ -662,7 +678,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
       }
       if (!formData.signatureSupervisor || formData.signatureSupervisor === 'false') {
          fields.add('signatureSupervisor');
-         errors.push("Falta la firma del supervisor de cierre.");
+         errors.push("Falta la firma de recepción y conformidad del supervisor de cierre en la Sección 3.");
       }
       if (!formData.signatureExecutor || formData.signatureExecutor === 'false') {
          fields.add('signatureExecutor');
@@ -675,7 +691,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
 
       if (fields.size > 0) {
          setInvalidFields(fields);
-         setValidationError("Existen campos obligatorios pendientes de validación o firma.");
+         setValidationError("Existen campos obligatorios o firmas pendientes. Se requiere la firma del Ejecutante y del Supervisor en la Sección 2, y la firma de Cierre del Supervisor en la Sección 3 para poder cerrar el mantenimiento.");
          
          // Scroll to first error? For now just show the banner.
          return;
@@ -695,7 +711,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
    };
 
    const signExecutor = () => {
-      if (!isSection2Editable) return;
+      if (!canSignSection2) return;
       if (formData.signatureExecutor && formData.signatureExecutor !== 'false') return;
 
       const techName = formData.assignedMechanic
@@ -711,7 +727,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
    };
 
    const signExecutionSupervisor = () => {
-      if (!isSection2Editable) return;
+      if (!canSignSection2) return;
       if (formData.signatureExecutionSupervisor && formData.signatureExecutionSupervisor !== 'false') return;
 
       setFormData(prev => ({
@@ -755,15 +771,15 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                      1. Solicitud {formData.currentStage !== WorkOrderStage.DRAFT && '✓'}
                   </div>
                   <span className="text-industrial-600">→</span>
-                  <div className={`px-2 py-0.5 rounded transition-colors font-bold ${formData.currentStage === WorkOrderStage.REQUESTED || formData.currentStage === WorkOrderStage.EXECUTION ? 'bg-pink-500 text-white' : (formData.currentStage === WorkOrderStage.HANDOVER || formData.currentStage === WorkOrderStage.CLOSED ? 'bg-industrial-800 text-pink-400' : 'bg-industrial-800 text-industrial-500')}`}>
-                     2. Intervenciones {(formData.currentStage === WorkOrderStage.HANDOVER || formData.currentStage === WorkOrderStage.CLOSED) && '✓'}
+                  <div className={`px-2 py-0.5 rounded transition-colors font-bold ${formData.currentStage === WorkOrderStage.REQUESTED || formData.currentStage === WorkOrderStage.EXECUTION ? 'bg-pink-500 text-white' : (formData.currentStage === WorkOrderStage.HANDOVER || formData.currentStage === WorkOrderStage.CLOSED ? (hasSection2Signatures ? 'bg-industrial-800 text-pink-400' : 'bg-amber-900/60 text-amber-400 border border-amber-500/40') : 'bg-industrial-800 text-industrial-500')}`}>
+                     2. Intervenciones {(formData.currentStage === WorkOrderStage.HANDOVER || formData.currentStage === WorkOrderStage.CLOSED) && hasSection2Signatures ? '✓' : (!hasSection2Signatures && (formData.currentStage === WorkOrderStage.HANDOVER || formData.currentStage === WorkOrderStage.CLOSED) ? '⚠️' : '')}
                   </div>
                   <span className="text-industrial-600">→</span>
-                  <div className={`px-2 py-0.5 rounded transition-colors font-bold ${formData.currentStage === WorkOrderStage.HANDOVER ? 'bg-emerald-500 text-white' : (formData.currentStage === WorkOrderStage.CLOSED ? 'bg-industrial-800 text-emerald-400' : 'bg-industrial-800 text-industrial-500')}`}>
-                     3. Cierre y Entrega {formData.currentStage === WorkOrderStage.CLOSED && '✓'}
+                  <div className={`px-2 py-0.5 rounded transition-colors font-bold ${formData.currentStage === WorkOrderStage.HANDOVER && hasSection2Signatures ? 'bg-emerald-500 text-white' : (formData.currentStage === WorkOrderStage.CLOSED && hasSection3Signature ? 'bg-industrial-800 text-emerald-400' : 'bg-industrial-800 text-industrial-500')}`}>
+                     3. Cierre y Entrega {formData.currentStage === WorkOrderStage.CLOSED && hasSection3Signature && '✓'}
                   </div>
                   <span className="text-industrial-600">→</span>
-                  <div className={`px-2 py-0.5 rounded transition-colors font-bold ${formData.currentStage === WorkOrderStage.CLOSED ? 'bg-emerald-600 text-white shadow-[0_0_10px_rgba(16,185,129,0.3)]' : 'bg-industrial-800 text-industrial-500'}`}>
+                  <div className={`px-2 py-0.5 rounded transition-colors font-bold ${formData.currentStage === WorkOrderStage.CLOSED && hasSection3Signature && hasSection2Signatures ? 'bg-emerald-600 text-white shadow-[0_0_10px_rgba(16,185,129,0.3)]' : 'bg-industrial-800 text-industrial-500'}`}>
                      4. Cerrado
                   </div>
                </div>
@@ -1930,10 +1946,13 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                            {/* Firma Ejecutante */}
                            <div>
-                              <label className="text-xs text-industrial-400 font-bold mb-2 block">Firma Ejecutante</label>
+                              <label className="text-xs text-industrial-400 font-bold mb-2 flex items-center justify-between">
+                                 <span>Firma Ejecutante</span>
+                                 <span className="text-[10px] text-pink-400 font-normal">Requerida para avanzar</span>
+                              </label>
                               <div
                                  onClick={signExecutor}
-                                 className={`h-24 bg-white/5 rounded border-2 border-dashed ${isSection2Editable && (!formData.signatureExecutor || formData.signatureExecutor === 'false') ? (invalidFields.has('signatureExecutor') ? 'border-red-500 bg-red-900/10' : 'border-pink-500/50 cursor-pointer hover:bg-white/10') : 'border-industrial-600'} flex items-center justify-center flex-col gap-1 transition-colors`}
+                                 className={`h-24 bg-white/5 rounded border-2 border-dashed ${canSignSection2 && (!formData.signatureExecutor || formData.signatureExecutor === 'false') ? (invalidFields.has('signatureExecutor') ? 'border-red-500 bg-red-900/10 cursor-pointer animate-pulse' : 'border-pink-500/50 cursor-pointer hover:bg-white/10') : 'border-industrial-600'} flex items-center justify-center flex-col gap-1 transition-colors`}
                               >
                                  {formData.signatureExecutor && formData.signatureExecutor !== 'false' ? (
                                     <>
@@ -1942,7 +1961,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                     </>
                                  ) : (
                                     <span className={`text-xs ${invalidFields.has('signatureExecutor') ? 'text-red-400 font-bold' : 'text-industrial-500'}`}>
-                                       {isSection2Editable ? 'Click para Firmar (Ejecutante)' : 'Firma Pendiente'}
+                                       {canSignSection2 ? 'Click para Firmar (Ejecutante)' : 'Firma Pendiente'}
                                     </span>
                                  )}
                               </div>
@@ -1950,10 +1969,13 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
 
                            {/* Firma Supervisor (Conformidad) */}
                            <div>
-                              <label className="text-xs text-industrial-400 font-bold mb-2 block">Firma Supervisor (Conformidad)</label>
+                              <label className="text-xs text-industrial-400 font-bold mb-2 flex items-center justify-between">
+                                 <span>Firma Supervisor (Conformidad)</span>
+                                 <span className="text-[10px] text-pink-400 font-normal">Requerida para avanzar</span>
+                              </label>
                               <div
                                  onClick={signExecutionSupervisor}
-                                 className={`h-24 bg-white/5 rounded border-2 border-dashed ${isSection2Editable && (!formData.signatureExecutionSupervisor || formData.signatureExecutionSupervisor === 'false') ? (invalidFields.has('signatureExecutionSupervisor') ? 'border-red-500 bg-red-900/10' : 'border-pink-500/50 cursor-pointer hover:bg-white/10') : 'border-industrial-600'} flex items-center justify-center flex-col gap-1 transition-colors`}
+                                 className={`h-24 bg-white/5 rounded border-2 border-dashed ${canSignSection2 && (!formData.signatureExecutionSupervisor || formData.signatureExecutionSupervisor === 'false') ? (invalidFields.has('signatureExecutionSupervisor') ? 'border-red-500 bg-red-900/10 cursor-pointer animate-pulse' : 'border-pink-500/50 cursor-pointer hover:bg-white/10') : 'border-industrial-600'} flex items-center justify-center flex-col gap-1 transition-colors`}
                               >
                                  {formData.signatureExecutionSupervisor && formData.signatureExecutionSupervisor !== 'false' ? (
                                     <>
@@ -1962,7 +1984,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                     </>
                                  ) : (
                                     <span className={`text-xs ${invalidFields.has('signatureExecutionSupervisor') ? 'text-red-400 font-bold' : 'text-industrial-500'}`}>
-                                       {isSection2Editable ? 'Click para Firmar (Supervisor)' : 'Firma Pendiente'}
+                                       {canSignSection2 ? 'Click para Firmar (Supervisor)' : 'Firma Pendiente'}
                                     </span>
                                  )}
                               </div>
@@ -1971,7 +1993,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                      </div>
                   </div>
 
-                  {isSection2Editable && (formData.currentStage === WorkOrderStage.REQUESTED || formData.currentStage === WorkOrderStage.EXECUTION) && (
+                  {isSection2Editable && (formData.currentStage === WorkOrderStage.REQUESTED || formData.currentStage === WorkOrderStage.EXECUTION || (formData.currentStage === WorkOrderStage.HANDOVER && !hasSection2Signatures)) && (
                      <div className="p-4 border-t border-pink-500/30 flex justify-end gap-3">
                         <button 
                            type="button" 
@@ -2032,15 +2054,19 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                         <span>
                            {formData.currentStage === WorkOrderStage.CLOSED
                               ? 'Esta orden de mantenimiento ya ha sido formalmente cerrada.'
-                              : 'Esta sección se habilitará una vez finalizadas las intervenciones de mantenimiento en la Sección 2 (haga clic en "Finalizar Intervenciones").'}
+                              : !hasSection2Signatures
+                                 ? 'Esta sección requiere obligatoriamente las firmas del Ejecutante y del Supervisor en la Sección 2 (Intervenciones de Mantenimiento) para poder ser habilitada.'
+                                 : 'Esta sección se habilitará una vez finalizadas las intervenciones de mantenimiento en la Sección 2 (haga clic en "Finalizar Intervenciones").'}
                         </span>
                      </div>
                   )}
 
                   <div className={`p-6 space-y-8 ${!isSection3Editable ? 'opacity-50 pointer-events-none select-none filter grayscale-[30%]' : ''}`}>
-                     {/* 1. Checklist - R-MANT-05 Specific Options */}
+                     {/* 1. Checklist - Specific Options */}
                      <div>
-                        <h4 className="text-sm font-bold text-white mb-4 uppercase border-b border-industrial-700 pb-2">Entrega del área o equipo donde se realizó el trabajo correctivo</h4>
+                        <h4 className="text-sm font-bold text-white mb-4 uppercase border-b border-industrial-700 pb-2">
+                           {type === 'R-MANT-02' ? 'Entrega del área o equipo donde se realizó el trabajo preventivo' : 'Entrega del área o equipo donde se realizó el trabajo correctivo'}
+                        </h4>
                         <div className="space-y-4">
                            {[
                               { key: 'pointClean', label: 'Punto específico de intervención limpio libre de contaminantes (grasas u otros químicos)' },
@@ -2148,11 +2174,10 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
 
                         {/* Supervisor Signature */}
                         <div className="mt-6 max-w-md">
-
                            <div>
-                              <label className="text-xs text-industrial-400 font-bold mb-2 block">
-                                 Firma Supervisor (Conformidad)
-                                 <span className="text-[10px] text-industrial-500 font-normal ml-2">Recepción total del trabajo y cierre</span>
+                              <label className="text-xs text-industrial-400 font-bold mb-2 flex items-center justify-between">
+                                 <span>Firma Supervisor (Conformidad de Cierre)</span>
+                                 <span className="text-[10px] text-emerald-400 font-normal">Requerida para cerrar el mantenimiento</span>
                               </label>
                               <div
                                  onClick={() => {
@@ -2161,7 +2186,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                        clearInvalidField('signatureSupervisor');
                                     }
                                  }}
-                                 className={`h-24 bg-white/5 rounded border-2 border-dashed ${isSection3Editable && (!formData.signatureSupervisor || formData.signatureSupervisor === 'false') ? (invalidFields.has('signatureSupervisor') ? 'border-red-500 bg-red-900/10' : 'border-emerald-500/50 cursor-pointer hover:bg-white/10') : 'border-industrial-600'} flex items-center justify-center flex-col gap-1 transition-colors`}
+                                 className={`h-24 bg-white/5 rounded border-2 border-dashed ${isSection3Editable && (!formData.signatureSupervisor || formData.signatureSupervisor === 'false') ? (invalidFields.has('signatureSupervisor') ? 'border-red-500 bg-red-900/10 cursor-pointer animate-pulse' : 'border-emerald-500/50 cursor-pointer hover:bg-white/10') : 'border-industrial-600'} flex items-center justify-center flex-col gap-1 transition-colors`}
                               >
                                  {formData.signatureSupervisor && formData.signatureSupervisor !== 'false' ? (
                                     <>
@@ -2170,7 +2195,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                     </>
                                  ) : (
                                     <span className={`text-xs ${invalidFields.has('signatureSupervisor') ? 'text-red-400 font-bold' : 'text-industrial-500'}`}>
-                                       {isSection3Editable ? 'Click to Sign (Supervisor)' : 'Pending Signature'}
+                                       {isSection3Editable ? 'Click para Firmar (Supervisor - Cierre y Entrega)' : 'Firma Pendiente'}
                                     </span>
                                  )}
                               </div>
@@ -2183,9 +2208,13 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                      isSection3Editable && formData.currentStage === WorkOrderStage.HANDOVER && (
                         <div className="p-4 border-t border-emerald-500/30 flex justify-end gap-4">
                            <button 
-                              type="button"
+                              type="button" 
                               disabled={isSaving}
-                              onClick={() => setFormData(p => ({ ...p, currentStage: WorkOrderStage.EXECUTION, status: WorkOrderStatus.IN_PROGRESS }))} 
+                              onClick={async () => {
+                                 const updated = { ...formData, currentStage: WorkOrderStage.EXECUTION, status: WorkOrderStatus.IN_PROGRESS };
+                                 setFormData(updated);
+                                 await handleInternalSave(updated as WorkOrder, true);
+                              }} 
                               className="text-industrial-400 hover:text-white text-sm underline disabled:opacity-50 disabled:cursor-not-allowed"
                            >
                               Rechazar (Volver a Intervenciones)

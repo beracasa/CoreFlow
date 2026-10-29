@@ -148,6 +148,8 @@ export class WorkOrderSupabaseService implements IWorkOrderService {
             // Signatures
             signature_executor: order.signatureExecutor,
             signature_executor_date: order.signatureExecutorDate,
+            signature_execution_supervisor: order.signatureExecutionSupervisor,
+            signature_execution_supervisor_date: order.signatureExecutionSupervisorDate,
             signature_supervisor: order.signatureSupervisor,
             signature_supervisor_date: order.signatureSupervisorDate,
         };

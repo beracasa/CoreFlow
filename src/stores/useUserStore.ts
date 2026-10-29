@@ -19,7 +19,7 @@ interface UserState {
   deleteUser: (id: string) => Promise<void>;
 
   fetchRoles: () => Promise<void>;
-  addRole: (role: Omit<RoleDefinition, 'id'>) => Promise<void>;
+  addRole: (role: Omit<RoleDefinition, 'id'>) => Promise<RoleDefinition>;
   updateRole: (role: RoleDefinition) => Promise<void>;
   deleteRole: (id: string) => Promise<void>;
 
@@ -140,8 +140,10 @@ export const useUserStore = create<UserState>((set, get) => ({
     try {
       const newRole = await RoleSupabaseService.createRole(role);
       set(state => ({ roles: [...state.roles, newRole] }));
+      return newRole;
     } catch (error: any) {
       set({ error: error.message });
+      throw error;
     }
   },
 
@@ -151,6 +153,7 @@ export const useUserStore = create<UserState>((set, get) => ({
       set(state => ({ roles: state.roles.map(r => r.id === role.id ? role : r) }));
     } catch (error: any) {
       set({ error: error.message });
+      throw error;
     }
   },
 
@@ -160,6 +163,7 @@ export const useUserStore = create<UserState>((set, get) => ({
       set(state => ({ roles: state.roles.filter(r => r.id !== id) }));
     } catch (error: any) {
       set({ error: error.message });
+      throw error;
     }
   },
 

@@ -1,9 +1,15 @@
 
 import React, { useState } from 'react';
-import { RoleDefinition, Permission } from '../../types';
+import { RoleDefinition, Permission, UserRole } from '../../types';
 import { Shield, Lock, CheckSquare, Square, Save, Plus, Trash2, ChevronDown, ChevronRight, Users, AlertCircle } from 'lucide-react';
 import { useUserStore } from '../../src/stores/useUserStore';
 import { useAuth } from '../../contexts/AuthContext';
+
+const isProtectedRole = (role?: Partial<RoleDefinition> | null): boolean => {
+    if (!role) return false;
+    const normalizedName = (role.name || '').trim().toLowerCase();
+    return Boolean(role.isSystem || normalizedName === 'admin' || normalizedName === 'administrador');
+};
 
 // --- DEFINICIÓN DE PERMISOS DEL SISTEMA ---
 const SYSTEM_PERMISSIONS: Permission[] = [
@@ -83,7 +89,7 @@ const RoleTreeItem: React.FC<RoleTreeItemProps> = ({ role, selectedId, onSelect,
         </span>
         
         {/* System Lock Icon */}
-        {(role.isSystem || role.name.includes('Admin')) && <Lock size={12} className="text-industrial-500" />}
+        {isProtectedRole(role) && <Lock size={12} className="text-industrial-500" />}
         
         {/* Users Count */}
         <span className="text-[10px] bg-industrial-900 text-industrial-400 px-1.5 py-0.5 rounded flex items-center gap-1">
@@ -112,8 +118,8 @@ const RoleTreeItem: React.FC<RoleTreeItemProps> = ({ role, selectedId, onSelect,
 
 export const RoleManagement: React.FC = () => {
     const { roles, roleTree, fetchRoles, addRole, updateRole, deleteRole } = useUserStore();
-    const { hasPermission } = useAuth();
-    const canManage = hasPermission('manage_roles');
+    const { hasPermission, hasRole } = useAuth();
+    const canManage = hasRole([UserRole.ADMIN_SOLICITANTE]) || hasPermission('manage_roles');
     const [selectedRole, setSelectedRole] = useState<RoleDefinition | null>(null);
     const [isEditing, setIsEditing] = useState(false);
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -127,18 +133,21 @@ export const RoleManagement: React.FC = () => {
         permissions: {}
     });
 
+    const isCurrentRoleProtected = !showCreateModal && Boolean(selectedRole && isProtectedRole(selectedRole));
+
     // Cargar roles al montar
     React.useEffect(() => {
         fetchRoles();
     }, []);
 
-    // Seleccionar primer rol al cargar
+    // Seleccionar primer rol editable al cargar (solo si no estamos creando uno nuevo)
     React.useEffect(() => {
-        if (roles.length > 0 && !selectedRole) {
-            setSelectedRole(roles[0]);
-            setFormData(roles[0]);
+        if (roles.length > 0 && !selectedRole && !showCreateModal) {
+            const defaultRole = roles.find(r => !isProtectedRole(r)) || roles[0];
+            setSelectedRole(defaultRole);
+            setFormData(defaultRole);
         }
-    }, [roles]);
+    }, [roles, selectedRole, showCreateModal]);
 
     const handleSelectRole = (role: RoleDefinition) => {
         setSelectedRole(role);
@@ -149,10 +158,11 @@ export const RoleManagement: React.FC = () => {
 
     const handleCreateRole = () => {
         if (!canManage) return;
+        const defaultParentId = selectedRole && !isProtectedRole(selectedRole) ? selectedRole.id : null;
         const newRoleData: Partial<RoleDefinition> = {
-            name: 'Nuevo Rol',
-            description: 'Descripción del rol...',
-            parentRoleId: null,
+            name: '',
+            description: '',
+            parentRoleId: defaultParentId,
             isSystem: false,
             permissions: {}
         };
@@ -163,11 +173,25 @@ export const RoleManagement: React.FC = () => {
     };
 
     const handleSaveNewRole = async () => {
+        const trimmedName = (formData.name || '').trim();
+        if (!trimmedName) {
+            alert('Por favor ingrese un nombre para el nuevo rol.');
+            return;
+        }
+
         try {
-            await addRole(formData as Omit<RoleDefinition, 'id'>);
+            const createdRole = await addRole({
+                ...formData,
+                name: trimmedName,
+                description: formData.description || '',
+                parentRoleId: formData.parentRoleId || null,
+                isSystem: false,
+                permissions: formData.permissions || {}
+            } as Omit<RoleDefinition, 'id'>);
             setShowCreateModal(false);
             setIsEditing(false);
-            // Refrescar para obtener el nuevo rol con ID
+            setSelectedRole(createdRole);
+            setFormData(createdRole);
             await fetchRoles();
         } catch (error: any) {
             alert(`Error al crear rol: ${error.message}`);
@@ -183,8 +207,7 @@ export const RoleManagement: React.FC = () => {
     ];
 
     const togglePermission = (permId: string) => {
-        if (!canManage) return;
-        if (formData.name?.includes('Admin')) return;
+        if (!canManage || isCurrentRoleProtected) return;
         const currentPerms = formData.permissions as Record<string, boolean> || {};
         const willBeEnabled = !currentPerms[permId];
         const newPerms = {
@@ -219,15 +242,23 @@ export const RoleManagement: React.FC = () => {
 
     const handleSave = async () => {
         if (!canManage) return;
-        if (!selectedRole) {
+        if (!selectedRole || showCreateModal) {
             // Modo creación
             await handleSaveNewRole();
             return;
         }
         
+        const trimmedName = (formData.name || '').trim();
+        if (!trimmedName) {
+            alert('El nombre del rol no puede estar vacío.');
+            return;
+        }
+
         try {
-            await updateRole({ ...selectedRole, ...formData } as RoleDefinition);
-            setSelectedRole({ ...selectedRole, ...formData } as RoleDefinition);
+            const updatedPayload = { ...selectedRole, ...formData, name: trimmedName } as RoleDefinition;
+            await updateRole(updatedPayload);
+            setSelectedRole(updatedPayload);
+            setFormData(updatedPayload);
             setIsEditing(false);
         } catch (error: any) {
             alert(`Error al guardar: ${error.message}`);
@@ -237,9 +268,7 @@ export const RoleManagement: React.FC = () => {
     const handleDelete = async () => {
         if (!canManage || !selectedRole) return;
         
-        const isProtected = selectedRole.isSystem || selectedRole.name.includes('Admin');
-        
-        if (isProtected) {
+        if (isProtectedRole(selectedRole)) {
             alert("No se pueden eliminar roles del sistema o de administración.");
             return;
         }
@@ -300,10 +329,10 @@ export const RoleManagement: React.FC = () => {
                     {canManage && (
                         <button 
                             onClick={handleCreateRole}
-                            className="p-1.5 bg-industrial-700 hover:bg-industrial-600 rounded text-white transition-colors"
+                            className="px-2.5 py-1.5 bg-industrial-accent hover:bg-blue-600 rounded text-white text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm"
                             title="Crear Nuevo Rol"
                         >
-                            <Plus size={16} />
+                            <Plus size={14} /> Nuevo Rol
                         </button>
                     )}
                 </div>
@@ -335,15 +364,25 @@ export const RoleManagement: React.FC = () => {
                     <>
                         {/* Header */}
                         <div className="p-6 border-b border-industrial-700 bg-industrial-900/30">
+                            {showCreateModal && (
+                                <div className="mb-4 px-3 py-2 bg-industrial-accent/15 border border-industrial-accent/40 rounded flex items-center justify-between">
+                                    <span className="text-xs font-bold text-blue-300 uppercase tracking-wider flex items-center gap-2">
+                                        <Plus size={14} /> Creando Nuevo Rol
+                                    </span>
+                                    <span className="text-xs text-industrial-400">
+                                        Complete los datos y seleccione los permisos para el nuevo rol
+                                    </span>
+                                </div>
+                            )}
                             <div className="space-y-4">
                                 {/* Nombre */}
                                 <div>
                                     <label className="block text-xs font-medium text-industrial-400 mb-1">Nombre del Rol</label>
                                     <input 
                                         type="text" 
-                                        disabled={!canManage || formData.name?.includes('Admin')}
+                                        disabled={!canManage || isCurrentRoleProtected}
                                         className="w-full bg-industrial-900 border border-industrial-600 rounded px-3 py-2 text-white text-lg font-bold outline-none focus:border-industrial-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                        placeholder="Ingrese un nombre para este rol"
+                                        placeholder="Ej: Coordinador de Mantenimiento"
                                         value={formData.name || ''}
                                         onChange={(e) => {
                                             setFormData({...formData, name: e.target.value});
@@ -362,7 +401,7 @@ export const RoleManagement: React.FC = () => {
                                             setFormData({...formData, parentRoleId: e.target.value || null});
                                             setIsEditing(true);
                                         }}
-                                        disabled={!canManage || formData.name?.includes('Admin')}
+                                        disabled={!canManage || isCurrentRoleProtected}
                                     >
                                         <option value="">-- Sin Jefe Directo (Rol Raíz) --</option>
                                         {getAvailableParentRoles().map(r => (
@@ -375,7 +414,7 @@ export const RoleManagement: React.FC = () => {
                                 <div>
                                     <label className="block text-xs font-medium text-industrial-400 mb-1">Descripción</label>
                                     <textarea 
-                                        disabled={!canManage || formData.name?.includes('Admin')}
+                                        disabled={!canManage || isCurrentRoleProtected}
                                         className="w-full bg-industrial-900 border border-industrial-600 rounded px-3 py-2 text-white text-sm outline-none focus:border-industrial-accent transition-colors resize-none disabled:opacity-50 disabled:cursor-not-allowed"
                                         placeholder="Ingrese una descripción para este rol"
                                         rows={2}
@@ -388,16 +427,24 @@ export const RoleManagement: React.FC = () => {
                                 </div>
                                 
                                 {/* Botones de Acción */}
-                                <div className="flex gap-2 pt-2">
-                                    {isEditing && canManage && (
+                                <div className="flex flex-wrap gap-2 pt-2">
+                                    {(isEditing || showCreateModal) && canManage && !isCurrentRoleProtected && (
                                         <button 
                                             onClick={handleSave}
                                             className="px-4 py-2 bg-industrial-accent hover:bg-blue-600 text-white text-sm font-bold rounded shadow-lg flex items-center gap-2"
                                         >
-                                            <Save size={14} /> Guardar Cambios
+                                            <Save size={14} /> {showCreateModal ? 'Crear Rol' : 'Guardar Cambios'}
                                         </button>
                                     )}
-                                    {selectedRole && canManage && !(selectedRole.isSystem || selectedRole.name.includes('Admin')) && (
+                                    {!showCreateModal && canManage && (
+                                        <button 
+                                            onClick={handleCreateRole}
+                                            className="px-4 py-2 bg-industrial-700 hover:bg-industrial-600 text-white border border-industrial-600 text-sm font-bold rounded flex items-center gap-2 transition-colors"
+                                        >
+                                            <Plus size={14} /> Crear Nuevo Rol
+                                        </button>
+                                    )}
+                                    {selectedRole && !showCreateModal && canManage && !isCurrentRoleProtected && (
                                         <button 
                                             onClick={handleDelete}
                                             className="px-4 py-2 bg-red-900/30 hover:bg-red-900/50 text-red-400 border border-red-900/50 text-sm font-bold rounded flex items-center gap-2"
@@ -409,8 +456,10 @@ export const RoleManagement: React.FC = () => {
                                         <button 
                                             onClick={() => {
                                                 setShowCreateModal(false);
-                                                setFormData({});
                                                 setIsEditing(false);
+                                                const fallbackRole = roles.find(r => !isProtectedRole(r)) || roles[0] || null;
+                                                setSelectedRole(fallbackRole);
+                                                setFormData(fallbackRole || {});
                                             }}
                                             className="px-4 py-2 bg-industrial-700 hover:bg-industrial-600 text-white text-sm font-bold rounded"
                                         >
@@ -435,8 +484,7 @@ export const RoleManagement: React.FC = () => {
                                             {perms.map(perm => {
                                                 const permsObj = formData.permissions as Record<string, boolean> || {};
                                                 const isEnabled = permsObj[perm.id] || false;
-                                                const isAdmin = formData.name?.includes('Admin');
-                                                const isReadOnly = isAdmin || !canManage;
+                                                const isReadOnly = isCurrentRoleProtected || !canManage;
                                                 return (
                                                     <div 
                                                         key={perm.id} 
