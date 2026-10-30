@@ -313,6 +313,18 @@ export const generateRMant02PDF = (order: WorkOrder, machine?: Machine, logoUrl?
         tableRows.push(row);
       });
 
+      // Etiquetas verticales para la matriz de acciones (columnas 10 a 17)
+      const verticalActionHeaders: Record<number, string> = {
+        10: 'Desmontaje',
+        11: 'Limpieza',
+        12: 'Controlar',
+        13: 'Lubricación',
+        14: 'Cambio',
+        15: 'Montaje',
+        16: 'Ajuste-Calib.',
+        17: 'Llenado'
+      };
+
       // Headers exactos de la creación
       const tableHeaders = [
         [
@@ -321,22 +333,22 @@ export const generateRMant02PDF = (order: WorkOrder, machine?: Machine, logoUrl?
           { content: 'Punto de intervención', rowSpan: 2, styles: { halign: 'center' as const, valign: 'middle' as const } },
           { content: 'Tipo de intervención', rowSpan: 2, styles: { halign: 'center' as const, valign: 'middle' as const } },
           { content: 'Ref. de interv.\nCat. Mtto', rowSpan: 2, styles: { halign: 'center' as const, valign: 'middle' as const } },
-          { content: 'Materiales / Repuestos', colSpan: 4, styles: { halign: 'center' as const, fillColor: [80, 95, 80] as [number, number, number] } },
+          { content: 'Materiales / Repuestos', colSpan: 4, styles: { halign: 'center' as const, valign: 'middle' as const, fillColor: [80, 95, 80] as [number, number, number] } },
           { content: 'Tiem.\nEstim\nmin', rowSpan: 2, styles: { halign: 'center' as const, valign: 'middle' as const } },
-          { content: 'D', rowSpan: 2, styles: { halign: 'center' as const, valign: 'middle' as const, fillColor: [44, 62, 80] as [number, number, number] } },
-          { content: 'L', rowSpan: 2, styles: { halign: 'center' as const, valign: 'middle' as const, fillColor: [44, 62, 80] as [number, number, number] } },
-          { content: 'C', rowSpan: 2, styles: { halign: 'center' as const, valign: 'middle' as const, fillColor: [44, 62, 80] as [number, number, number] } },
-          { content: 'Lu', rowSpan: 2, styles: { halign: 'center' as const, valign: 'middle' as const, fillColor: [44, 62, 80] as [number, number, number] } },
-          { content: 'Ca', rowSpan: 2, styles: { halign: 'center' as const, valign: 'middle' as const, fillColor: [44, 62, 80] as [number, number, number] } },
-          { content: 'M', rowSpan: 2, styles: { halign: 'center' as const, valign: 'middle' as const, fillColor: [44, 62, 80] as [number, number, number] } },
-          { content: 'A-C', rowSpan: 2, styles: { halign: 'center' as const, valign: 'middle' as const, fillColor: [44, 62, 80] as [number, number, number] } },
-          { content: 'Ll', rowSpan: 2, styles: { halign: 'center' as const, valign: 'middle' as const, fillColor: [44, 62, 80] as [number, number, number] } }
+          { content: '', rowSpan: 2, styles: { halign: 'center' as const, valign: 'middle' as const, fillColor: [44, 62, 80] as [number, number, number], minCellHeight: 18 } },
+          { content: '', rowSpan: 2, styles: { halign: 'center' as const, valign: 'middle' as const, fillColor: [44, 62, 80] as [number, number, number], minCellHeight: 18 } },
+          { content: '', rowSpan: 2, styles: { halign: 'center' as const, valign: 'middle' as const, fillColor: [44, 62, 80] as [number, number, number], minCellHeight: 18 } },
+          { content: '', rowSpan: 2, styles: { halign: 'center' as const, valign: 'middle' as const, fillColor: [44, 62, 80] as [number, number, number], minCellHeight: 18 } },
+          { content: '', rowSpan: 2, styles: { halign: 'center' as const, valign: 'middle' as const, fillColor: [44, 62, 80] as [number, number, number], minCellHeight: 18 } },
+          { content: '', rowSpan: 2, styles: { halign: 'center' as const, valign: 'middle' as const, fillColor: [44, 62, 80] as [number, number, number], minCellHeight: 18 } },
+          { content: '', rowSpan: 2, styles: { halign: 'center' as const, valign: 'middle' as const, fillColor: [44, 62, 80] as [number, number, number], minCellHeight: 18 } },
+          { content: '', rowSpan: 2, styles: { halign: 'center' as const, valign: 'middle' as const, fillColor: [44, 62, 80] as [number, number, number], minCellHeight: 18 } }
         ],
         [
-          { content: 'Tipo Lub.', styles: { halign: 'center' as const } },
-          { content: 'Nombre', styles: { halign: 'center' as const } },
-          { content: 'Código', styles: { halign: 'center' as const } },
-          { content: 'Cant.', styles: { halign: 'center' as const } }
+          { content: 'Tipo Lub.', styles: { halign: 'center' as const, valign: 'middle' as const } },
+          { content: 'Nombre', styles: { halign: 'center' as const, valign: 'middle' as const } },
+          { content: 'Código', styles: { halign: 'center' as const, valign: 'middle' as const } },
+          { content: 'Cant.', styles: { halign: 'center' as const, valign: 'middle' as const } }
         ]
       ];
 
@@ -385,6 +397,19 @@ export const generateRMant02PDF = (order: WorkOrder, machine?: Machine, logoUrl?
           { content: `${totalEstTime} min`, styles: { halign: 'center' as const, fontStyle: 'bold' as const, fillColor: [255, 255, 255] as [number, number, number] } },
           { content: '', colSpan: 8, styles: { fillColor: [240, 240, 240] as [number, number, number] } }
         ]],
+        didDrawCell: (data: any) => {
+          if (data.section === 'head' && data.row.index === 0 && verticalActionHeaders[data.column.index]) {
+            const label = verticalActionHeaders[data.column.index];
+            const cell = data.cell;
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(5.5);
+            doc.setTextColor(255, 255, 255);
+            const textWidth = doc.getTextWidth(label);
+            const x = cell.x + cell.width / 2 + 0.65;
+            const y = cell.y + (cell.height + textWidth) / 2;
+            doc.text(label, x, y, { angle: 90 });
+          }
+        },
         margin: { left: margin, right: margin }
       });
 
@@ -829,7 +854,7 @@ export const generateRMant02PDF = (order: WorkOrder, machine?: Machine, logoUrl?
     doc.setLineWidth(0.15);
     doc.line(margin, 264, pageWidth - margin, 264);
     
-    doc.text("CoreFlow CMMS • Registro de Calidad • R-MANT-02 Preventivo", margin, 269);
+    doc.text("CoreFlow CMMS • Registro de Calidad • R-MANT-02 Preventivo • Rev. 01 - 29/10/2026", margin, 269);
     doc.text(`Página ${i} de ${totalPages}`, pageWidth - margin, 269, { align: 'right' });
   }
 
@@ -1578,7 +1603,7 @@ export const generateRMant05PDF = (order: WorkOrder, machine?: Machine, logoUrl?
     doc.setLineWidth(0.15);
     doc.line(margin, 264, pageWidth - margin, 264);
     
-    doc.text("CoreFlow CMMS • Registro de Calidad • R-MANT-05 Correctivo", margin, 269);
+    doc.text("CoreFlow CMMS • Registro de Calidad • R-MANT-05 Correctivo • Rev. 01 - 29/10/2026", margin, 269);
     doc.text(`Página ${i} de ${totalPages}`, pageWidth - margin, 269, { align: 'right' });
   }
 
