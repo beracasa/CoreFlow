@@ -13,6 +13,7 @@ lerna-debug.log*
 !.env.example
 
 node_modules
+node_modules.nosync
 dist
 dist-ssr
 *.local

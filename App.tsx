@@ -227,6 +227,7 @@ const MaintenanceFormPage = () => {
 
   return (
     <MaintenanceForm
+      key={orderId || 'new'}
       type={existingOrder?.formType || (state?.type as any) || 'R-MANT-02'}
       machines={machines}
       technicians={technicians}
@@ -237,7 +238,7 @@ const MaintenanceFormPage = () => {
           const existing = getOrderById(order.id);
           if (existing) {
             await updateOrder(order.id, order);
-            return existing;
+            return { ...existing, ...order };
           } else {
             const newOrder = await addOrder(order);
             return newOrder;

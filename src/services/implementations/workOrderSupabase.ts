@@ -72,6 +72,8 @@ export class WorkOrderSupabaseService implements IWorkOrderService {
             signatureExecutionSupervisorDate: record.signature_execution_supervisor_date || (record.checklist as any)?._executionSupervisorSignatureDate,
             signatureSupervisor: record.signature_supervisor,
             signatureSupervisorDate: record.signature_supervisor_date,
+            interventionsClosed: (record.checklist as any)?._interventionsClosed ?? (Boolean(record.signature_execution_supervisor) || record.current_stage === 'HANDOVER' || record.current_stage === 'CLOSED'),
+            interventionsClosedDate: (record.checklist as any)?._interventionsClosedDate,
         } as WorkOrder;
     }
 
@@ -107,16 +109,21 @@ export class WorkOrderSupabaseService implements IWorkOrderService {
             total_maintenance_cost: order.totalMaintenanceCost,
 
             // JSON fields
-            checklist: order.checklist ? {
-                ...order.checklist,
-                ...(order.signatureExecutionSupervisor ? {
-                    _executionSupervisorSignature: order.signatureExecutionSupervisor,
-                    _executionSupervisorSignatureDate: order.signatureExecutionSupervisorDate
-                } : {})
-            } : (order.signatureExecutionSupervisor ? {
-                _executionSupervisorSignature: order.signatureExecutionSupervisor,
-                _executionSupervisorSignatureDate: order.signatureExecutionSupervisorDate
-            } : undefined),
+            checklist: (() => {
+                const ch = { ...(order.checklist || {}) };
+                if (order.signatureExecutionSupervisor) {
+                    ch._executionSupervisorSignature = order.signatureExecutionSupervisor;
+                    ch._executionSupervisorSignatureDate = order.signatureExecutionSupervisorDate;
+                } else if (order.signatureExecutionSupervisor === null || order.signatureExecutionSupervisor === '') {
+                    delete ch._executionSupervisorSignature;
+                    delete ch._executionSupervisorSignatureDate;
+                }
+                if (order.interventionsClosed !== undefined) {
+                    ch._interventionsClosed = order.interventionsClosed;
+                    ch._interventionsClosedDate = order.interventionsClosedDate;
+                }
+                return ch;
+            })(),
             consumed_parts: order.consumedParts,
             executors: order.executors,
             tasks: order.tasks,
@@ -148,8 +155,6 @@ export class WorkOrderSupabaseService implements IWorkOrderService {
             // Signatures
             signature_executor: order.signatureExecutor,
             signature_executor_date: order.signatureExecutorDate,
-            signature_execution_supervisor: order.signatureExecutionSupervisor,
-            signature_execution_supervisor_date: order.signatureExecutionSupervisorDate,
             signature_supervisor: order.signatureSupervisor,
             signature_supervisor_date: order.signatureSupervisorDate,
         };
