@@ -313,6 +313,8 @@ export interface WorkOrder {
   signatureExecutionSupervisorDate?: string;
   signatureSupervisor?: string; // Name of supervisor for final closure (Section 3)
   signatureSupervisorDate?: string;
+  interventionsClosed?: boolean;
+  interventionsClosedDate?: string;
   tasks?: any[];
   branch?: string;
 }

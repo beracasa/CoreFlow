@@ -108,6 +108,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
    const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
    const [machineSearchTerm, setMachineSearchTerm] = useState('');
    const [validationError, setValidationError] = useState<string | null>(null);
+   const [successMessage, setSuccessMessage] = useState<string | null>(null);
    const [invalidFields, setInvalidFields] = useState<Set<string>>(new Set());
    const clearInvalidField = (field: string) => {
       setInvalidFields(prev => {
@@ -136,12 +137,23 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
       formData.signatureSupervisor && formData.signatureSupervisor !== 'false'
    );
 
+   // Determinar si las intervenciones han sido formalmente cerradas por el ejecutante
+   const isInterventionClosed = Boolean(
+      formData.interventionsClosed ||
+      (formData.checklist as any)?._interventionsClosed ||
+      (formData.signatureExecutionSupervisor && formData.signatureExecutionSupervisor !== 'false') ||
+      formData.currentStage === WorkOrderStage.HANDOVER ||
+      formData.currentStage === WorkOrderStage.CLOSED
+   );
+
    const isSection1Editable = (!isOrderCreated && hasPermission('create_wo')) || (editingSection === 1 && hasPermission('edit_wo'));
    
    const isSection2Editable = isOrderCreated && (
-      ((formData.currentStage === WorkOrderStage.REQUESTED || formData.currentStage === WorkOrderStage.EXECUTION) && hasPermission('execute_wo')) || 
-      (formData.currentStage === WorkOrderStage.HANDOVER && !hasSection2Signatures && (hasPermission('execute_wo') || hasPermission('supervise_order') || hasPermission('edit_wo'))) ||
-      (editingSection === 2 && hasPermission('edit_wo'))
+      (editingSection === 2 && hasPermission('edit_wo')) ||
+      (!isInterventionClosed && (
+         ((formData.currentStage === WorkOrderStage.REQUESTED || formData.currentStage === WorkOrderStage.EXECUTION) && (hasPermission('execute_wo') || hasPermission('edit_wo') || hasPermission('supervise_order'))) || 
+         (formData.currentStage === WorkOrderStage.HANDOVER && !hasSection2Signatures && (hasPermission('execute_wo') || hasPermission('supervise_order') || hasPermission('edit_wo')))
+      ))
    );
 
    const isSection3Editable = isOrderCreated && hasSection2Signatures && (
@@ -149,10 +161,19 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
       (editingSection === 3 && hasPermission('edit_wo'))
    );
 
-   const canSignSection2 = Boolean(
-      isSection2Editable || 
-      (!hasSection2Signatures && (hasPermission('execute_wo') || hasPermission('supervise_order') || hasPermission('edit_wo')))
+   const canSignExecutor = Boolean(
+      isOrderCreated && (
+         isSection2Editable ||
+         (!formData.signatureExecutor && (hasPermission('execute_wo') || hasPermission('supervise_order') || hasPermission('edit_wo')))
+      )
    );
+
+   const canSignSupervisorIntervention = Boolean(
+      isInterventionClosed &&
+      (hasPermission('supervise_order') || hasPermission('edit_wo'))
+   );
+
+   const canSignSection2 = canSignExecutor || canSignSupervisorIntervention;
 
 
    // Access store
@@ -282,7 +303,9 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                assignedTo: initialData.assignedTo || prev.assignedTo || user?.id,
                startDate: (initialData.startDate || initialData.createdDate || prev.startDate || prev.createdDate || new Date().toISOString()).split('T')[0],
                machineWorkHours: initialData.machineWorkHours || prev.machineWorkHours || 0,
-               nextMaintenanceHours: initialData.nextMaintenanceHours || prev.nextMaintenanceHours || 0
+               nextMaintenanceHours: initialData.nextMaintenanceHours || prev.nextMaintenanceHours || 0,
+               interventionsClosed: initialData.interventionsClosed ?? (initialData.checklist as any)?._interventionsClosed ?? Boolean(initialData.signatureExecutionSupervisor || initialData.currentStage === WorkOrderStage.HANDOVER || initialData.currentStage === WorkOrderStage.CLOSED),
+               interventionsClosedDate: initialData.interventionsClosedDate ?? (initialData.checklist as any)?._interventionsClosedDate
             };
             // Deep check to prevent infinite React render loops if initialData reference keeps changing from parent
             if (JSON.stringify(prev) === JSON.stringify(nextData)) {
@@ -307,7 +330,9 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                if (machine) {
                   // Pass the machine ID to generate tasks from the store
                   const tasks = generateCumulativeTasks(machine.id, machine.type, initialData.interval);
-                  setFormData(prev => ({ ...prev, tasks }));
+                  if (tasks.length > 0) {
+                     setFormData(prev => ({ ...prev, tasks }));
+                  }
                }
             }
          }
@@ -319,7 +344,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
             supervisor: prev.supervisor || (hasPermission('supervise_order') || hasPermission('create_wo') ? user.id : prev.supervisor)
          }));
       }
-   }, [initialMachineId, initialData, user]);
+   }, [initialMachineId, initialData, user, machines, maintenancePlans]);
 
    const availableTechnicians = useMemo(() => {
       const filtered = users.filter(u => 
@@ -535,14 +560,16 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
       }
    };
 
-   const saveProgress = () => {
+   const saveProgress = async () => {
       // Save without closing or changing stage
       const orderToSave = {
          ...formData,
          id: formData.id || `WO-${Date.now()}` // Generate ID if it's the first save
       } as WorkOrder;
 
-      handleInternalSave(orderToSave, false); // False = Close (Navigate back)
+      await handleInternalSave(orderToSave, true); // True = Stay on page
+      setSuccessMessage("Progreso guardado correctamente.");
+      setTimeout(() => setSuccessMessage(null), 4000);
    };
 
    // -- STATE MACHINE TRANSITIONS --
@@ -604,10 +631,80 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
       handleInternalSave({ ...updated, id: formData.id || `WO-${now.getTime()}` } as WorkOrder, true);
    };
 
-   const finishInterventions = async () => {
-      // RBAC: Check permission
+   const closeInterventions = async () => {
+      // 1. RBAC: Check permission (executor, supervisor, or editor)
       if (!hasPermission('execute_wo') && !hasPermission('edit_wo') && !hasPermission('supervise_order')) {
-         setValidationError("Acceso denegado: No tiene permiso para finalizar intervenciones.");
+         setValidationError("Acceso denegado: No tiene permiso para cerrar intervenciones.");
+         return;
+      }
+
+      // 2. Validate executor signature
+      if (!formData.signatureExecutor || formData.signatureExecutor === 'false') {
+         setInvalidFields(new Set(['signatureExecutor']));
+         setValidationError("Debe registrar la Firma del Ejecutante antes de poder cerrar las intervenciones.");
+         return;
+      }
+
+      const now = new Date();
+      const currentTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+
+      const updated: WorkOrder = {
+         ...formData,
+         currentStage: formData.currentStage === WorkOrderStage.REQUESTED ? WorkOrderStage.EXECUTION : formData.currentStage,
+         status: formData.status === WorkOrderStatus.BACKLOG ? WorkOrderStatus.IN_PROGRESS : formData.status,
+         startTime: formData.startTime || currentTime,
+         endTime: formData.endTime || currentTime,
+         interventionsClosed: true,
+         interventionsClosedDate: now.toISOString(),
+         checklist: {
+            ...(formData.checklist || {}),
+            _interventionsClosed: true,
+            _interventionsClosedDate: now.toISOString()
+         }
+      };
+
+      setFormData(updated);
+      setValidationError(null);
+      setInvalidFields(new Set());
+      await handleInternalSave(updated, true);
+      setSuccessMessage("Intervenciones cerradas con éxito. Ahora el Supervisor o Gerente puede registrar su firma de conformidad y Finalizar Intervenciones.");
+      setTimeout(() => setSuccessMessage(null), 5000);
+   };
+
+   const reopenInterventions = async () => {
+      if (!hasPermission('execute_wo') && !hasPermission('edit_wo') && !hasPermission('supervise_order')) {
+         setValidationError("Acceso denegado: No tiene permiso para reabrir intervenciones.");
+         return;
+      }
+
+      const updated: WorkOrder = {
+         ...formData,
+         interventionsClosed: false,
+         interventionsClosedDate: undefined,
+         checklist: {
+            ...(formData.checklist || {}),
+            _interventionsClosed: false,
+            _interventionsClosedDate: undefined
+         }
+      };
+
+      setFormData(updated);
+      setValidationError(null);
+      setInvalidFields(new Set());
+      await handleInternalSave(updated, true);
+      setSuccessMessage("Intervenciones reabiertas para edición.");
+      setTimeout(() => setSuccessMessage(null), 4000);
+   };
+
+   const finishInterventions = async () => {
+      // RBAC: Check permission (supervisor or gerente)
+      if (!hasPermission('supervise_order') && !hasPermission('edit_wo')) {
+         setValidationError("Acceso denegado: Solo un Supervisor o Gerente puede finalizar las intervenciones.");
+         return;
+      }
+
+      if (!isInterventionClosed) {
+         setValidationError("Debe presionar primero el botón 'Cerrar Intervenciones' debajo de la Firma del Ejecutante antes de finalizar.");
          return;
       }
 
@@ -626,7 +723,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
 
       if (fields.size > 0) {
          setInvalidFields(fields);
-         setValidationError("Debe registrar la Firma del Ejecutante y la Firma del Supervisor en la Sección 2 antes de poder pasar a la próxima etapa.");
+         setValidationError("Debe registrar la Firma del Supervisor (Conformidad) en la Sección 2 antes de finalizar las intervenciones.");
          return;
       }
 
@@ -644,6 +741,8 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
       setValidationError(null);
       setInvalidFields(new Set());
       await handleInternalSave({ ...updated, id: formData.id || `WO-${Date.now()}` } as WorkOrder, true);
+      setSuccessMessage("Intervenciones finalizadas. Se ha habilitado la Sección 3: Cierre y Entrega.");
+      setTimeout(() => setSuccessMessage(null), 4000);
    };
 
    const finishExecution = finishInterventions;
@@ -711,7 +810,11 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
    };
 
    const signExecutor = () => {
-      if (!canSignSection2) return;
+      if (!canSignExecutor) return;
+      if (isInterventionClosed) {
+         setValidationError("Las intervenciones están cerradas. Si necesita modificar la firma, primero reabra las intervenciones.");
+         return;
+      }
       if (formData.signatureExecutor && formData.signatureExecutor !== 'false') return;
 
       const techName = formData.assignedMechanic
@@ -727,7 +830,14 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
    };
 
    const signExecutionSupervisor = () => {
-      if (!canSignSection2) return;
+      if (!isInterventionClosed) {
+         setValidationError("Debe presionar primero el botón 'Cerrar Intervenciones' debajo de la Firma del Ejecutante antes de que el supervisor pueda firmar.");
+         return;
+      }
+      if (!hasPermission('supervise_order') && !hasPermission('edit_wo')) {
+         setValidationError("Acceso denegado: Solo un Supervisor o Gerente puede firmar la conformidad de las intervenciones.");
+         return;
+      }
       if (formData.signatureExecutionSupervisor && formData.signatureExecutionSupervisor !== 'false') return;
 
       setFormData(prev => ({
@@ -820,6 +930,13 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
          {validationError && (
             <div className="bg-red-900/50 border-b border-red-500/50 p-2 flex items-center justify-center gap-2 text-red-200 text-sm animate-pulse">
                <AlertCircle size={16} /> {validationError}
+            </div>
+         )}
+
+         {/* Global Success Banner */}
+         {successMessage && (
+            <div className="bg-emerald-900/50 border-b border-emerald-500/50 p-2 flex items-center justify-center gap-2 text-emerald-200 text-sm animate-fadeIn">
+               <CheckCircle size={16} /> {successMessage}
             </div>
          )}
 
@@ -1945,46 +2062,170 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                         {/* Firmas de Intervención: Ejecutante y Supervisor */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                            {/* Firma Ejecutante */}
-                           <div>
-                              <label className="text-xs text-industrial-400 font-bold mb-2 flex items-center justify-between">
-                                 <span>Firma Ejecutante</span>
-                                 <span className="text-[10px] text-pink-400 font-normal">Requerida para avanzar</span>
-                              </label>
-                              <div
-                                 onClick={signExecutor}
-                                 className={`h-24 bg-white/5 rounded border-2 border-dashed ${canSignSection2 && (!formData.signatureExecutor || formData.signatureExecutor === 'false') ? (invalidFields.has('signatureExecutor') ? 'border-red-500 bg-red-900/10 cursor-pointer animate-pulse' : 'border-pink-500/50 cursor-pointer hover:bg-white/10') : 'border-industrial-600'} flex items-center justify-center flex-col gap-1 transition-colors`}
-                              >
-                                 {formData.signatureExecutor && formData.signatureExecutor !== 'false' ? (
-                                    <>
-                                       <span className="text-pink-400 font-script text-xl">{formData.signatureExecutor}</span>
-                                       <span className="text-xs text-industrial-500">{formData.signatureExecutorDate ? formatDate(formData.signatureExecutorDate) : ''}</span>
-                                    </>
+                           <div className="flex flex-col justify-between">
+                              <div>
+                                 <label className="text-xs text-industrial-400 font-bold mb-2 flex items-center justify-between">
+                                    <span>Firma Ejecutante</span>
+                                    <span className="text-[10px] text-pink-400 font-normal">Requerida para avanzar</span>
+                                 </label>
+                                 <div
+                                    onClick={signExecutor}
+                                    className={`relative h-24 bg-white/5 rounded border-2 border-dashed ${
+                                       !isInterventionClosed && canSignExecutor && (!formData.signatureExecutor || formData.signatureExecutor === 'false')
+                                          ? (invalidFields.has('signatureExecutor') ? 'border-red-500 bg-red-900/10 cursor-pointer animate-pulse' : 'border-pink-500/50 cursor-pointer hover:bg-white/10')
+                                          : 'border-industrial-600'
+                                    } flex items-center justify-center flex-col gap-1 transition-colors`}
+                                 >
+                                    {formData.signatureExecutor && formData.signatureExecutor !== 'false' ? (
+                                       <>
+                                          <span className="text-pink-400 font-script text-xl">{formData.signatureExecutor}</span>
+                                          <span className="text-xs text-industrial-500">{formData.signatureExecutorDate ? formatDate(formData.signatureExecutorDate) : ''}</span>
+                                          {!isInterventionClosed && (
+                                             <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                   e.stopPropagation();
+                                                   setFormData(prev => ({ ...prev, signatureExecutor: undefined, signatureExecutorDate: undefined }));
+                                                }}
+                                                className="absolute top-1 right-1.5 text-industrial-500 hover:text-red-400 p-1 text-[10px] flex items-center gap-0.5 rounded transition-colors"
+                                                title="Borrar firma"
+                                             >
+                                                <X size={12} />
+                                             </button>
+                                          )}
+                                       </>
+                                    ) : (
+                                       <span className={`text-xs ${invalidFields.has('signatureExecutor') ? 'text-red-400 font-bold' : 'text-industrial-500'}`}>
+                                          {canSignExecutor ? 'Click para Firmar (Ejecutante)' : 'Firma Pendiente'}
+                                       </span>
+                                    )}
+                                 </div>
+                              </div>
+
+                              {/* Botón Cerrar Intervenciones debajo de Firma Ejecutante */}
+                              <div className="mt-3">
+                                 {isInterventionClosed ? (
+                                    <div className="w-full p-2.5 bg-emerald-950/40 border border-emerald-500/40 rounded-lg flex items-center justify-between text-xs text-emerald-400 font-semibold shadow-inner">
+                                       <span className="flex items-center gap-2">
+                                          <CheckCircle size={15} className="text-emerald-400 shrink-0" />
+                                          <span>Intervenciones Cerradas</span>
+                                          {formData.interventionsClosedDate && (
+                                             <span className="text-[10px] text-emerald-500/80 font-normal hidden sm:inline">
+                                                ({formatDate(formData.interventionsClosedDate)})
+                                             </span>
+                                          )}
+                                       </span>
+                                       {formData.currentStage !== WorkOrderStage.CLOSED && (hasPermission('execute_wo') || hasPermission('edit_wo') || hasPermission('supervise_order')) && (
+                                          <button
+                                             type="button"
+                                             disabled={isSaving}
+                                             onClick={reopenInterventions}
+                                             className="text-[11px] text-industrial-400 hover:text-amber-400 font-medium underline transition-colors px-1 py-0.5"
+                                             title="Reabrir para editar tareas o datos"
+                                          >
+                                             Reabrir
+                                          </button>
+                                       )}
+                                    </div>
                                  ) : (
-                                    <span className={`text-xs ${invalidFields.has('signatureExecutor') ? 'text-red-400 font-bold' : 'text-industrial-500'}`}>
-                                       {canSignSection2 ? 'Click para Firmar (Ejecutante)' : 'Firma Pendiente'}
-                                    </span>
+                                    <button
+                                       type="button"
+                                       disabled={isSaving}
+                                       onClick={closeInterventions}
+                                       className={`w-full py-2.5 px-3 rounded-lg text-xs font-bold shadow-md transition-all flex items-center justify-center gap-2 ${
+                                          formData.signatureExecutor && formData.signatureExecutor !== 'false'
+                                             ? 'bg-pink-600 hover:bg-pink-500 text-white shadow-pink-900/40 active:scale-[0.99] animate-pulse'
+                                             : 'bg-industrial-800 hover:bg-industrial-700 text-industrial-300 border border-industrial-600'
+                                       }`}
+                                       title={
+                                          !formData.signatureExecutor || formData.signatureExecutor === 'false'
+                                             ? "Debe firmar en el recuadro 'Firma Ejecutante' para cerrar las intervenciones"
+                                             : "Haga clic para cerrar las intervenciones y activar la firma del supervisor"
+                                       }
+                                    >
+                                       {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Lock size={14} />}
+                                       <span>Cerrar Intervenciones</span>
+                                    </button>
                                  )}
                               </div>
                            </div>
 
                            {/* Firma Supervisor (Conformidad) */}
-                           <div>
-                              <label className="text-xs text-industrial-400 font-bold mb-2 flex items-center justify-between">
-                                 <span>Firma Supervisor (Conformidad)</span>
-                                 <span className="text-[10px] text-pink-400 font-normal">Requerida para avanzar</span>
-                              </label>
-                              <div
-                                 onClick={signExecutionSupervisor}
-                                 className={`h-24 bg-white/5 rounded border-2 border-dashed ${canSignSection2 && (!formData.signatureExecutionSupervisor || formData.signatureExecutionSupervisor === 'false') ? (invalidFields.has('signatureExecutionSupervisor') ? 'border-red-500 bg-red-900/10 cursor-pointer animate-pulse' : 'border-pink-500/50 cursor-pointer hover:bg-white/10') : 'border-industrial-600'} flex items-center justify-center flex-col gap-1 transition-colors`}
-                              >
-                                 {formData.signatureExecutionSupervisor && formData.signatureExecutionSupervisor !== 'false' ? (
-                                    <>
-                                       <span className="text-pink-400 font-script text-xl">{formData.signatureExecutionSupervisor}</span>
-                                       <span className="text-xs text-industrial-500">{formData.signatureExecutionSupervisorDate ? formatDate(formData.signatureExecutionSupervisorDate) : ''}</span>
-                                    </>
-                                 ) : (
-                                    <span className={`text-xs ${invalidFields.has('signatureExecutionSupervisor') ? 'text-red-400 font-bold' : 'text-industrial-500'}`}>
-                                       {canSignSection2 ? 'Click para Firmar (Supervisor)' : 'Firma Pendiente'}
+                           <div className="flex flex-col justify-between">
+                              <div>
+                                 <label className="text-xs text-industrial-400 font-bold mb-2 flex items-center justify-between">
+                                    <span>Firma Supervisor (Conformidad)</span>
+                                    <span className={`text-[10px] ${isInterventionClosed ? 'text-pink-400' : 'text-industrial-500'} font-normal`}>
+                                       {isInterventionClosed ? 'Requerida para avanzar' : 'Bloqueada hasta cerrar'}
+                                    </span>
+                                 </label>
+                                 <div
+                                    onClick={signExecutionSupervisor}
+                                    className={`relative h-24 bg-white/5 rounded border-2 border-dashed ${
+                                       !isInterventionClosed
+                                          ? 'border-industrial-700 bg-industrial-900/40 opacity-60 cursor-not-allowed'
+                                          : canSignSupervisorIntervention && (!formData.signatureExecutionSupervisor || formData.signatureExecutionSupervisor === 'false')
+                                             ? (invalidFields.has('signatureExecutionSupervisor') ? 'border-red-500 bg-red-900/10 cursor-pointer animate-pulse' : 'border-pink-500/50 cursor-pointer hover:bg-white/10')
+                                             : 'border-industrial-600'
+                                    } flex items-center justify-center flex-col gap-1 transition-colors`}
+                                 >
+                                    {formData.signatureExecutionSupervisor && formData.signatureExecutionSupervisor !== 'false' ? (
+                                       <>
+                                          <span className="text-pink-400 font-script text-xl">{formData.signatureExecutionSupervisor}</span>
+                                          <span className="text-xs text-industrial-500">{formData.signatureExecutionSupervisorDate ? formatDate(formData.signatureExecutionSupervisorDate) : ''}</span>
+                                          {formData.currentStage !== WorkOrderStage.HANDOVER && formData.currentStage !== WorkOrderStage.CLOSED && (
+                                             <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                   e.stopPropagation();
+                                                   setFormData(prev => {
+                                                      const nextChecklist = { ...(prev.checklist || {}) };
+                                                      delete nextChecklist._executionSupervisorSignature;
+                                                      delete nextChecklist._executionSupervisorSignatureDate;
+                                                      return {
+                                                         ...prev,
+                                                         signatureExecutionSupervisor: undefined,
+                                                         signatureExecutionSupervisorDate: undefined,
+                                                         checklist: nextChecklist
+                                                      };
+                                                   });
+                                                }}
+                                                className="absolute top-1 right-1.5 text-industrial-500 hover:text-red-400 p-1 text-[10px] flex items-center gap-0.5 rounded transition-colors"
+                                                title="Borrar firma"
+                                             >
+                                                <X size={12} />
+                                             </button>
+                                          )}
+                                       </>
+                                    ) : (
+                                       <span className={`text-xs flex items-center gap-1.5 ${
+                                          !isInterventionClosed
+                                             ? 'text-industrial-500'
+                                             : invalidFields.has('signatureExecutionSupervisor')
+                                                ? 'text-red-400 font-bold'
+                                                : 'text-industrial-400'
+                                       }`}>
+                                          {!isInterventionClosed ? (
+                                             <>
+                                                <Lock size={12} className="text-industrial-500" />
+                                                <span>Requiere cerrar intervenciones</span>
+                                             </>
+                                          ) : canSignSupervisorIntervention ? (
+                                             'Click para Firmar (Supervisor)'
+                                          ) : (
+                                             'Firma Pendiente (Supervisor)'
+                                          )}
+                                       </span>
+                                    )}
+                                 </div>
+                              </div>
+
+                              {/* Indicador de estado para el supervisor */}
+                              <div className="mt-3 text-right min-h-[36px] flex items-center justify-end">
+                                 {isInterventionClosed && (!formData.signatureExecutionSupervisor || formData.signatureExecutionSupervisor === 'false') && (
+                                    <span className="text-[11px] text-pink-400/90 italic flex items-center gap-1">
+                                       <span className="inline-block w-2 h-2 rounded-full bg-pink-500 animate-pulse"></span>
+                                       Esperando firma de conformidad del supervisor
                                     </span>
                                  )}
                               </div>
@@ -1993,24 +2234,40 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                      </div>
                   </div>
 
-                  {isSection2Editable && (formData.currentStage === WorkOrderStage.REQUESTED || formData.currentStage === WorkOrderStage.EXECUTION || (formData.currentStage === WorkOrderStage.HANDOVER && !hasSection2Signatures)) && (
-                     <div className="p-4 border-t border-pink-500/30 flex justify-end gap-3">
+                  {(isSection2Editable || canSignSection2 || isInterventionClosed) && (formData.currentStage === WorkOrderStage.REQUESTED || formData.currentStage === WorkOrderStage.EXECUTION || (formData.currentStage === WorkOrderStage.HANDOVER && !hasSection2Signatures)) && (
+                     <div className="p-4 border-t border-pink-500/30 flex justify-end items-center gap-3 bg-industrial-900/60">
+                        {/* Botón Guardar Progreso - Morado, activo para guardar siempre */}
                         <button 
                            type="button" 
                            disabled={isSaving}
                            onClick={saveProgress} 
-                           className="text-pink-400 hover:text-white px-4 py-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                           className="bg-purple-700 hover:bg-purple-600 active:scale-95 text-white px-5 py-2.5 rounded-lg font-bold shadow-md shadow-purple-900/30 border border-purple-500/40 transition-all flex items-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                           title="Guardar el registro y la información ingresada sin cambiar de etapa"
                         >
-                           Guardar Progreso
+                           {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                           <span>Guardar Progreso</span>
                         </button>
+
+                        {/* Botón Finalizar Intervenciones */}
                         <button 
                            type="button" 
-                           disabled={isSaving}
+                           disabled={isSaving || !isInterventionClosed || (!hasPermission('supervise_order') && !hasPermission('edit_wo'))}
                            onClick={finishInterventions} 
-                           className="bg-pink-600 hover:bg-pink-500 text-white px-6 py-2 rounded font-bold shadow-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                           className={`${
+                              !isInterventionClosed || (!hasPermission('supervise_order') && !hasPermission('edit_wo'))
+                                 ? 'bg-industrial-800 text-industrial-500 border border-industrial-700 cursor-not-allowed opacity-60 shadow-none'
+                                 : 'bg-pink-600 hover:bg-pink-500 text-white font-bold shadow-lg shadow-pink-900/40 active:scale-95'
+                           } px-6 py-2.5 rounded-lg font-bold transition-all flex items-center gap-2 text-sm disabled:cursor-not-allowed`}
+                           title={
+                              !isInterventionClosed
+                                 ? "Debe pulsar 'Cerrar Intervenciones' debajo de Firma Ejecutante primero"
+                                 : (!hasPermission('supervise_order') && !hasPermission('edit_wo'))
+                                    ? "Solo un supervisor o gerente puede finalizar las intervenciones"
+                                    : "Finalizar intervenciones y avanzar a Cierre y Entrega"
+                           }
                         >
                            {isSaving && <Loader2 size={16} className="animate-spin" />}
-                           {isSaving ? 'Finalizando...' : <>Finalizar Intervenciones <CheckCircle size={16} /></>}
+                           {isSaving ? 'Finalizando...' : <><span>Finalizar Intervenciones</span> <CheckCircle size={16} /></>}
                         </button>
                      </div>
                   )}
