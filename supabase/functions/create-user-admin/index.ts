@@ -155,23 +155,38 @@ serve(async (req) => {
     const resendKey = Deno.env.get('RESEND_API_KEY');
     if (resendKey) {
       const resend = new Resend(resendKey);
+      const textLines = [
+        '============================================================',
+        'COREFLOW 4.0 - SISTEMA DE MANTENIMIENTO INDUSTRIAL',
+        'BIENVENIDA E INVITACIÓN A LA PLATAFORMA',
+        '============================================================',
+        '',
+        `Hola, ${fullName},`,
+        '',
+        'Has sido invitado a la plataforma de Mantenimiento y Gestión de Repuestos CoreFlow 4.0.',
+        '',
+        'CREDENCIALES DE ACCESO:',
+        '------------------------------------------------------------',
+        `• Usuario:                ${email}`,
+        `• Contraseña Provisional: ${generatedPassword}`,
+        '------------------------------------------------------------',
+        '',
+        'ENLACE DE ACCESO A LA PLATAFORMA:',
+        'https://coreflow-six.vercel.app/',
+        '',
+        'NOTA DE SEGURIDAD:',
+        'Por seguridad, el sistema te pedirá cambiar esta contraseña al iniciar sesión por primera vez.',
+        '',
+        '------------------------------------------------------------',
+        '¡Bienvenido a CoreFlow 4.0!',
+        '© 2026 CoreFlow Industrial Systems. Todos los derechos reservados.',
+      ];
+
       const { error: emailError } = await resend.emails.send({
         from: 'CoreFlow <notificaciones@ravicaribeinc.com>',
         to: email,
         subject: 'Bienvenido a CoreFlow 4.0',
-        html: `<div style="font-family: sans-serif; padding: 20px; background-color: #f8fafc; color: #333;">
-                <h2 style="color: #1d4ed8;">CoreFlow 4.0</h2>
-                <p>Hola, <strong>${fullName}</strong>,</p>
-                <p>Has sido invitado a la plataforma de Mantenimiento y Gestión de Repuestos CoreFlow 4.0.</p>
-                <p>Puedes acceder a la plataforma utilizando este enlace:<br>
-                <a href="https://coreflow-six.vercel.app/" style="color: #1d4ed8; text-decoration: none;">https://coreflow-six.vercel.app/</a></p>
-                <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; margin-top: 20px; margin-bottom: 20px;">
-                  <p style="margin: 0 0 10px 0;"><strong>Usuario:</strong> ${email}</p>
-                  <p style="margin: 0;"><strong>Contraseña Provisional:</strong> ${generatedPassword}</p>
-                </div>
-                <p>Por seguridad, el sistema te pedirá cambiar esta contraseña al iniciar sesión por primera vez.</p>
-                <p style="margin-top: 20px; font-weight: bold;">¡Bienvenido a CoreFlow 4.0!</p>
-               </div>`
+        text: textLines.join('\n'),
       });
 
       if (emailError) {
