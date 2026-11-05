@@ -114,6 +114,25 @@ serve(async (req) => {
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
     if (resendApiKey && record.requester_email) {
       try {
+        const textLines = [
+          '============================================================',
+          'COREFLOW - SOPORTE TÉCNICO (HELP DESK)',
+          '============================================================',
+          '',
+          `Hemos recibido tu reporte sobre: ${record.subject}`,
+          '',
+          'RESPUESTA PRELIMINAR DE NUESTRO ASISTENTE IA:',
+          '------------------------------------------------------------',
+          respuestaIA,
+          '------------------------------------------------------------',
+          '',
+          'Puedes ver el estado de tu ticket y responder a este hilo directamente desde la plataforma de CoreFlow.',
+          '',
+          '------------------------------------------------------------',
+          'CoreFlow Maintenance Cloud - Secure Industrial Gateway',
+          '© 2026 CoreFlow Industrial Systems. Todos los derechos reservados.',
+        ];
+
         const emailResponse = await fetch('https://api.resend.com/emails', {
           method: 'POST',
           headers: {
@@ -125,19 +144,7 @@ serve(async (req) => {
             reply_to: `soporte@soporte.ravicaribeinc.com`,
             to: [record.requester_email],
             subject: `Soporte CoreFlow - Ticket Recibido [TKT-${record.id}]`,
-            html: `
-              <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; padding: 20px;">
-                <h2 style="color: #0f172a;">Soporte Técnico CoreFlow</h2>
-                <p>Hemos recibido tu reporte sobre: <b>${record.subject}</b>.</p>
-                <div style="background-color: #f8fafc; border-left: 4px solid #3b82f6; padding: 15px; margin: 20px 0; border-radius: 0 4px 4px 0;">
-                  <p style="margin-top: 0;"><b>Respuesta preliminar de nuestro asistente IA:</b></p>
-                  <i style="color: #475569;">${respuestaIA}</i>
-                </div>
-                <p>Puedes ver el estado de tu ticket y responder a este hilo directamente desde la plataforma de CoreFlow.</p>
-                <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;" />
-                <p style="font-size: 12px; color: #94a3b8; text-align: center;">CoreFlow Maintenance Cloud - Secure Industrial Gateway</p>
-              </div>
-            `
+            text: textLines.join('\n'),
           }),
         });
         
