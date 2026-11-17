@@ -47,6 +47,17 @@ export const AssetDrawer: React.FC<AssetDrawerProps> = ({ machine, onClose, anal
     }
   }, [machine?.criticalParts, parts]);
   
+  // Real Kardex Data mapped from machine's `criticalParts`
+  const actualCriticalParts = React.useMemo(() => {
+    if (!machine) return [];
+    const allKnown = new Map<string, SparePart>();
+    (parts || []).forEach(p => allKnown.set(p.id, p));
+    loadedCriticalParts.forEach(p => allKnown.set(p.id, p));
+    return (machine.criticalParts || [])
+      .map(partId => allKnown.get(partId))
+      .filter((p): p is SparePart => p !== undefined);
+  }, [machine, parts, loadedCriticalParts]);
+
   if (!machine) return null;
 
   const oee = calculateMachineOEE(machine.id, allOrders || []);
@@ -115,16 +126,6 @@ export const AssetDrawer: React.FC<AssetDrawerProps> = ({ machine, onClose, anal
     [machine.brand, machine.model].filter(Boolean).join(' ')
   ].filter(Boolean);
   const headerSubtitle = subtitleParts.length > 0 ? subtitleParts.join(' • ') : 'Sin datos adicionales';
-
-  // Real Kardex Data mapped from machine's `criticalParts`
-  const actualCriticalParts = React.useMemo(() => {
-    const allKnown = new Map<string, SparePart>();
-    (parts || []).forEach(p => allKnown.set(p.id, p));
-    loadedCriticalParts.forEach(p => allKnown.set(p.id, p));
-    return (machine.criticalParts || [])
-      .map(partId => allKnown.get(partId))
-      .filter((p): p is SparePart => p !== undefined);
-  }, [machine.criticalParts, parts, loadedCriticalParts]);
 
   return (
     <AnimatePresence>

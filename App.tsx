@@ -460,8 +460,8 @@ const AppRoutes = () => {
   }
 
   if (!isAuthenticated) {
-    // Prevent wiping the hash if Supabase is still processing a magic link or recovery link
-    if (window.location.hash.includes('access_token')) {
+    // Prevent wiping the hash/query if Supabase is still processing a magic link or recovery link
+    if (window.location.hash.includes('access_token') || window.location.search.includes('token_hash')) {
       return (
         <div className="h-screen w-screen bg-industrial-900 flex items-center justify-center">
           <div className="flex flex-col items-center gap-4">

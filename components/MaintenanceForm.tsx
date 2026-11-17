@@ -252,38 +252,42 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
       return false;
    };
 
-   // Available Requesters for R-MANT-05 (Nombre del Solicitante): Usuarios con permiso 'create_wo'
+   // Available Requesters for R-MANT-05 (Nombre del Solicitante): Usuarios activos con permiso 'create_wo'
    const availableRequesters = useMemo(() => {
-      const filtered = users.filter(u => hasUserPermission(u, 'create_wo'));
-      if (user && hasPermission('create_wo') && !filtered.some(u => u.id === user.id)) {
+      const activeUsers = users.filter(u => u.status !== 'INACTIVE' || u.id === formData.assignedTo);
+      const filtered = activeUsers.filter(u => hasUserPermission(u, 'create_wo') || u.id === formData.assignedTo);
+      if (user && user.status !== 'INACTIVE' && hasPermission('create_wo') && !filtered.some(u => u.id === user.id)) {
          filtered.push(user);
       }
-      return filtered.length > 0 ? filtered : users;
-   }, [users, roles, user, hasPermission]);
+      return filtered.length > 0 ? filtered : activeUsers;
+   }, [users, roles, user, hasPermission, formData.assignedTo]);
 
-   // Available Supervisors for R-MANT-02 y Sección 3 (Supervisión y Cierre): Usuarios con 'supervise_order' o 'create_wo'
+   // Available Supervisors for R-MANT-02 y Sección 3 (Supervisión y Cierre): Usuarios activos con 'supervise_order' o 'create_wo'
    const availableSupervisors = useMemo(() => {
-      const filtered = users.filter(u => hasUserPermission(u, 'supervise_order') || hasUserPermission(u, 'create_wo'));
-      if (user && (hasPermission('supervise_order') || hasPermission('create_wo')) && !filtered.some(u => u.id === user.id)) {
+      const activeUsers = users.filter(u => u.status !== 'INACTIVE' || u.id === formData.supervisor || u.id === formData.supervisorId);
+      const filtered = activeUsers.filter(u => hasUserPermission(u, 'supervise_order') || hasUserPermission(u, 'create_wo') || u.id === formData.supervisor || u.id === formData.supervisorId);
+      if (user && user.status !== 'INACTIVE' && (hasPermission('supervise_order') || hasPermission('create_wo')) && !filtered.some(u => u.id === user.id)) {
          filtered.push(user);
       }
-      return filtered.length > 0 ? filtered : users;
-   }, [users, roles, user, hasPermission]);
+      return filtered.length > 0 ? filtered : activeUsers;
+   }, [users, roles, user, hasPermission, formData.supervisor, formData.supervisorId]);
 
-   // Available Received By for R-MANT-05 (Sección 2): Usuarios con 'execute_wo' o 'supervise_order'
+   // Available Received By for R-MANT-05 (Sección 2): Usuarios activos con 'execute_wo' o 'supervise_order'
    const availableReceivedBy = useMemo(() => {
-      const filtered = users.filter(u => 
+      const activeUsers = users.filter(u => u.status !== 'INACTIVE' || u.id === formData.requestReceivedBy);
+      const filtered = activeUsers.filter(u => 
          hasUserPermission(u, 'execute_wo') || 
          hasUserPermission(u, 'supervise_order') ||
          u.roleName?.toLowerCase().includes('electromec') ||
          u.roleName?.toLowerCase().includes('técnico') ||
-         u.roleName?.toLowerCase().includes('tecnico')
+         u.roleName?.toLowerCase().includes('tecnico') ||
+         u.id === formData.requestReceivedBy
       );
-      if (user && !filtered.some(u => u.id === user.id)) {
+      if (user && user.status !== 'INACTIVE' && !filtered.some(u => u.id === user.id)) {
          filtered.push(user);
       }
-      return filtered.length > 0 ? filtered : users;
-   }, [users, roles, user]);
+      return filtered.length > 0 ? filtered : activeUsers;
+   }, [users, roles, user, formData.requestReceivedBy]);
 
    // -- INITIALIZATION EFFECT --
    useEffect(() => {
@@ -347,7 +351,8 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
    }, [initialMachineId, initialData, user, machines, maintenancePlans]);
 
    const availableTechnicians = useMemo(() => {
-      const filtered = users.filter(u => 
+      const activeUsers = users.filter(u => u.status !== 'INACTIVE' || u.id === formData.assignedMechanic);
+      const filtered = activeUsers.filter(u => 
          u.roleName === 'Electromecánico Labels' || 
          u.roleName === 'Electromecánico Ravi' ||
          u.roleName?.toLowerCase().includes('electromec') ||
@@ -357,7 +362,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
          u.notification_preferences?.alerts_rmant05 ||
          u.id === formData.assignedMechanic
       );
-      return filtered.length > 0 ? filtered : users;
+      return filtered.length > 0 ? filtered : activeUsers;
    }, [users, formData.assignedMechanic]);
 
    const handleDelete = async (e?: React.MouseEvent) => {
@@ -1374,7 +1379,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                  clearInvalidField('assignedMechanic');
                               }}>
                               <option value="">- Seleccionar Técnico -</option>
-                              {users.filter(u => u.roleName === 'Electromecánico Labels' || u.roleName === 'Electromecánico Ravi').map(u => (
+                              {users.filter(u => (u.status !== 'INACTIVE' || u.id === formData.assignedMechanic) && (u.roleName === 'Electromecánico Labels' || u.roleName === 'Electromecánico Ravi' || u.id === formData.assignedMechanic)).map(u => (
                                  <option key={u.id} value={u.id}>{u.full_name}</option>
                               ))}
                            </select>
@@ -1933,7 +1938,7 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                        }}
                                     >
                                        <option value="">Seleccionar Técnico...</option>
-                                       {users.filter(u => u.roleName === 'Electromecánico Labels' || u.roleName === 'Electromecánico Ravi').map(u => (
+                                       {users.filter(u => (u.status !== 'INACTIVE' || u.full_name === exec.name) && (u.roleName === 'Electromecánico Labels' || u.roleName === 'Electromecánico Ravi' || u.full_name === exec.name)).map(u => (
                                           <option key={u.id} value={u.id}>{u.full_name}</option>
                                        ))}
                                     </select>

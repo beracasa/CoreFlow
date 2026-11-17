@@ -91,6 +91,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   useEffect(() => {
     let mounted = true;
+    const isInitialRecoveryUrl =
+      window.location.hash.includes('type=recovery') ||
+      window.location.search.includes('type=recovery');
+    let isRecoveryFlow = isInitialRecoveryUrl;
 
     if (import.meta.env.VITE_USE_MOCK === 'true') {
       console.log("AuthContext: Mock mode active. Reading session from localStorage...");
@@ -132,9 +136,33 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // 1. Initial Session Check with Timeout Race
     const checkSession = async () => {
       console.log("AuthContext: Starting session check...");
+      const searchParams = new URLSearchParams(window.location.search);
+      const tokenHash = searchParams.get('token_hash');
+      const otpType = searchParams.get('type');
 
       const sessionPromise = (async () => {
         try {
+          if (tokenHash && (otpType === 'recovery' || !otpType)) {
+            console.log("AuthContext: Verifying recovery token_hash...");
+            isRecoveryFlow = true;
+            const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({
+              token_hash: tokenHash,
+              type: 'recovery',
+            });
+            if (verifyError) {
+              console.error("AuthContext: Error verifying recovery token_hash:", verifyError);
+            } else if (verifyData?.session?.user && mounted) {
+              window.history.replaceState({}, document.title, '/change-password');
+              const profile = await fetchProfile(verifyData.session.user.id);
+              if (mounted) {
+                const baseUser = profile || mapSupabaseUser(verifyData.session.user);
+                setUser({ ...baseUser, requires_password_change: true });
+                navigate('/change-password', { replace: true });
+              }
+              return;
+            }
+          }
+
           const { data: { session }, error } = await supabase.auth.getSession();
 
           if (mounted) {
@@ -148,15 +176,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 const profile = await fetchProfile(session.user.id);
                 if (mounted) {
                   if (profile) {
-                    setUser(profile);
+                    setUser(isRecoveryFlow ? { ...profile, requires_password_change: true } : profile);
                   } else {
                     console.warn("AuthContext: Using metadata fallback.");
-                    setUser(mapSupabaseUser(session.user));
+                    const fallback = mapSupabaseUser(session.user);
+                    setUser(isRecoveryFlow ? { ...fallback, requires_password_change: true } : fallback);
+                  }
+                  if (isRecoveryFlow) {
+                    navigate('/change-password', { replace: true });
                   }
                 }
               } catch (err) {
                 console.error("AuthContext: Profile fetch error:", err);
-                if (mounted) setUser(mapSupabaseUser(session.user));
+                if (mounted) {
+                  const fallback = mapSupabaseUser(session.user);
+                  setUser(isRecoveryFlow ? { ...fallback, requires_password_change: true } : fallback);
+                  if (isRecoveryFlow) {
+                    navigate('/change-password', { replace: true });
+                  }
+                }
               }
             } else {
               console.log("AuthContext: No active session.");
@@ -167,8 +205,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
       })();
 
-      // Force timeout after 1.5 seconds to clear loading state
-      const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 1500));
+      // Force timeout after 1.5 seconds (or 5s when verifying recovery token) to clear loading state
+      const timeoutPromise = new Promise((resolve) => setTimeout(resolve, tokenHash ? 5000 : 1500));
 
       await Promise.race([sessionPromise, timeoutPromise]);
 
@@ -189,17 +227,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // Only set loading for SIGNED_IN if we don't already have a current session (initial login)
       // or for SIGNED_OUT to ensure a clean transition.
       if (event === 'PASSWORD_RECOVERY') {
+        isRecoveryFlow = true;
         if (mounted && session?.user) {
-          // Set fallback user immediately to avoid unauthenticated redirect
-          setUser(mapSupabaseUser(session.user));
+          // Set fallback user immediately with requires_password_change to avoid unauthenticated or dashboard redirect
+          setUser({ ...mapSupabaseUser(session.user), requires_password_change: true });
           setIsLoading(true);
         }
-        navigate('/change-password');
+        navigate('/change-password', { replace: true });
       }
 
       if (event === 'SIGNED_IN' && !session?.user) {
         if (mounted) setIsLoading(true);
       } else if (event === 'SIGNED_OUT') {
+        isRecoveryFlow = false;
         if (mounted) setIsLoading(true);
       }
 
@@ -210,12 +250,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             try {
               const profile = await fetchProfile(session.user.id);
               if (mounted) {
-                if (profile) setUser(profile);
-                else setUser(mapSupabaseUser(session.user));
+                if (profile) {
+                  setUser(isRecoveryFlow ? { ...profile, requires_password_change: true } : profile);
+                } else {
+                  const fallback = mapSupabaseUser(session.user);
+                  setUser(isRecoveryFlow ? { ...fallback, requires_password_change: true } : fallback);
+                }
+                if (isRecoveryFlow) {
+                  navigate('/change-password', { replace: true });
+                }
               }
             } catch (err) {
               console.error("AuthContext: Profile fetch error in listener:", err);
-              if (mounted) setUser(mapSupabaseUser(session.user));
+              if (mounted) {
+                const fallback = mapSupabaseUser(session.user);
+                setUser(isRecoveryFlow ? { ...fallback, requires_password_change: true } : fallback);
+              }
             }
           })();
 

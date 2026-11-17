@@ -14,20 +14,149 @@ serve(async (req) => {
   }
 
   try {
-    const { email, fullName, roleId, jobTitle, companyCode, specialties, tenantId } = await req.json()
-
-    console.log("=== CREATE USER START ===");
-    console.log("Payload:", JSON.stringify({ email, fullName, roleId, jobTitle, companyCode, tenantId }));
-
-    if (!email || !fullName || !roleId) {
-      throw new Error('Faltan campos requeridos: email, fullName, roleId');
-    }
+    const body = await req.json()
+    const { action, email, fullName, roleId, jobTitle, companyCode, specialties, tenantId, redirectTo } = body
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
+
+    // =========================================================================
+    // CASE 1: RECUPERACIÓN / RESTABLECIMIENTO DE CONTRASEÑA (RESEND)
+    // =========================================================================
+    if (action === 'reset_password') {
+      console.log("=== RESET PASSWORD START ===", email);
+
+      if (!email) {
+        throw new Error('El correo electrónico es requerido para recuperar la contraseña.');
+      }
+
+      const normalizedEmail = email.trim().toLowerCase();
+      const rawAppUrl = Deno.env.get('PUBLIC_APP_URL') || 'https://coreflow-six.vercel.app';
+      const appUrl = rawAppUrl.startsWith('http') ? rawAppUrl : `https://${rawAppUrl}`;
+      const rawRedirect = redirectTo || `${appUrl}/change-password`;
+      const targetRedirect = rawRedirect.startsWith('http') ? rawRedirect : `https://${rawRedirect}`;
+
+      // Buscar perfil para obtener el nombre y marcar requires_password_change
+      const { data: profileData } = await supabaseAdmin
+        .from('profiles')
+        .select('id, full_name, email')
+        .ilike('email', normalizedEmail)
+        .maybeSingle();
+
+      const recipientName = profileData?.full_name || normalizedEmail.split('@')[0];
+
+      // Generar enlace oficial de recuperación con Supabase Admin API
+      const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+        type: 'recovery',
+        email: normalizedEmail,
+        options: {
+          redirectTo: targetRedirect,
+        },
+      });
+
+      if (linkError || !linkData?.properties?.action_link) {
+        console.error("Error generating recovery link:", linkError?.message);
+        throw new Error(linkError?.message || 'No se pudo generar el enlace de recuperación para este correo.');
+      }
+
+      // Construir enlace directo a nuestra app (/change-password?token_hash=...&type=recovery)
+      // para evitar el error de redirección cuando el Site URL de Supabase no tiene https://
+      const actionLink = linkData.properties.action_link;
+      const hashedToken =
+        linkData.properties.hashed_token ||
+        new URL(actionLink).searchParams.get('token') ||
+        '';
+
+      let recoveryLink = actionLink;
+      if (hashedToken) {
+        const directUrl = new URL(targetRedirect);
+        directUrl.pathname = '/change-password';
+        directUrl.search = '';
+        directUrl.searchParams.set('token_hash', hashedToken);
+        directUrl.searchParams.set('type', 'recovery');
+        recoveryLink = directUrl.toString();
+      }
+
+      const targetUserId = profileData?.id || linkData.user?.id;
+
+      // Marcar requires_password_change = true para asegurar redirección a /change-password
+      // incluso si el Site URL de Supabase redirige a la raíz "/"
+      if (targetUserId) {
+        const { error: flagError } = await supabaseAdmin
+          .from('profiles')
+          .update({ requires_password_change: true })
+          .eq('id', targetUserId);
+
+        if (flagError) {
+          console.warn("Non-fatal: could not set requires_password_change flag:", flagError.message);
+        }
+      }
+
+      const resendKey = Deno.env.get('RESEND_API_KEY');
+      if (!resendKey) {
+        throw new Error('RESEND_API_KEY no está configurada en el servidor.');
+      }
+
+      const resend = new Resend(resendKey);
+      const textLines = [
+        '============================================================',
+        'COREFLOW 4.0 - SISTEMA DE MANTENIMIENTO INDUSTRIAL',
+        'RECUPERACIÓN Y CAMBIO DE CONTRASEÑA',
+        '============================================================',
+        '',
+        `Hola, ${recipientName},`,
+        '',
+        'Hemos recibido una solicitud para restablecer la contraseña de tu cuenta en CoreFlow 4.0.',
+        '',
+        'ENLACE SEGURO PARA CAMBIAR TU CONTRASEÑA:',
+        '------------------------------------------------------------',
+        recoveryLink,
+        '------------------------------------------------------------',
+        '',
+        'INSTRUCCIONES:',
+        '1. Haz clic en el enlace superior (o cópialo y pégalo en tu navegador).',
+        '2. Ingresa y confirma tu nueva contraseña (mínimo 8 caracteres).',
+        '3. Serás redirigido automáticamente al panel principal de CoreFlow.',
+        '',
+        'NOTA DE SEGURIDAD:',
+        'Este enlace es de un solo uso. Si no solicitaste este cambio, puedes ignorar este mensaje.',
+        '',
+        '------------------------------------------------------------',
+        'Este es un correo automático generado por el Sistema CoreFlow.',
+        '© 2026 CoreFlow Industrial Systems. Todos los derechos reservados.',
+      ];
+
+      const { error: emailError } = await resend.emails.send({
+        from: 'CoreFlow <notificaciones@ravicaribeinc.com>',
+        to: normalizedEmail,
+        subject: '🔐 Recuperación de Contraseña - CoreFlow 4.0',
+        text: textLines.join('\n'),
+      });
+
+      if (emailError) {
+        console.error("Error sending recovery email via Resend:", emailError);
+        throw new Error(`Error al enviar el correo de recuperación: ${emailError.message}`);
+      }
+
+      console.log("=== RESET PASSWORD EMAIL SENT SUCCESSFULLY ===", normalizedEmail);
+      return new Response(
+        JSON.stringify({ success: true, emailSent: true }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      );
+    }
+
+    // =========================================================================
+    // CASE 2: CREACIÓN / INVITACIÓN DE USUARIO
+    // =========================================================================
+    console.log("=== CREATE USER START ===");
+    console.log("Payload:", JSON.stringify({ email, fullName, roleId, jobTitle, companyCode, tenantId }));
+
+    if (!email || !fullName || !roleId) {
+      throw new Error('Faltan campos requeridos: email, fullName, roleId');
+    }
 
     const generatedPassword = 'CF-' + Math.random().toString(36).slice(-6).toUpperCase();
 

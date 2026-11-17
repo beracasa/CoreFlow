@@ -60,7 +60,8 @@ serve(async (req) => {
       // 2. Query subscribers with notification preference 'low_stock' = true
       const { data: subscribers, error: subscriberError } = await supabaseAdmin
         .from('profiles')
-        .select('email, full_name')
+        .select('email, full_name, status')
+        .neq('status', 'INACTIVE')
         .filter('notification_preferences->>low_stock', 'eq', 'true');
 
       if (subscriberError) throw subscriberError;
@@ -225,7 +226,8 @@ serve(async (req) => {
       // 1. Query Subscribers with preference 'pending_approvals' = true (Cierre Mantenimientos)
       const { data: subscribers, error: subscriberError } = await supabaseAdmin
         .from('profiles')
-        .select('email, full_name')
+        .select('email, full_name, status')
+        .neq('status', 'INACTIVE')
         .filter('notification_preferences->>pending_approvals', 'eq', 'true');
 
       if (subscriberError) throw subscriberError;
@@ -484,7 +486,8 @@ serve(async (req) => {
     // 3. Query Subscribers configured in Notification Preferences
     const { data: subscribers, error: subscriberError } = await supabaseAdmin
       .from('profiles')
-      .select('email, full_name')
+      .select('email, full_name, status')
+      .neq('status', 'INACTIVE')
       .filter(`notification_preferences->>${prefKey}`, 'eq', 'true');
 
     if (subscriberError) throw subscriberError;

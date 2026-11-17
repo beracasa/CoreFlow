@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../src/services/supabaseClient';
 import { useAuth } from '../../contexts/AuthContext';
 import { Shield, Key, Eye, EyeOff, Loader2, CheckCircle } from 'lucide-react';
 
 export const ChangePasswordView: React.FC = () => {
     const { user, logout } = useAuth();
+    const navigate = useNavigate();
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -29,23 +31,44 @@ export const ChangePasswordView: React.FC = () => {
         setIsLoading(true);
 
         try {
+            if (import.meta.env.VITE_USE_MOCK === 'true') {
+                const stored = localStorage.getItem('coreflow_mock_session');
+                if (stored) {
+                    const parsed = JSON.parse(stored);
+                    parsed.requires_password_change = false;
+                    parsed.status = 'ACTIVE';
+                    localStorage.setItem('coreflow_mock_session', JSON.stringify(parsed));
+                }
+                setIsSuccess(true);
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 1500);
+                return;
+            }
+
             // 1. Actualizar contraseña en Auth
-            const { error: authError } = await supabase.auth.updateUser({
+            const { data: updateData, error: authError } = await supabase.auth.updateUser({
                 password: newPassword
             });
 
             if (authError) throw authError;
 
-            // 2. Actualizar perfil para quitar el flag y activar usuario
-            const { error: profileError } = await supabase
-                .from('profiles')
-                .update({ 
-                    requires_password_change: false,
-                    status: 'ACTIVE' 
-                })
-                .eq('id', user?.id);
+            const targetUserId = updateData?.user?.id || user?.id;
 
-            if (profileError) throw profileError;
+            // 2. Actualizar perfil para quitar el flag y activar usuario
+            if (targetUserId) {
+                const { error: profileError } = await supabase
+                    .from('profiles')
+                    .update({ 
+                        requires_password_change: false,
+                        status: 'ACTIVE' 
+                    })
+                    .eq('id', targetUserId);
+
+                if (profileError) {
+                    console.warn('Warning updating profile requires_password_change:', profileError);
+                }
+            }
 
             setIsSuccess(true);
             
@@ -146,10 +169,16 @@ export const ChangePasswordView: React.FC = () => {
                         
                         <button
                             type="button"
-                            onClick={() => logout()}
+                            onClick={() => {
+                                if (!user?.requires_password_change) {
+                                    navigate(-1);
+                                } else {
+                                    logout();
+                                }
+                            }}
                             className="w-full text-industrial-500 hover:text-white text-xs py-2 transition-colors"
                         >
-                            Cancelar y Cerrar Sesión
+                            {!user?.requires_password_change ? 'Cancelar y Volver' : 'Cancelar y Cerrar Sesión'}
                         </button>
                     </div>
                 </form>

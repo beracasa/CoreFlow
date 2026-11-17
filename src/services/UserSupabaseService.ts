@@ -62,7 +62,8 @@ export const UserSupabaseService = {
   // Get all users (profiles) with notification preferences
   async getUsersWithPreferences(): Promise<UserProfile[]> {
     if (import.meta.env.VITE_USE_MOCK === 'true') {
-      return this.getUsers();
+      const allUsers = await this.getUsers();
+      return allUsers.filter(u => u.status !== 'INACTIVE');
     }
 
     const isSuperAdmin = await this.isCurrentSuperAdmin();
@@ -74,9 +75,11 @@ export const UserSupabaseService = {
 
     if (error) throw error;
 
+    const activeData = (data || []).filter((p: any) => p.status !== 'INACTIVE');
+
     const filteredData = isSuperAdmin
-      ? data
-      : data.filter((p: any) => 
+      ? activeData
+      : activeData.filter((p: any) => 
           p.email?.toLowerCase().trim() !== 'beracasa@gmail.com' &&
           p.full_name?.toLowerCase().trim() !== 'admin coreflow'
         );
@@ -265,6 +268,45 @@ export const UserSupabaseService = {
     }
 
     return data;
+  },
+
+  // Request password reset email via Edge Function (Resend) with fallback
+  async requestPasswordReset(email: string, redirectTo?: string): Promise<void> {
+    const cleanEmail = email.trim().toLowerCase();
+    const targetRedirect = redirectTo || `${window.location.origin}/change-password`;
+
+    if (import.meta.env.VITE_USE_MOCK === 'true') {
+      console.log(`[Mock Mode] Password reset requested for ${cleanEmail} -> ${targetRedirect}`);
+      return;
+    }
+
+    console.log(`[UserSupabaseService] Requesting password reset for: ${cleanEmail}`);
+
+    const { data, error } = await supabase.functions.invoke('create-user-admin', {
+      body: {
+        action: 'reset_password',
+        email: cleanEmail,
+        redirectTo: targetRedirect,
+      }
+    });
+
+    if (error) {
+      const parsedErr = await parseEdgeFunctionError(error);
+      // Fallback to native Supabase Auth reset if the Edge Function hasn't been deployed with reset_password yet
+      if (parsedErr.message.includes('Faltan campos requeridos')) {
+        console.warn('[UserSupabaseService] Edge Function aún no actualizada con reset_password, usando fallback nativo...');
+        const { error: fallbackError } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+          redirectTo: targetRedirect,
+        });
+        if (fallbackError) throw fallbackError;
+        return;
+      }
+      throw parsedErr;
+    }
+
+    if (data && data.error) {
+      throw new Error(data.error);
+    }
   },
   // Update User Profile
   async updateUser(user: UserProfile): Promise<void> {

@@ -174,9 +174,10 @@ export const NotificationSettings = () => {
       try {
         const allUsers = await UserSupabaseService.getUsersWithPreferences();
         const isSuperAdmin = currentUser?.email?.toLowerCase().trim() === 'beracasa@gmail.com';
+        const activeUsers = allUsers.filter(u => u.status !== 'INACTIVE');
         const visibleUsers = isSuperAdmin
-          ? allUsers
-          : allUsers.filter(u => 
+          ? activeUsers
+          : activeUsers.filter(u => 
               u.email?.toLowerCase().trim() !== 'beracasa@gmail.com' &&
               u.full_name?.toLowerCase().trim() !== 'admin coreflow'
             );

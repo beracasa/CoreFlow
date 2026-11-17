@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../src/services/supabaseClient'; // Import supabase directly for signup
+import { UserSupabaseService } from '../src/services/UserSupabaseService';
 import { Lock, Mail, ArrowRight, AlertCircle, ShieldCheck, Hexagon, User } from 'lucide-react';
 import { UserRole } from '../types';
 
@@ -33,11 +33,11 @@ export const Login: React.FC = () => {
 
     try {
       if (isForgotPassword) {
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/change-password`,
-        });
-        if (error) throw error;
-        setMessage('Password recovery link sent to your email.');
+        await UserSupabaseService.requestPasswordReset(
+          email,
+          `${window.location.origin}/change-password`
+        );
+        setMessage('Se ha enviado el enlace de recuperación de contraseña a tu correo electrónico.');
       } else {
         // Handle Login
         await login(email, password);

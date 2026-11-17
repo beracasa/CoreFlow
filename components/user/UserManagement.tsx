@@ -1,10 +1,11 @@
 
 import React, { useState } from 'react';
 import { UserProfile, UserRole } from '../../types';
-import { Plus, Mail, Shield, UserCheck, MoreVertical, Search, CheckCircle, Pencil, X, Trash2, BadgeCheck, Briefcase } from 'lucide-react';
+import { Plus, Mail, Shield, UserCheck, MoreVertical, Search, CheckCircle, Pencil, X, Trash2, BadgeCheck, Briefcase, Key } from 'lucide-react';
 
 import { useUserStore } from '../../src/stores/useUserStore';
 import { useAuth } from '../../contexts/AuthContext';
+import { UserSupabaseService } from '../../src/services/UserSupabaseService';
 
 export const UserManagement: React.FC = () => {
     const { users, roles, fetchUsers, fetchRoles, inviteUserWithPassword, updateUser, deleteUser, isLoading } = useUserStore();
@@ -444,9 +445,29 @@ export const UserManagement: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div className="flex justify-end gap-3 pt-4 border-t border-industrial-700">
-                                <button type="button" onClick={() => setEditingUser(null)} className="px-4 py-2 text-sm text-industrial-400 hover:text-white">Cancelar</button>
-                                <button type="submit" className="px-4 py-2 bg-industrial-accent hover:bg-blue-600 text-white rounded text-sm font-bold shadow-lg">Guardar Cambios</button>
+                            <div className="flex items-center justify-between gap-3 pt-4 border-t border-industrial-700">
+                                <button
+                                    type="button"
+                                    onClick={async () => {
+                                        if (!editingUser?.email) return;
+                                        try {
+                                            await UserSupabaseService.requestPasswordReset(
+                                                editingUser.email,
+                                                `${window.location.origin}/change-password`
+                                            );
+                                            alert(`✅ Enlace de recuperación de contraseña enviado a ${editingUser.email}`);
+                                        } catch (err: any) {
+                                            alert(`❌ Error al enviar correo de recuperación: ${err.message}`);
+                                        }
+                                    }}
+                                    className="px-3 py-2 text-xs bg-industrial-900 hover:bg-industrial-700 text-industrial-300 hover:text-white border border-industrial-600 rounded flex items-center gap-1.5 transition-colors"
+                                >
+                                    <Key size={13} className="text-industrial-accent" /> Enviar Reset de Contraseña
+                                </button>
+                                <div className="flex gap-3">
+                                    <button type="button" onClick={() => setEditingUser(null)} className="px-4 py-2 text-sm text-industrial-400 hover:text-white">Cancelar</button>
+                                    <button type="submit" className="px-4 py-2 bg-industrial-accent hover:bg-blue-600 text-white rounded text-sm font-bold shadow-lg">Guardar Cambios</button>
+                                </div>
                             </div>
                         </form>
                     </div>

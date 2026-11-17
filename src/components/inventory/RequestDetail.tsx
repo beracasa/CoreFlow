@@ -123,9 +123,11 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
     };
 
     const filteredUsers = systemUsers.filter(u =>
-        !receiverSearch ||
-        (u.full_name || '').toLowerCase().includes(receiverSearch.toLowerCase()) ||
-        (u.email || '').toLowerCase().includes(receiverSearch.toLowerCase())
+        u.status !== 'INACTIVE' && (
+            !receiverSearch ||
+            (u.full_name || '').toLowerCase().includes(receiverSearch.toLowerCase()) ||
+            (u.email || '').toLowerCase().includes(receiverSearch.toLowerCase())
+        )
     );
 
     const selectedReceiverUser = systemUsers.find(u => u.id === selectedReceiver);

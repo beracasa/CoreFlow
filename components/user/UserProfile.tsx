@@ -1,8 +1,9 @@
 
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { UserProfile } from '../../types';
 import { SignaturePad } from '../shared/SignaturePad';
-import { User, BadgeCheck, Mail, Briefcase, Award, X, Send } from 'lucide-react';
+import { User, BadgeCheck, Mail, Briefcase, Award, X, Send, Key } from 'lucide-react';
 import { useUserStore } from '../../src/stores/useUserStore';
 import { UserSupabaseService } from '../../src/services/UserSupabaseService';
 
@@ -11,6 +12,7 @@ interface UserProfileProps {
 }
 
 export const UserProfileView: React.FC<UserProfileProps> = ({ user }) => {
+   const navigate = useNavigate();
    const [signature, setSignature] = useState<string | undefined>(user.signature_url);
    const [isEditing, setIsEditing] = useState(false);
    const [showSkillModal, setShowSkillModal] = useState(false);
@@ -78,6 +80,15 @@ export const UserProfileView: React.FC<UserProfileProps> = ({ user }) => {
                         <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-blue-900/30 text-blue-400 border border-blue-800">
                            {roleName}
                         </span>
+                     </div>
+                     <div className="mt-4">
+                        <button
+                           type="button"
+                           onClick={() => navigate('/change-password')}
+                           className="inline-flex items-center gap-1.5 text-xs bg-industrial-700 hover:bg-industrial-600 text-white px-3 py-1.5 rounded border border-industrial-600 transition-colors"
+                        >
+                           <Key size={13} className="text-industrial-accent" /> Cambiar Contraseña
+                        </button>
                      </div>
                   </div>
                </div>
