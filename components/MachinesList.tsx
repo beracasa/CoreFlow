@@ -22,7 +22,7 @@ export const MachinesList: React.FC = () => {
 
   const { t } = useLanguage();
   const { hasPermission } = useAuth();
-  const canManage = hasPermission('manage_machines') || hasPermission('manage_assets');
+  const canManage = hasPermission('manage_machines');
   const canView = hasPermission('view_machines') || canManage;
 
   if (!canView) {

@@ -96,8 +96,7 @@ const InventoryPage = () => {
     hasPermission('manage_inventory') ||
     hasPermission('view_inventory') ||
     hasPermission('view_part_requests') ||
-    hasPermission('view_purchase_requests') ||
-    hasPermission('manage_assets');
+    hasPermission('view_purchase_requests');
 
   if (!canAccessInventory) {
     return (
@@ -337,8 +336,7 @@ const AppLayout = () => {
                 !hasPermission('manage_inventory') &&
                 !hasPermission('view_inventory') &&
                 !hasPermission('view_part_requests') &&
-                !hasPermission('view_purchase_requests') &&
-                !hasPermission('manage_assets')
+                !hasPermission('view_purchase_requests')
               } />
 
             <div className="pt-4 mt-4 border-t border-industrial-800">

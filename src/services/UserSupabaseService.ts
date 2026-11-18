@@ -70,7 +70,7 @@ export const UserSupabaseService = {
 
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, email, full_name, job_title, role, tenant_id, status, notification_preferences, app_roles(name)')
+      .select('id, email, full_name, job_title, role, role_id, tenant_id, status, notification_preferences, app_roles(name)')
       .order('full_name');
 
     if (error) throw error;
@@ -88,7 +88,7 @@ export const UserSupabaseService = {
       id: p.id,
       email: p.email,
       full_name: p.full_name || '',
-      role: p.role,
+      role: p.role_id || p.role,
       roleName: (Array.isArray(p.app_roles) ? p.app_roles[0]?.name : p.app_roles?.name) || p.role,
       job_title: p.job_title || '',
       tenant_id: p.tenant_id,
@@ -324,18 +324,38 @@ export const UserSupabaseService = {
       .from('profiles')
       .update({
         full_name: user.full_name,
-        role_id: user.role, // Direct update to profiles using `role_id`
+        role_id: user.role || null, // Direct update to profiles using `role_id`
         job_title: user.job_title,
         status: user.status,
-        specialties: user.specialties,
-        company_code: user.company_code // Added company_code to update
+        specialties: user.specialties || [],
+        company_code: user.company_code || ''
       })
       .eq('id', user.id)
       .select();
 
     if (error) {
-       console.error("Error updating profile:", error);
-       throw error;
+      console.error("Error updating profile:", error);
+      throw error;
+    }
+
+    // Fallback via SECURITY DEFINER RPC if RLS prevented direct row update (0 rows returned)
+    if (!data || data.length === 0) {
+      const { error: rpcError } = await supabase.rpc('update_user_profile', {
+        p_user_id: user.id,
+        p_full_name: user.full_name || '',
+        p_role_id: user.role || null,
+        p_job_title: user.job_title || '',
+        p_company_code: user.company_code || '',
+        p_specialties: user.specialties || [],
+        p_tenant_id: user.tenant_id || 'primary',
+        p_status: user.status || 'ACTIVE',
+        p_requires_password_change: user.requires_password_change ?? false
+      });
+
+      if (rpcError) {
+        console.error("Error updating profile via RPC fallback:", rpcError);
+        throw rpcError;
+      }
     }
   },
   // Delete User (Profile)

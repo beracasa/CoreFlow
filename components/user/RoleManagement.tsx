@@ -25,10 +25,11 @@ const SYSTEM_PERMISSIONS: Permission[] = [
     // Operativos
     { id: 'manage_machines', category: 'OPERATIONAL', label: 'Gestionar Equipos', description: 'Agregar, editar y desactivar equipos y máquinas.' },
     { id: 'view_machines', category: 'OPERATIONAL', label: 'Ver Equipos', description: 'Ver listado de equipos y fichas de detalle, sin editar ni desactivar.' },
-    { id: 'create_wo', category: 'OPERATIONAL', label: 'Crear Órdenes de Mantenimiento', description: 'Generar nuevos tickets R-MANT-02/05.' },
-    { id: 'execute_wo', category: 'OPERATIONAL', label: 'Ejecutar Órdenes de Mantenimiento', description: 'Llenar checklists y consumir repuestos.' },
-    { id: 'supervise_order', category: 'OPERATIONAL', label: 'Supervisar y Recibir Órdenes', description: 'Llenar checklists y recepción de una orden.' },
-    { id: 'edit_wo', category: 'OPERATIONAL', label: 'Editar Órdenes de Mantenimiento', description: 'Editar información de la orden.' },
+    { id: 'create_wo', category: 'OPERATIONAL', label: 'Crear Órdenes de Mantenimiento', description: 'Generar nuevos tickets R-MANT-02/05 (Sección 1).' },
+    { id: 'execute_wo', category: 'OPERATIONAL', label: 'Ejecutar Órdenes de Mantenimiento', description: 'Llenar checklists de intervención, registrar repuestos y firmar como Ejecutante (Sección 2).' },
+    { id: 'supervise_intervention', category: 'OPERATIONAL', label: 'Supervisar Intervenciones (Sección 2)', description: 'Firmar conformidad de las intervenciones ejecutadas y finalizar la Sección 2 (Supervisor de Mantenimiento).' },
+    { id: 'supervise_order', category: 'OPERATIONAL', label: 'Recibir y Cerrar Órdenes (Sección 3)', description: 'Llenar checklist de entrega, firmar recepción conforme y cerrar la orden en la Sección 3 (Supervisor de Producción).' },
+    { id: 'edit_wo', category: 'OPERATIONAL', label: 'Editar Órdenes de Mantenimiento', description: 'Editar información de la orden y eliminar registros.' },
     { id: 'log_hours', category: 'OPERATIONAL', label: 'Registrar Uso del Equipo', description: 'Actualizar contadores de horas de máquinas.' },
     
     // Administrativos
@@ -144,14 +145,38 @@ export const RoleManagement: React.FC = () => {
     React.useEffect(() => {
         if (roles.length > 0 && !selectedRole && !showCreateModal) {
             const defaultRole = roles.find(r => !isProtectedRole(r)) || roles[0];
-            setSelectedRole(defaultRole);
-            setFormData(defaultRole);
+            const cleanCopy = {
+                ...defaultRole,
+                permissions: { ...((defaultRole.permissions as Record<string, boolean>) || {}) }
+            };
+            setSelectedRole(cleanCopy);
+            setFormData(cleanCopy);
+        } else if (selectedRole && !isEditing && !showCreateModal) {
+            // Mantener sincronizado el rol seleccionado con la lista actualizada del store cuando no se está editando
+            const fresh = roles.find(r => r.id === selectedRole.id);
+            if (fresh && JSON.stringify(fresh.permissions) !== JSON.stringify(selectedRole.permissions)) {
+                const cleanCopy = {
+                    ...fresh,
+                    permissions: { ...((fresh.permissions as Record<string, boolean>) || {}) }
+                };
+                setSelectedRole(cleanCopy);
+                setFormData(cleanCopy);
+            }
         }
-    }, [roles, selectedRole, showCreateModal]);
+    }, [roles, selectedRole, isEditing, showCreateModal]);
 
     const handleSelectRole = (role: RoleDefinition) => {
-        setSelectedRole(role);
-        setFormData(role);
+        if (isEditing && selectedRole && selectedRole.id !== role.id) {
+            const discard = confirm(`Tiene cambios sin guardar en el rol "${selectedRole.name}". ¿Desea descartar los cambios y cambiar al rol "${role.name}"?`);
+            if (!discard) return;
+        }
+        const canonical = roles.find(r => r.id === role.id) || role;
+        const cleanCopy: RoleDefinition = {
+            ...canonical,
+            permissions: { ...((canonical.permissions as Record<string, boolean>) || {}) }
+        };
+        setSelectedRole(cleanCopy);
+        setFormData(cleanCopy);
         setIsEditing(false);
         setShowCreateModal(false);
     };
@@ -255,11 +280,25 @@ export const RoleManagement: React.FC = () => {
         }
 
         try {
-            const updatedPayload = { ...selectedRole, ...formData, name: trimmedName } as RoleDefinition;
+            const cleanedPermissions = { ...((formData.permissions as Record<string, boolean>) || {}) };
+            // Eliminar llave legacy que no forma parte de los checkboxes actuales de SYSTEM_PERMISSIONS
+            delete cleanedPermissions['manage_assets'];
+            cleanedPermissions['supervise_intervention'] = Boolean(cleanedPermissions['supervise_intervention']);
+            cleanedPermissions['supervise_order'] = Boolean(cleanedPermissions['supervise_order']);
+
+            const updatedPayload: RoleDefinition = {
+                ...selectedRole,
+                ...formData,
+                id: selectedRole.id,
+                name: trimmedName,
+                permissions: cleanedPermissions
+            };
             await updateRole(updatedPayload);
             setSelectedRole(updatedPayload);
             setFormData(updatedPayload);
             setIsEditing(false);
+            await fetchRoles();
+            alert(`✅ Cambios guardados exitosamente para el rol "${trimmedName}".`);
         } catch (error: any) {
             alert(`Error al guardar: ${error.message}`);
         }
@@ -472,7 +511,19 @@ export const RoleManagement: React.FC = () => {
 
                         {/* Panel de Permisos */}
                         <div className="flex-1 overflow-y-auto p-6">
-                            <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-6">Configuración de Permisos</h4>
+                            <div className="flex items-center justify-between mb-6">
+                                <h4 className="text-sm font-bold text-white uppercase tracking-wider">
+                                    Configuración de Permisos {formData.name ? `— ${formData.name}` : ''}
+                                </h4>
+                                {(isEditing || showCreateModal) && canManage && !isCurrentRoleProtected && (
+                                    <button 
+                                        onClick={handleSave}
+                                        className="px-3.5 py-1.5 bg-industrial-accent hover:bg-blue-600 text-white text-xs font-bold rounded shadow-lg flex items-center gap-1.5"
+                                    >
+                                        <Save size={13} /> {showCreateModal ? 'Crear Rol' : 'Guardar Cambios'}
+                                    </button>
+                                )}
+                            </div>
                             
                             <div className="grid grid-cols-2 gap-x-8 gap-y-8">
                                 {Object.entries(groupedPermissions).map(([category, perms]) => (
