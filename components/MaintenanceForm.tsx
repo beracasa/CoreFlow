@@ -2092,8 +2092,8 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                  <div
                                     onClick={signExecutor}
                                     className={`relative h-24 bg-white/5 rounded border-2 border-dashed ${!isInterventionClosed && canSignExecutor && (!formData.signatureExecutor || formData.signatureExecutor === 'false')
-                                          ? (invalidFields.has('signatureExecutor') ? 'border-red-500 bg-red-900/10 cursor-pointer animate-pulse' : 'border-pink-500/50 cursor-pointer hover:bg-white/10')
-                                          : 'border-industrial-600'
+                                       ? (invalidFields.has('signatureExecutor') ? 'border-red-500 bg-red-900/10 cursor-pointer animate-pulse' : 'border-pink-500/50 cursor-pointer hover:bg-white/10')
+                                       : 'border-industrial-600'
                                        } flex items-center justify-center flex-col gap-1 transition-colors`}
                                  >
                                     {formData.signatureExecutor && formData.signatureExecutor !== 'false' ? (
@@ -2153,8 +2153,8 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                        disabled={isSaving}
                                        onClick={closeInterventions}
                                        className={`w-full py-2.5 px-3 rounded-lg text-xs font-bold shadow-md transition-all flex items-center justify-center gap-2 ${formData.signatureExecutor && formData.signatureExecutor !== 'false'
-                                             ? 'bg-pink-600 hover:bg-pink-500 text-white shadow-pink-900/40 active:scale-[0.99] animate-pulse'
-                                             : 'bg-industrial-800 hover:bg-industrial-700 text-industrial-300 border border-industrial-600'
+                                          ? 'bg-pink-600 hover:bg-pink-500 text-white shadow-pink-900/40 active:scale-[0.99] animate-pulse'
+                                          : 'bg-industrial-800 hover:bg-industrial-700 text-industrial-300 border border-industrial-600'
                                           }`}
                                        title={
                                           !formData.signatureExecutor || formData.signatureExecutor === 'false'
@@ -2181,10 +2181,10 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                  <div
                                     onClick={signExecutionSupervisor}
                                     className={`relative h-24 bg-white/5 rounded border-2 border-dashed ${!isInterventionClosed
-                                          ? 'border-industrial-700 bg-industrial-900/40 opacity-60 cursor-not-allowed'
-                                          : canSignSupervisorIntervention && (!formData.signatureExecutionSupervisor || formData.signatureExecutionSupervisor === 'false')
-                                             ? (invalidFields.has('signatureExecutionSupervisor') ? 'border-red-500 bg-red-900/10 cursor-pointer animate-pulse' : 'border-pink-500/50 cursor-pointer hover:bg-white/10')
-                                             : 'border-industrial-600'
+                                       ? 'border-industrial-700 bg-industrial-900/40 opacity-60 cursor-not-allowed'
+                                       : canSignSupervisorIntervention && (!formData.signatureExecutionSupervisor || formData.signatureExecutionSupervisor === 'false')
+                                          ? (invalidFields.has('signatureExecutionSupervisor') ? 'border-red-500 bg-red-900/10 cursor-pointer animate-pulse' : 'border-pink-500/50 cursor-pointer hover:bg-white/10')
+                                          : 'border-industrial-600'
                                        } flex items-center justify-center flex-col gap-1 transition-colors`}
                                  >
                                     {formData.signatureExecutionSupervisor && formData.signatureExecutionSupervisor !== 'false' ? (
@@ -2217,10 +2217,10 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                        </>
                                     ) : (
                                        <span className={`text-xs flex items-center gap-1.5 ${!isInterventionClosed
-                                             ? 'text-industrial-500'
-                                             : invalidFields.has('signatureExecutionSupervisor')
-                                                ? 'text-red-400 font-bold'
-                                                : 'text-industrial-400'
+                                          ? 'text-industrial-500'
+                                          : invalidFields.has('signatureExecutionSupervisor')
+                                             ? 'text-red-400 font-bold'
+                                             : 'text-industrial-400'
                                           }`}>
                                           {!isInterventionClosed ? (
                                              <>
@@ -2271,8 +2271,8 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                            disabled={isSaving || !isInterventionClosed || !hasPermission('supervise_intervention')}
                            onClick={finishInterventions}
                            className={`${!isInterventionClosed || !hasPermission('supervise_intervention')
-                                 ? 'bg-industrial-800 text-industrial-500 border border-industrial-700 cursor-not-allowed opacity-60 shadow-none'
-                                 : 'bg-pink-600 hover:bg-pink-500 text-white font-bold shadow-lg shadow-pink-900/40 active:scale-95'
+                              ? 'bg-industrial-800 text-industrial-500 border border-industrial-700 cursor-not-allowed opacity-60 shadow-none'
+                              : 'bg-pink-600 hover:bg-pink-500 text-white font-bold shadow-lg shadow-pink-900/40 active:scale-95'
                               } px-6 py-2.5 rounded-lg font-bold transition-all flex items-center gap-2 text-sm disabled:cursor-not-allowed`}
                            title={
                               !isInterventionClosed
