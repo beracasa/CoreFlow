@@ -14,7 +14,7 @@ import { Layers, FileText, ArrowDownCircle, PlusCircle, List, Shield, Eye, Edit3
 export const Inventory: React.FC<any> = () => {
   const { hasPermission } = useAuth();
 
-  const canManage = hasPermission('manage_inventory') || hasPermission('manage_assets');
+  const canManage = hasPermission('manage_inventory');
   const canViewInventory = canManage || hasPermission('view_inventory');
   const canViewPartRequests = canManage || hasPermission('view_part_requests');
   const canViewPurchaseRequests = canManage || hasPermission('view_purchase_requests');

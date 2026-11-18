@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { UserProfile, UserRole } from '../types';
 import { supabase } from '../src/services/supabaseClient';
 import { useUserStore } from '../src/stores/useUserStore';
+import { normalizeRolePermissions } from '../src/services/RoleSupabaseService';
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -70,7 +71,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const appRole = Array.isArray(data.app_roles) ? data.app_roles[0] : data.app_roles;
     const roleId = data.role_id || appRole?.id || data.role;
     const roleName = appRole?.name || data.role;
-    const permissions = appRole?.permissions || data.permissions;
+    const permissions = normalizeRolePermissions(roleName, appRole?.permissions || data.permissions, appRole?.is_system);
 
     return {
       id: data.id,
@@ -297,6 +298,71 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const roles = useUserStore(state => state.roles);
   const storeUsers = useUserStore(state => state.users);
 
+  // 4. Keep current user state synchronized when storeUsers or roles change, or when tab regains focus
+  useEffect(() => {
+    if (!user?.id || import.meta.env.VITE_USE_MOCK === 'true') return;
+
+    const matchedStoreUser = storeUsers.find(u => u.id === user.id);
+    if (matchedStoreUser) {
+      const matchedRoleDef = roles.find(r => r.id === matchedStoreUser.role);
+      const nextRoleName = matchedRoleDef?.name || matchedStoreUser.roleName || user.roleName;
+      const nextPerms = matchedRoleDef?.permissions || user.permissions;
+
+      if (
+        matchedStoreUser.role !== user.role ||
+        nextRoleName !== user.roleName ||
+        matchedStoreUser.job_title !== user.job_title ||
+        matchedStoreUser.full_name !== user.full_name
+      ) {
+        setUser(prev => prev ? {
+          ...prev,
+          role: matchedStoreUser.role,
+          roleName: nextRoleName,
+          job_title: matchedStoreUser.job_title,
+          full_name: matchedStoreUser.full_name,
+          permissions: nextPerms
+        } : prev);
+      }
+    }
+  }, [storeUsers, roles, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id || import.meta.env.VITE_USE_MOCK === 'true') return;
+
+    const handleVisibilityOrFocus = async () => {
+      if (document.visibilityState === 'visible') {
+        useUserStore.getState().fetchRoles().catch(console.error);
+        const freshProfile = await fetchProfile(user.id);
+        if (freshProfile) {
+          setUser(prev => prev ? { ...prev, ...freshProfile } : freshProfile);
+        }
+      }
+    };
+
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+
+    const channel = supabase
+      .channel(`rbac-sync-${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'app_roles' }, () => {
+        useUserStore.getState().fetchRoles().catch(console.error);
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` }, async () => {
+        const freshProfile = await fetchProfile(user.id);
+        if (freshProfile) {
+          setUser(prev => prev ? { ...prev, ...freshProfile } : freshProfile);
+        }
+        useUserStore.getState().fetchUsers().catch(console.error);
+      })
+      .subscribe();
+
+    return () => {
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
+
   const login = async (email: string, password: string) => {
     // Do not set global loading here. Let the UI handle its own loading state.
     // setIsLoading(true); 
@@ -370,37 +436,74 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // setIsLoading(false);
   };
 
+  // Helper: Resolver definición de rol con prioridad estricta (1º por UUID exacto, 2º por Nombre exacto)
+  // NUNCA usar job_title para evitar colisiones entre roles (ej. Supervisor de Mantenimiento vs Supervisor de Producción)
+  const resolveUserRoleDef = () => {
+    if (!user || roles.length === 0) return undefined;
+
+    const storeUser = storeUsers.find(
+      u => u.id === user.id || (user.email && u.email?.toLowerCase().trim() === user.email.toLowerCase().trim())
+    );
+
+    const activeRoleValue = (storeUser?.role || user.role || '').toString().toLowerCase().trim();
+    const activeRoleName = (storeUser?.roleName || user.roleName || '').toString().toLowerCase().trim();
+
+    // Pasada 1: Coincidencia exacta por ID de rol (UUID)
+    if (activeRoleValue) {
+      const byId = roles.find(r => (r.id || '').toString().toLowerCase().trim() === activeRoleValue);
+      if (byId) return byId;
+    }
+
+    // Pasada 2: Coincidencia exacta por Nombre de rol (solo si activeRoleValue no era un ID válido en roles)
+    if (activeRoleValue) {
+      const byValueAsName = roles.find(r => (r.name || '').toString().toLowerCase().trim() === activeRoleValue);
+      if (byValueAsName) return byValueAsName;
+    }
+
+    if (activeRoleName) {
+      const byRoleName = roles.find(r => (r.name || '').toString().toLowerCase().trim() === activeRoleName);
+      if (byRoleName) return byRoleName;
+    }
+
+    return undefined;
+  };
+
   const hasRole = (allowedRoles: UserRole[]) => {
     if (!user) return false;
 
-    // Si el rol sigue siendo el string hardcodeado, usa la lógica vieja
-    if (allowedRoles.includes(user.role as UserRole)) return true;
+    const storeUser = storeUsers.find(
+      u => u.id === user.id || (user.email && u.email?.toLowerCase().trim() === user.email.toLowerCase().trim())
+    );
+    const activeRole = (storeUser?.role || user.role) as UserRole;
 
-    // Buscar en los roles dinámicos por ID o por Nombre
-    const userRoleStr = (user.role || '').toString().toLowerCase().trim();
-    const userRoleNameStr = (user.roleName || '').toString().toLowerCase().trim();
+    // Si el rol sigue siendo el string hardcodeado, usa la lógica directa
+    if (allowedRoles.includes(activeRole)) return true;
 
-    const userRoleDef = roles.find(r => {
-      const rId = (r.id || '').toString().toLowerCase().trim();
-      const rName = (r.name || '').toString().toLowerCase().trim();
-      return rId === userRoleStr || rName === userRoleStr || (userRoleNameStr && rName === userRoleNameStr);
-    });
+    const userRoleDef = resolveUserRoleDef();
 
     if (userRoleDef) {
-      // Si el rol de DB dice "Admin", "Manager" o "Supervisor" o es de sistema
-      // consideramos que es un "ADMIN_SOLICITANTE" lógico para mantener compatibilidad
+      const rNameNorm = (userRoleDef.name || '').toLowerCase().trim();
+      // Solo el rol de sistema o Administrador tiene bypass global de ADMIN_SOLICITANTE
       if (allowedRoles.includes(UserRole.ADMIN_SOLICITANTE)) {
-        if (userRoleDef.name?.toLowerCase().includes('admin') ||
-          userRoleDef.name?.toLowerCase().includes('manager') ||
-          userRoleDef.isSystem) {
+        if (
+          userRoleDef.isSystem ||
+          rNameNorm === 'admin' ||
+          rNameNorm === 'administrador' ||
+          rNameNorm === 'administrador solicitante'
+        ) {
           return true;
         }
       }
 
-      // Si se requiere tecnico
+      // Si se requiere técnico
       if (allowedRoles.includes(UserRole.TECNICO_MANT)) {
-        if (userRoleDef.name?.toLowerCase().includes('tecnico') ||
-          userRoleDef.name?.toLowerCase().includes('mecanico')) {
+        if (
+          rNameNorm.includes('tecnico') ||
+          rNameNorm.includes('técnico') ||
+          rNameNorm.includes('mecanico') ||
+          rNameNorm.includes('mecánico') ||
+          rNameNorm.includes('electromec')
+        ) {
           return true;
         }
       }
@@ -409,43 +512,36 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return false;
   };
 
+  // Solo pares directos de Edición -> Lectura (idénticos a VIEW_EDIT_PAIRS en RoleManagement)
   const IMPLICIT_PERMISSIONS_MAP: Record<string, string[]> = {
     view_dashboard: ['edit_dashboard_map'],
-    view_kanban: ['edit_kanban', 'create_wo', 'execute_wo', 'supervise_order', 'edit_wo'],
+    view_kanban: ['edit_kanban'],
     view_calendar: ['manage_calendar'],
-    view_machines: ['manage_machines', 'manage_assets'],
-    view_inventory: ['manage_inventory', 'manage_assets'],
-    view_part_requests: ['manage_inventory', 'manage_assets'],
-    view_purchase_requests: ['manage_inventory', 'manage_assets'],
-    manage_machines: ['manage_assets'],
-    manage_inventory: ['manage_assets'],
-    create_wo: ['manage_assets'],
-    execute_wo: ['manage_assets'],
-    supervise_order: ['manage_assets'],
-    edit_wo: ['manage_assets'],
-    log_hours: ['manage_assets'],
+    view_machines: ['manage_machines'],
+    view_inventory: ['manage_inventory'],
+    view_part_requests: ['manage_inventory'],
+    view_purchase_requests: ['manage_inventory'],
   };
 
   const hasPermission = (permissionId: string) => {
     if (!user) return false;
 
-    // 1. Super Admin Bypass
+    // 1. Obtener estado más reciente del usuario desde el store si está disponible
     const storeUser = storeUsers.find(
       u => u.id === user.id || (user.email && u.email?.toLowerCase().trim() === user.email.toLowerCase().trim())
     );
-    const userRoleStr = (storeUser?.role || user.role || '').toString().toLowerCase().trim();
-    const rawUserRoleStr = (user.role || '').toString().toLowerCase().trim();
-    const userRoleNameStr = (storeUser?.roleName || user.roleName || '').toString().toLowerCase().trim();
-    const userJobTitleStr = (storeUser?.job_title || user.job_title || '').toString().toLowerCase().trim();
+    const activeRoleStr = (storeUser?.role || user.role || '').toString().toLowerCase().trim();
+    const userRoleDef = resolveUserRoleDef();
+    const resolvedRoleName = (userRoleDef?.name || storeUser?.roleName || user.roleName || '').toString().toLowerCase().trim();
 
+    // Super Admin Bypass (exclusivo para rol Admin / Administrador / Sistema)
     if (
-      user.role === UserRole.ADMIN_SOLICITANTE ||
-      userRoleStr === 'admin_solicitante' ||
-      rawUserRoleStr === 'admin_solicitante' ||
-      userRoleStr === 'admin' ||
-      userRoleStr === 'administrador' ||
-      userRoleNameStr === 'admin' ||
-      userRoleNameStr === 'administrador'
+      activeRoleStr === 'admin_solicitante' ||
+      activeRoleStr === 'admin' ||
+      activeRoleStr === 'administrador' ||
+      resolvedRoleName === 'admin' ||
+      resolvedRoleName === 'administrador' ||
+      Boolean(userRoleDef?.isSystem)
     ) {
       return true;
     }
@@ -459,45 +555,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         try { p = JSON.parse(p); } catch { return null; }
       }
       if (Array.isArray(p)) {
-        if (validPerms.some(req => p.includes(req))) return true;
-        return false;
+        return validPerms.some(req => p.includes(req));
       } else if (typeof p === 'object' && p !== null) {
-        if (validPerms.some(req => !!p[req])) return true;
-        return false;
+        return validPerms.some(req => p[req] === true);
       }
       return null;
     };
 
-    // 2. Check dynamic roles definition from store (reactive source of truth)
-    const userRoleDef = roles.find(r => {
-      const rId = (r.id || '').toString().toLowerCase().trim();
-      const rName = (r.name || '').toString().toLowerCase().trim();
-      return (
-        rId === userRoleStr ||
-        rId === rawUserRoleStr ||
-        rName === userRoleStr ||
-        rName === rawUserRoleStr ||
-        (userRoleNameStr && rName === userRoleNameStr) ||
-        (userJobTitleStr && rName === userJobTitleStr)
-      );
-    });
-
+    // 2. Fuente de verdad reactiva: Definición del rol en useUserStore
     if (userRoleDef) {
-      const rNameNorm = (userRoleDef.name || '').toLowerCase().trim();
-      if (userRoleDef.isSystem || rNameNorm === 'admin' || rNameNorm === 'administrador') {
-        return true;
-      }
-
-      // Check specific permission in role definition
-      const rolePermRes = checkContainer(userRoleDef.permissions);
-      if (rolePermRes === true) return true;
+      const normalizedPerms = normalizeRolePermissions(userRoleDef.name, userRoleDef.permissions, userRoleDef.isSystem);
+      const rolePermRes = checkContainer(normalizedPerms);
+      // Retornar resultado definitivo del rol actual (no caer al fallback estático si fue desactivado)
+      return rolePermRes === true;
     } else if (roles.length === 0) {
       useUserStore.getState().fetchRoles().catch(console.error);
     }
 
-    // 3. Fallback: Check direct user permissions attached to profile at login
+    // 3. Fallback únicamente mientras roles aún no ha terminado de cargar en el store
     if (user.permissions) {
-      const userPermRes = checkContainer(user.permissions);
+      const normalizedFallback = normalizeRolePermissions(resolvedRoleName, user.permissions, false);
+      const userPermRes = checkContainer(normalizedFallback);
       if (userPermRes === true) return true;
     }
 

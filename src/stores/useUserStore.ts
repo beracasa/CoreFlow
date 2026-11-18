@@ -106,11 +106,21 @@ export const useUserStore = create<UserState>((set, get) => ({
   updateUser: async (user) => {
     try {
       await UserSupabaseService.updateUser(user);
-      set((state) => ({
-        users: state.users.map(u => u.id === user.id ? user : u)
-      }));
+      set((state) => {
+        const matchedRole = state.roles.find(r => r.id === user.role);
+        const normalizedUser: UserProfile = {
+          ...user,
+          roleName: matchedRole ? matchedRole.name : user.roleName
+        };
+        return {
+          users: state.users.map(u => u.id === user.id ? normalizedUser : u)
+        };
+      });
+      // Refresh roles to keep usersCount accurate per role
+      get().fetchRoles().catch(console.error);
     } catch (error: any) {
       set({ error: error.message });
+      throw error;
     }
   },
 

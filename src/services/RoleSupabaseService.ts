@@ -3,6 +3,64 @@ import { supabase } from './supabaseClient';
 import { RoleDefinition } from '../../types';
 import { UserSupabaseService } from './UserSupabaseService';
 
+export function normalizeRolePermissions(
+  roleName?: string,
+  rawPerms?: any,
+  isSystem?: boolean
+): Record<string, boolean> {
+  let perms: Record<string, boolean> = {};
+  if (typeof rawPerms === 'string') {
+    try {
+      const parsed = JSON.parse(rawPerms);
+      if (Array.isArray(parsed)) {
+        parsed.forEach((k: string) => { perms[k] = true; });
+      } else if (parsed && typeof parsed === 'object') {
+        perms = { ...parsed };
+      }
+    } catch {
+      perms = {};
+    }
+  } else if (Array.isArray(rawPerms)) {
+    rawPerms.forEach((k: string) => { perms[k] = true; });
+  } else if (rawPerms && typeof rawPerms === 'object') {
+    perms = { ...rawPerms };
+  }
+
+  // Eliminar llave obsoleta que no existe en la matriz actual de permisos
+  delete perms['manage_assets'];
+
+  const rName = (roleName || '').toLowerCase().trim();
+  const isAdminOrDirector =
+    Boolean(isSystem) ||
+    rName === 'admin' ||
+    rName === 'administrador' ||
+    rName === 'administrador solicitante' ||
+    rName.includes('director');
+
+  // Migración automática cuando el rol en la BD aún no tiene definido explícitamente 'supervise_intervention':
+  // Separa el cierre de Sección 2 (Supervisor de Mantenimiento -> supervise_intervention)
+  // de la recepción y cierre de Sección 3 (Supervisor de Producción -> supervise_order).
+  if (perms.supervise_intervention === undefined) {
+    if (isAdminOrDirector || (rName.includes('gerente') && rName.includes('mantenimiento'))) {
+      perms.supervise_intervention = Boolean(perms.supervise_order ?? true);
+      perms.supervise_order = Boolean(perms.supervise_order ?? true);
+    } else if (rName.includes('mantenimiento') && rName.includes('supervisor')) {
+      // Supervisor de Mantenimiento: único encargado de firmar el cierre de la Sección 2
+      perms.supervise_intervention = Boolean(perms.supervise_order ?? true);
+      perms.supervise_order = false;
+    } else {
+      // Supervisor de Producción y demás roles: firman recepción en Sección 3, no el cierre técnico de Sección 2
+      perms.supervise_intervention = false;
+      perms.supervise_order = Boolean(perms.supervise_order);
+      if (rName.includes('supervisor') && (rName.includes('producción') || rName.includes('produccion'))) {
+        perms.execute_wo = false;
+      }
+    }
+  }
+
+  return perms;
+}
+
 export const RoleSupabaseService = {
   // Get all roles (flat list with parent_role_id)
   async getRoles(): Promise<RoleDefinition[]> {
@@ -90,7 +148,7 @@ export const RoleSupabaseService = {
       description: r.description || '',
       parentRoleId: r.parent_role_id,
       isSystem: r.is_system || false,
-      permissions: r.permissions || {},
+      permissions: normalizeRolePermissions(r.name, r.permissions, r.is_system),
       shareDataWithPeers: r.share_data_with_peers || false,
       usersCount: userCounts[r.id] || 0
     }));

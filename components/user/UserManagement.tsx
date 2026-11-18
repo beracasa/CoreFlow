@@ -91,11 +91,17 @@ export const UserManagement: React.FC = () => {
         }
     };
 
-    const handleUpdateUser = (e: React.FormEvent) => {
+    const handleUpdateUser = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!editingUser || !canManage) return;
-        updateUser(editingUser);
-        setEditingUser(null);
+        try {
+            await updateUser(editingUser);
+            await fetchUsers();
+            setEditingUser(null);
+        } catch (error: any) {
+            console.error("Error updating user:", error);
+            alert(`❌ Error al actualizar el perfil del usuario: ${error.message || 'Error desconocido'}`);
+        }
     };
 
     const addSpecialty = () => {
@@ -345,7 +351,14 @@ export const UserManagement: React.FC = () => {
                                     <select
                                         className="w-full bg-industrial-900 border border-industrial-600 rounded p-2 text-white text-sm focus:border-industrial-accent outline-none"
                                         value={editingUser.role || ''}
-                                        onChange={e => setEditingUser({ ...editingUser, role: e.target.value })}
+                                        onChange={e => {
+                                            const selectedRoleObj = roles.find(r => r.id === e.target.value);
+                                            setEditingUser({
+                                                ...editingUser,
+                                                role: e.target.value,
+                                                roleName: selectedRoleObj?.name || ''
+                                            });
+                                        }}
                                     >
                                         <option value="">-- Sin Rol Asignado --</option>
                                         {roles.map(role => (
