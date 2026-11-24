@@ -1167,7 +1167,6 @@ export const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                                  <option value="">- Seleccionar -</option>
                                  <option value="Mecánica">Mecánica</option>
                                  <option value="Eléctrica">Eléctrica</option>
-                                 <option value="Electrónica">Electrónica</option>
                                  <option value="Plomería">Plomería</option>
                               </select>
                            </div>
