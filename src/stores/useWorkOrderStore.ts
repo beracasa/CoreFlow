@@ -2,6 +2,9 @@ import { create } from 'zustand';
 import { WorkOrder } from '../../types'; // Adjust path if types.ts is in src, currently at root so ../../types or ../types depending on where we are.
 // Wait, file is src/stores/useWorkOrderStore.ts -> ../../types is correct if types is in root.
 import { workOrderService } from '../services';
+import { WorkOrderFilters } from '../services/workOrderService';
+
+let lastOrdersFetchId = 0;
 
 interface WorkOrderState {
     workOrders: WorkOrder[];
@@ -9,6 +12,7 @@ interface WorkOrderState {
     loading: boolean;
     isInitialized: boolean;
     error: string | null;
+    activeFilters?: WorkOrderFilters;
     pagination: {
         page: number;
         limit: number;
@@ -16,8 +20,11 @@ interface WorkOrderState {
     };
 
     calendarOrders: WorkOrder[];
-    fetchOrders: (page?: number, limit?: number, formType?: string) => Promise<void>;
-    setPage: (page: number, formType?: string) => Promise<void>;
+    allOrdersLoading: boolean;
+    fetchOrders: (page?: number, limit?: number, formType?: string, filters?: WorkOrderFilters) => Promise<void>;
+    fetchAllOrders: () => Promise<void>;
+    fetchAllFilteredOrders: (formType?: string, filters?: WorkOrderFilters) => Promise<WorkOrder[]>;
+    setPage: (page: number, formType?: string, filters?: WorkOrderFilters) => Promise<void>;
     addOrder: (order: Omit<WorkOrder, 'id'>) => Promise<WorkOrder>;
     updateOrder: (id: string, updates: Partial<WorkOrder>) => Promise<void>;
     deleteOrder: (id: string) => Promise<void>;
@@ -30,20 +37,26 @@ export const useWorkOrderStore = create<WorkOrderState>((set, get) => ({
     allOrders: [],
     calendarOrders: [],
     loading: false,
+    allOrdersLoading: false,
     isInitialized: false, // Add flag
     error: null,
+    activeFilters: undefined,
     pagination: {
         page: 1,
         limit: 25,
         total: 0
     },
 
-    fetchOrders: async (page = 1, limit = 25, formType) => {
-        set({ loading: true, error: null });
+    fetchOrders: async (page = 1, limit = 25, formType, filters) => {
+        const fetchId = ++lastOrdersFetchId;
+        set({ loading: true, error: null, activeFilters: filters });
         try {
-            const result = await workOrderService.getAll(page, limit, formType);
-            
-            // If fetching without formType, it's a global fetch (effectively "all orders" for indicators)
+            const result = await workOrderService.getAll(page, limit, formType, filters);
+
+            // Ignore stale responses if a newer fetch was triggered
+            if (fetchId !== lastOrdersFetchId) return;
+
+            // If fetching without formType or filters, it's a global fetch (effectively "all orders" for indicators)
             const updates: Partial<WorkOrderState> = {
                 workOrders: result.data,
                 pagination: { page, limit, total: result.total },
@@ -51,19 +64,62 @@ export const useWorkOrderStore = create<WorkOrderState>((set, get) => ({
                 isInitialized: true
             };
 
-            if (!formType) {
+            if (!formType && !filters) {
                 updates.allOrders = result.data;
             }
 
             set(updates);
         } catch (err: any) {
+            if (fetchId !== lastOrdersFetchId) return;
             set({ error: err.message || 'Failed to fetch orders', loading: false, isInitialized: true });
         }
     },
 
-    setPage: async (page, formType) => {
-        const { pagination } = get();
-        await get().fetchOrders(page, pagination.limit, formType);
+    fetchAllOrders: async () => {
+        set({ allOrdersLoading: true, error: null });
+        try {
+            const pageSize = 1000;
+            let page = 1;
+            let collected: WorkOrder[] = [];
+            let total = 0;
+
+            do {
+                const result = await workOrderService.getAll(page, pageSize);
+                collected = collected.concat(result.data);
+                total = result.total;
+                page += 1;
+                if (result.data.length === 0) break;
+            } while (collected.length < total);
+
+            set({
+                allOrders: collected,
+                allOrdersLoading: false
+            });
+        } catch (err: any) {
+            set({ error: err.message || 'Failed to fetch all orders', allOrdersLoading: false });
+        }
+    },
+
+    fetchAllFilteredOrders: async (formType, filters) => {
+        const pageSize = 1000;
+        let page = 1;
+        let collected: WorkOrder[] = [];
+        let total = 0;
+
+        do {
+            const result = await workOrderService.getAll(page, pageSize, formType, filters);
+            collected = collected.concat(result.data);
+            total = result.total;
+            page += 1;
+            if (result.data.length === 0) break;
+        } while (collected.length < total);
+
+        return collected;
+    },
+
+    setPage: async (page, formType, filters) => {
+        const { pagination, activeFilters } = get();
+        await get().fetchOrders(page, pagination.limit, formType, filters ?? activeFilters);
     },
 
     addOrder: async (orderData) => {

@@ -284,7 +284,7 @@ export interface WorkOrder {
   equipmentType?:
     | "Mantenimiento Maquinaria"
     | "Mantenimiento Elemento Auxiliar";
-  failureType?: "Mecánica" | "Eléctrica" | "Electrónica" | "Plomería";
+  failureType?: "Mecánica" | "Eléctrica" | "Plomería";
   condition?: "Crítica" | "Media" | "Normal";
   frequency?: "Primera vez" | "Ocasional" | "Frecuente" | "Muy frecuente";
   consequence?: "Ninguna" | "Bajo Rendimiento" | "Parada";

@@ -1,5 +1,5 @@
 import { WorkOrder, WorkOrderStatus, WorkOrderStage, Priority } from '../../../types';
-import { IWorkOrderService } from '../workOrderService';
+import { IWorkOrderService, WorkOrderFilters } from '../workOrderService';
 import { saveToStorage, loadFromStorage } from '../../utils/persistence';
 
 const INITIAL_ORDERS: WorkOrder[] = [
@@ -50,7 +50,7 @@ const INITIAL_ORDERS: WorkOrder[] = [
         department: 'Mantenimiento',
         equipmentType: 'Mantenimiento Maquinaria',
         condition: 'Crítica',
-        failureType: 'Electrónica',
+        failureType: 'Eléctrica',
         requestDescription: 'El sensor de visión de la estación principal está enviando lecturas fuera de rango intermitentemente, lo que provoca paradas continuas de la línea de producción.',
         frequency: 'Ocasional',
         consequence: 'Bajo Rendimiento',
@@ -149,12 +149,57 @@ export class WorkOrderMockService implements IWorkOrderService {
         saveToStorage(STORAGE_KEY, data);
     }
 
-    async getAll(page: number = 1, limit: number = 25, formType?: string): Promise<{ data: WorkOrder[], total: number }> {
+    async getAll(page: number = 1, limit: number = 25, formType?: string, filters?: WorkOrderFilters): Promise<{ data: WorkOrder[], total: number }> {
         await this.delay();
         let orders = this.getFromStorage();
-        
+
         if (formType) {
             orders = orders.filter(o => o.formType === formType);
+        }
+
+        if (filters) {
+            if (filters.machineIds) {
+                if (filters.machineIds.length === 0) {
+                    return { data: [], total: 0 };
+                }
+                const allowed = new Set(filters.machineIds);
+                orders = orders.filter(o => allowed.has(o.machineId));
+            }
+
+            if (filters.search && filters.search.trim()) {
+                const searchLower = filters.search.trim().toLowerCase();
+                const searchMachines = new Set(filters.searchMachineIds || []);
+                orders = orders.filter(o =>
+                    (o.displayId && o.displayId.toLowerCase().includes(searchLower)) ||
+                    searchMachines.has(o.machineId)
+                );
+            }
+
+            if (filters.interval) {
+                orders = orders.filter(o => o.interval === filters.interval);
+            }
+
+            if (filters.failureType) {
+                orders = orders.filter(o => o.failureType === filters.failureType);
+            }
+
+            if (filters.stage) {
+                orders = orders.filter(o => o.currentStage === filters.stage);
+            }
+
+            if (filters.startDate) {
+                const start = new Date(`${filters.startDate}T00:00:00`);
+                if (!isNaN(start.getTime())) {
+                    orders = orders.filter(o => new Date(o.createdDate) >= start);
+                }
+            }
+
+            if (filters.endDate) {
+                const end = new Date(`${filters.endDate}T23:59:59.999`);
+                if (!isNaN(end.getTime())) {
+                    orders = orders.filter(o => new Date(o.createdDate) <= end);
+                }
+            }
         }
 
         const total = orders.length;
@@ -163,6 +208,16 @@ export class WorkOrderMockService implements IWorkOrderService {
         const data = orders.slice(from, to);
 
         return { data, total };
+    }
+
+    async getFilterOptions(formType: 'R-MANT-02' | 'R-MANT-05'): Promise<{ intervals: string[]; failureTypes: string[] }> {
+        const orders = this.getFromStorage().filter(o => o.formType === formType);
+        if (formType === 'R-MANT-02') {
+            const intervals = Array.from(new Set(orders.map(o => o.interval).filter((v): v is string => Boolean(v))));
+            return { intervals, failureTypes: [] };
+        }
+        const failureTypes = Array.from(new Set(orders.map(o => o.failureType).filter(Boolean) as string[]));
+        return { intervals: [], failureTypes };
     }
 
     async getById(id: string): Promise<WorkOrder | null> {

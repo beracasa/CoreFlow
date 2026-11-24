@@ -11,6 +11,15 @@ import { generateWorkOrderReport } from '../src/services/ReportService';
 import { TablePagination } from './shared/TablePagination';
 import { DateInput } from './shared/DateInput';
 import { formatDate } from '../src/utils/dateUtils';
+import { workOrderService } from '../src/services';
+import { WorkOrderFilters } from '../src/services/workOrderService';
+
+const DEFAULT_FAILURE_TYPES = ['Mecánica', 'Eléctrica', 'Plomería'];
+
+const extractIntervalHours = (label: string): number => {
+  const match = label.replace(/,/g, '').match(/\d+(\.\d+)?/);
+  return match ? parseFloat(match[0]) : Number.MAX_SAFE_INTEGER;
+};
 
 
 interface MaintenanceListProps {
@@ -19,35 +28,107 @@ interface MaintenanceListProps {
 
 export const MaintenanceList: React.FC<MaintenanceListProps> = ({ type }) => {
   const { t, language } = useLanguage();
-  const { workOrders, pagination, fetchOrders, setPage, loading } = useWorkOrderStore();
-  const { machines, plantSettings, fetchMasterData, isInitialized: masterInitialized } = useMasterStore();
+  const { workOrders, pagination, fetchOrders, fetchAllFilteredOrders, setPage, loading } = useWorkOrderStore();
+  const { machines, zones: zoneStructures, maintenancePlans, plantSettings, fetchMasterData, isInitialized: masterInitialized } = useMasterStore();
   const { hasPermission } = useAuth();
   const canCreate = hasPermission('create_wo');
   const navigate = useNavigate();
 
-  React.useEffect(() => {
-    if (!masterInitialized) {
-      fetchMasterData();
-    }
-    fetchOrders(1, 50, type);
-  }, [type, fetchOrders, fetchMasterData, masterInitialized]);
-
   const [searchQuery, setSearchQuery] = React.useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = React.useState('');
   const [selectedZone, setSelectedZone] = React.useState('');
   const [selectedInterval, setSelectedInterval] = React.useState('');
   const [selectedFailureType, setSelectedFailureType] = React.useState('');
   const [selectedStatus, setSelectedStatus] = React.useState('');
   const [startDateFilter, setStartDateFilter] = React.useState('');
   const [endDateFilter, setEndDateFilter] = React.useState('');
+  const [dbFilterOptions, setDbFilterOptions] = React.useState<{ intervals: string[]; failureTypes: string[] }>({
+    intervals: [],
+    failureTypes: []
+  });
+  const [exportingPdf, setExportingPdf] = React.useState(false);
 
   // Refs for date inputs
   const startDateRef = React.useRef<HTMLInputElement>(null);
   const endDateRef = React.useRef<HTMLInputElement>(null);
 
-  // Get unique values for filters
-  const uniqueZones = Array.from(new Set(machines.map(m => m.zone).filter(Boolean)));
-  const uniqueIntervals = Array.from(new Set(workOrders.filter(o => o.formType === 'R-MANT-02').map(o => o.interval).filter(Boolean)));
-  const uniqueFailureTypes = Array.from(new Set(workOrders.filter(o => o.formType === 'R-MANT-05').map(o => o.failureType).filter(Boolean)));
+  // Ensure master data (machines, zones, maintenance plans) is loaded
+  React.useEffect(() => {
+    if (!masterInitialized) {
+      fetchMasterData();
+    }
+  }, [fetchMasterData, masterInitialized]);
+
+  // Fetch distinct DB filter options (intervals for R-MANT-02, failure types for R-MANT-05) across all records
+  React.useEffect(() => {
+    let active = true;
+    if (workOrderService.getFilterOptions) {
+      workOrderService.getFilterOptions(type)
+        .then(opts => {
+          if (active) setDbFilterOptions(opts);
+        })
+        .catch(err => console.error('Error loading filter options:', err));
+    }
+    return () => { active = false; };
+  }, [type]);
+
+  // Debounce search input to avoid excessive DB queries while typing
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Build zone options strictly in Configuration module order (sorted by orderIndex)
+  const uniqueZones = React.useMemo(() => {
+    const configuredZones = zoneStructures.flatMap(z =>
+      z.lines && z.lines.length > 0
+        ? z.lines.map(l => `${z.name} - ${l}`)
+        : [z.name]
+    );
+    const ordered: string[] = [];
+    const seen = new Set<string>();
+    for (const z of configuredZones) {
+      if (z && !seen.has(z)) {
+        seen.add(z);
+        ordered.push(z);
+      }
+    }
+    // Append any legacy machine zones not present in current Configuration so no record is unreachable
+    const extraZones = Array.from(
+      new Set(machines.map(m => m.zone).filter((z): z is string => Boolean(z && !seen.has(z))))
+    ).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    return [...ordered, ...extraZones];
+  }, [zoneStructures, machines]);
+
+  // Build interval options (R-MANT-02) from Configuration maintenance plans + DB values, ordered by hours ascending
+  const uniqueIntervals = React.useMemo(() => {
+    const configured = maintenancePlans
+      .flatMap(p => p.intervals || [])
+      .map(i => i.label)
+      .filter((v): v is string => Boolean(v));
+    const combined = Array.from(new Set([...configured, ...dbFilterOptions.intervals]));
+    return combined.sort((a, b) => {
+      const diff = extractIntervalHours(a) - extractIntervalHours(b);
+      return diff !== 0 ? diff : a.localeCompare(b, undefined, { numeric: true });
+    });
+  }, [maintenancePlans, dbFilterOptions.intervals]);
+
+  // Build failure type options (R-MANT-05) in canonical form order + any extra DB values
+  const uniqueFailureTypes = React.useMemo(() => {
+    const ordered: string[] = [];
+    const seen = new Set<string>();
+    for (const ft of DEFAULT_FAILURE_TYPES) {
+      seen.add(ft);
+      ordered.push(ft);
+    }
+    const extras = dbFilterOptions.failureTypes
+      .filter(ft => ft && !seen.has(ft))
+      .sort((a, b) => a.localeCompare(b));
+    return [...ordered, ...extras];
+  }, [dbFilterOptions.failureTypes]);
+
   const statusOptions = [
     { label: 'SOLICITADO', value: WorkOrderStage.REQUESTED },
     { label: 'EJECUCIÓN', value: WorkOrderStage.EXECUTION },
@@ -55,49 +136,95 @@ export const MaintenanceList: React.FC<MaintenanceListProps> = ({ type }) => {
     { label: 'CERRADO', value: WorkOrderStage.CLOSED }
   ];
 
-  // Filter orders by form type, search, and filters
-  const filteredOrders = workOrders.filter(o => {
-    // 1. Type filter
-    if (o.formType !== type) return false;
+  // Build server-side query filters spanning the entire database
+  const activeFilters = React.useMemo<WorkOrderFilters>(() => {
+    const filters: WorkOrderFilters = {};
 
-    // 2. Search filter
-    const machine = machines.find(m => m.id === o.machineId);
-    const searchLower = searchQuery.toLowerCase().trim();
-    if (searchLower) {
-      const matchName = machine?.name?.toLowerCase().includes(searchLower);
-      const matchId = o.displayId?.toLowerCase().includes(searchLower);
-      const matchPlate = machine?.plate?.toLowerCase().includes(searchLower);
-      const matchAlias = machine?.alias?.toLowerCase().includes(searchLower);
-      if (!matchName && !matchId && !matchPlate && !matchAlias) return false;
+    if (selectedZone) {
+      filters.machineIds = machines
+        .filter(m => m.zone === selectedZone)
+        .map(m => m.id);
     }
 
-    // 3. Zone filter
-    if (selectedZone && machine?.zone !== selectedZone) return false;
+    const trimmedSearch = debouncedSearchQuery.trim();
+    if (trimmedSearch) {
+      const searchLower = trimmedSearch.toLowerCase();
+      filters.search = trimmedSearch;
+      const candidateMachines = selectedZone
+        ? machines.filter(m => m.zone === selectedZone)
+        : machines;
+      filters.searchMachineIds = candidateMachines
+        .filter(m =>
+          m.name?.toLowerCase().includes(searchLower) ||
+          m.plate?.toLowerCase().includes(searchLower) ||
+          m.alias?.toLowerCase().includes(searchLower)
+        )
+        .map(m => m.id);
+    }
 
-    // 4. Interval filter (R-MANT-02 only)
-    if (type === 'R-MANT-02' && selectedInterval && o.interval !== selectedInterval) return false;
+    if (type === 'R-MANT-02' && selectedInterval) {
+      filters.interval = selectedInterval;
+    }
 
-    // 4b. Failure Type filter (R-MANT-05 only)
-    if (type === 'R-MANT-05' && selectedFailureType && o.failureType !== selectedFailureType) return false;
+    if (type === 'R-MANT-05' && selectedFailureType) {
+      filters.failureType = selectedFailureType;
+    }
 
-    // 5. Status filter
-    if (selectedStatus && o.currentStage !== selectedStatus) return false;
+    if (selectedStatus) {
+      filters.stage = selectedStatus;
+    }
 
-    // 6. Date Range filter
     if (startDateFilter) {
-      const orderDate = new Date(o.createdDate);
-      const start = new Date(startDateFilter);
-      if (orderDate < start) return false;
-    }
-    if (endDateFilter) {
-      const orderDate = new Date(o.createdDate);
-      const end = new Date(endDateFilter);
-      end.setHours(23, 59, 59, 999); // Inclusion of the whole end day
-      if (orderDate > end) return false;
+      filters.startDate = startDateFilter;
     }
 
-    return true;
-  });
+    if (endDateFilter) {
+      filters.endDate = endDateFilter;
+    }
+
+    return filters;
+  }, [
+    machines,
+    selectedZone,
+    debouncedSearchQuery,
+    type,
+    selectedInterval,
+    selectedFailureType,
+    selectedStatus,
+    startDateFilter,
+    endDateFilter
+  ]);
+
+  // Fetch matching orders from the database whenever type or any filter changes (always reset to page 1)
+  React.useEffect(() => {
+    // Wait for master data if a machine-dependent filter (zone or search) is active
+    if ((selectedZone || debouncedSearchQuery.trim()) && !masterInitialized) {
+      return;
+    }
+    fetchOrders(1, 50, type, activeFilters);
+  }, [type, activeFilters, fetchOrders, masterInitialized, selectedZone, debouncedSearchQuery]);
+
+  // Guard against briefly displaying orders from another formType during route transitions
+  const filteredOrders = React.useMemo(
+    () => workOrders.filter(o => o.formType === type),
+    [workOrders, type]
+  );
+
+  const handleExportPDF = async () => {
+    if (exportingPdf) return;
+    setExportingPdf(true);
+    try {
+      const ordersToExport =
+        pagination.total > filteredOrders.length
+          ? await fetchAllFilteredOrders(type, activeFilters)
+          : filteredOrders;
+      generateWorkOrderReport(ordersToExport, getFiltersDescription(), machines, type, plantSettings.logoUrl);
+    } catch (err) {
+      console.error('Error exporting filtered work orders PDF:', err);
+    } finally {
+      setExportingPdf(false);
+    }
+  };
 
   const getStatusBadge = (stage: WorkOrderStage) => {
     switch (stage) {
@@ -159,14 +286,12 @@ export const MaintenanceList: React.FC<MaintenanceListProps> = ({ type }) => {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => {
-              console.log("Click en botón Exportar PDF detectado");
-              generateWorkOrderReport(filteredOrders, getFiltersDescription(), machines, type, plantSettings.logoUrl);
-            }}
-            className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded text-sm font-medium transition-colors shadow-lg shadow-emerald-900/20 flex items-center gap-2"
+            disabled={exportingPdf}
+            onClick={handleExportPDF}
+            className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white px-4 py-2 rounded text-sm font-medium transition-colors shadow-lg shadow-emerald-900/20 flex items-center gap-2"
           >
             <FileText className="w-4 h-4" />
-            Exportar PDF
+            {exportingPdf ? 'Exportando...' : 'Exportar PDF'}
           </button>
           {canCreate && (
             <button
@@ -433,7 +558,7 @@ export const MaintenanceList: React.FC<MaintenanceListProps> = ({ type }) => {
             totalItems={pagination.total}
             currentPage={pagination.page}
             itemsPerPage={pagination.limit}
-            onPageChange={(p) => setPage(p, type)}
+            onPageChange={(p) => setPage(p, type, activeFilters)}
             isLoading={loading}
           />
         </div>
