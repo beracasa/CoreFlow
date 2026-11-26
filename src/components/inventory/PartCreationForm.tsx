@@ -5,6 +5,7 @@ import { SparePart } from '../../types/inventory';
 import { useMasterStore } from '../../stores/useMasterStore';
 import { ImportSpareParts } from './ImportSpareParts';
 import { DateInput } from '../shared/DateInput';
+import { useAuth } from '../../../contexts/AuthContext';
 
 // Service initialized in index.ts
 
@@ -15,6 +16,9 @@ interface PartCreationFormProps {
 }
 
 export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData, onCancel, onSuccess }) => {
+    const { hasPermission } = useAuth();
+    const canCreate = hasPermission('manage_inventory') || hasPermission('create_inventory');
+    const canEdit = hasPermission('manage_inventory');
     const { 
         partCategories, 
         partLocations, 
@@ -178,6 +182,14 @@ export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData,
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (initialData && !canEdit) {
+            setFeedback({ type: 'error', message: 'No tiene permisos para editar repuestos.' });
+            return;
+        }
+        if (!initialData && !canCreate) {
+            setFeedback({ type: 'error', message: 'No tiene permisos para crear repuestos.' });
+            return;
+        }
         setIsSubmitting(true);
         try {
             const cleanPartNumber = formData.partNumber.trim();
@@ -235,6 +247,7 @@ export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData,
                     description: '',
                     minStock: 0,
                     unitOfMeasure: 'PCS',
+                    initialStock: 0,
                     maxStock: 0,
                     location: '',
                     subLocation: '',
@@ -284,7 +297,7 @@ export const PartCreationForm: React.FC<PartCreationFormProps> = ({ initialData,
                     </span>
                     <h2 className="text-xl font-bold">{initialData ? 'Editar Repuesto' : 'Crear Nuevo Repuesto'}</h2>
                 </div>
-                {!initialData && (
+                {!initialData && canCreate && (
                     <button
                         type="button"
                         onClick={() => setShowImportModal(true)}

@@ -16,10 +16,26 @@ export const Inventory: React.FC<any> = () => {
 
   const canManage = hasPermission('manage_inventory');
   const canViewInventory = canManage || hasPermission('view_inventory');
+  const canCreateParts = canManage || hasPermission('create_inventory');
   const canViewPartRequests = canManage || hasPermission('view_part_requests');
-  const canViewPurchaseRequests = canManage || hasPermission('view_purchase_requests');
+  const canCreatePartRequests = canManage || hasPermission('create_part_requests');
+  const canReceiveParts = canManage || hasPermission('receive_inventory');
+  const canPurchaseRequests = canManage || hasPermission('view_purchase_requests');
 
-  const canAccessModule = canManage || canViewInventory || canViewPartRequests || canViewPurchaseRequests;
+  const canAccessModule =
+    canManage ||
+    canViewInventory ||
+    canCreateParts ||
+    canViewPartRequests ||
+    canCreatePartRequests ||
+    canReceiveParts ||
+    canPurchaseRequests;
+
+  const hasAnyWriteAction =
+    canCreateParts ||
+    canCreatePartRequests ||
+    canReceiveParts ||
+    canPurchaseRequests;
 
   if (!canAccessModule) {
     return (
@@ -31,10 +47,13 @@ export const Inventory: React.FC<any> = () => {
   }
 
   // Determine initial valid tab based on permissions
-  const getInitialTab = (): 'list' | 'requests_list' | 'purchase_requests' => {
+  const getInitialTab = (): 'list' | 'request' | 'requests_list' | 'receive' | 'create' | 'purchase_requests' => {
     if (canViewInventory) return 'list';
     if (canViewPartRequests) return 'requests_list';
-    if (canViewPurchaseRequests) return 'purchase_requests';
+    if (canCreatePartRequests) return 'request';
+    if (canReceiveParts) return 'receive';
+    if (canCreateParts) return 'create';
+    if (canPurchaseRequests) return 'purchase_requests';
     return 'list';
   };
 
@@ -48,12 +67,24 @@ export const Inventory: React.FC<any> = () => {
       setActiveTab(getInitialTab());
     } else if (activeTab === 'requests_list' && !canViewPartRequests) {
       setActiveTab(getInitialTab());
-    } else if (activeTab === 'purchase_requests' && !canViewPurchaseRequests) {
+    } else if (activeTab === 'request' && !canCreatePartRequests) {
       setActiveTab(getInitialTab());
-    } else if (['request', 'receive', 'create'].includes(activeTab) && !canManage) {
+    } else if (activeTab === 'receive' && !canReceiveParts) {
+      setActiveTab(getInitialTab());
+    } else if (activeTab === 'create' && !canCreateParts) {
+      setActiveTab(getInitialTab());
+    } else if (activeTab === 'purchase_requests' && !canPurchaseRequests) {
       setActiveTab(getInitialTab());
     }
-  }, [canViewInventory, canViewPartRequests, canViewPurchaseRequests, canManage, activeTab]);
+  }, [
+    canViewInventory,
+    canCreateParts,
+    canViewPartRequests,
+    canCreatePartRequests,
+    canReceiveParts,
+    canPurchaseRequests,
+    activeTab
+  ]);
 
   // Fetch parts when entering requests list, as we need them for names and details
   useEffect(() => {
@@ -86,6 +117,10 @@ export const Inventory: React.FC<any> = () => {
             {canManage ? (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 shadow-sm">
                 <Edit3 size={12} /> Gestión Total Habilitada
+              </span>
+            ) : hasAnyWriteAction ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/30 shadow-sm">
+                <Shield size={12} /> Acceso Personalizado
               </span>
             ) : (
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-industrial-800 text-industrial-400 border border-industrial-700 shadow-sm">
@@ -124,42 +159,46 @@ export const Inventory: React.FC<any> = () => {
           </button>
         )}
 
-        {canManage && (
-          <>
-            <button
-              onClick={() => setActiveTab('request')}
-              className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${activeTab === 'request'
-                ? 'bg-industrial-800 text-white border-industrial-600 shadow-md'
-                : 'bg-transparent text-industrial-500 border-transparent hover:text-industrial-300 hover:bg-industrial-800/50'
-                }`}
-            >
-              <FileText className="w-4 h-4 mr-2" />
-              Nueva Solicitud
-            </button>
-            <button
-              onClick={() => setActiveTab('receive')}
-              className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${activeTab === 'receive'
-                ? 'bg-industrial-800 text-white border-industrial-600 shadow-md'
-                : 'bg-transparent text-industrial-500 border-transparent hover:text-industrial-300 hover:bg-industrial-800/50'
-                }`}
-            >
-              <ArrowDownCircle className="w-4 h-4 mr-2" />
-              Recepción
-            </button>
-            <button
-              onClick={() => setActiveTab('create')}
-              className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${activeTab === 'create'
-                ? 'bg-industrial-800 text-white border-industrial-600 shadow-md'
-                : 'bg-transparent text-industrial-500 border-transparent hover:text-industrial-300 hover:bg-industrial-800/50'
-                }`}
-            >
-              <PlusCircle className="w-4 h-4 mr-2" />
-              Nuevo Repuesto
-            </button>
-          </>
+        {canCreatePartRequests && (
+          <button
+            onClick={() => { setActiveTab('request'); setSelectedRequest(null); }}
+            className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${activeTab === 'request'
+              ? 'bg-industrial-800 text-white border-industrial-600 shadow-md'
+              : 'bg-transparent text-industrial-500 border-transparent hover:text-industrial-300 hover:bg-industrial-800/50'
+              }`}
+          >
+            <FileText className="w-4 h-4 mr-2" />
+            Nueva Solicitud
+          </button>
         )}
 
-        {canViewPurchaseRequests && (
+        {canReceiveParts && (
+          <button
+            onClick={() => { setActiveTab('receive'); setSelectedRequest(null); }}
+            className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${activeTab === 'receive'
+              ? 'bg-industrial-800 text-white border-industrial-600 shadow-md'
+              : 'bg-transparent text-industrial-500 border-transparent hover:text-industrial-300 hover:bg-industrial-800/50'
+              }`}
+          >
+            <ArrowDownCircle className="w-4 h-4 mr-2" />
+            Recepción
+          </button>
+        )}
+
+        {canCreateParts && (
+          <button
+            onClick={() => { setActiveTab('create'); setSelectedRequest(null); }}
+            className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${activeTab === 'create'
+              ? 'bg-industrial-800 text-white border-industrial-600 shadow-md'
+              : 'bg-transparent text-industrial-500 border-transparent hover:text-industrial-300 hover:bg-industrial-800/50'
+              }`}
+          >
+            <PlusCircle className="w-4 h-4 mr-2" />
+            Nuevo Repuesto
+          </button>
+        )}
+
+        {canPurchaseRequests && (
           <button
             onClick={() => { setActiveTab('purchase_requests'); setSelectedRequest(null); }}
             className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors border ${activeTab === 'purchase_requests'
@@ -175,10 +214,10 @@ export const Inventory: React.FC<any> = () => {
 
       <div className="bg-industrial-900 rounded-xl min-h-[500px]">
         {activeTab === 'list' && canViewInventory && <InventoryList />}
-        {activeTab === 'request' && canManage && <PartRequestForm />}
-        {activeTab === 'receive' && canManage && <ReceptionForm />}
-        {activeTab === 'create' && canManage && <PartCreationForm />}
-        {activeTab === 'purchase_requests' && canViewPurchaseRequests && <PurchaseRequestList />}
+        {activeTab === 'request' && canCreatePartRequests && <PartRequestForm />}
+        {activeTab === 'receive' && canReceiveParts && <ReceptionForm />}
+        {activeTab === 'create' && canCreateParts && <PartCreationForm />}
+        {activeTab === 'purchase_requests' && canPurchaseRequests && <PurchaseRequestList />}
         {activeTab === 'requests_list' && canViewPartRequests && (
           selectedRequest ? (
             <RequestDetail request={selectedRequest} parts={parts} onBack={handleBackToRequestList} />

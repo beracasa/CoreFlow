@@ -113,6 +113,7 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
     }, []);
 
     const handleStartProcessing = () => {
+        if (!canManage) return;
         const initialQuantities: Record<string, number> = {};
         localRequest.items.forEach(item => {
             // Default to remaining quantity
@@ -146,6 +147,7 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
     };
 
     const handleConfirmDelivery = async () => {
+        if (!canManage) return;
         if (!selectedReceiver) {
             setShowReceiverError(true);
             return;
@@ -217,6 +219,7 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
     };
 
     const handleCloseRequest = async () => {
+        if (!canManage) return;
         if (!confirm('¿Está seguro de cerrar esta solicitud?')) return;
         try {
             const updatedRequest = await inventoryService.closeRequest(localRequest.id);
@@ -227,6 +230,7 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
     };
 
     const handleDeleteRequest = async () => {
+        if (!canManage) return;
         if (!confirm('¿Está seguro de eliminar esta solicitud permanentemente?')) return;
         try {
             await inventoryService.deleteRequest(localRequest.id);
@@ -248,6 +252,7 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
     };
 
     const handleGenerateDetailsPDF = () => {
+        if (!canManage) return;
         const doc = new jsPDF();
 
         // Logo & Header
@@ -343,7 +348,7 @@ export const RequestDetail: React.FC<RequestDetailProps> = ({ request, parts, on
         return item?.partNumber || '';
     };
 
-    if (isEditing) {
+    if (isEditing && canManage) {
         return (
             <div className="h-full">
                 <PartRequestForm

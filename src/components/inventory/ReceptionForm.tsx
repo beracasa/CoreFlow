@@ -8,8 +8,11 @@ import { formatDate, formatDateTime } from '../../utils/dateUtils';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useMasterStore } from '../../stores/useMasterStore';
+import { useAuth } from '../../../contexts/AuthContext';
 
 export const ReceptionForm: React.FC = () => {
+    const { hasPermission } = useAuth();
+    const canReceive = hasPermission('manage_inventory') || hasPermission('receive_inventory');
     const [activeTab, setActiveTab] = useState<'new' | 'history'>('new');
 
     // --- Nueva Recepción State ---
@@ -257,6 +260,10 @@ export const ReceptionForm: React.FC = () => {
 
     const handleReceive = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!canReceive) {
+            setMessage({ type: 'error', text: 'No tiene permisos para registrar recepciones de repuestos.' });
+            return;
+        }
         if (itemsToReceive.length === 0) {
             setMessage({ type: 'error', text: 'Agregue al menos un ítem a la lista.' });
             return;

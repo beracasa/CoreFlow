@@ -17,6 +17,7 @@ interface SparePartDetailProps {
 export const SparePartDetail: React.FC<SparePartDetailProps> = ({ part, onClose }) => {
     const { hasPermission } = useAuth();
     const canManage = hasPermission('manage_inventory');
+    const canPurchaseRequests = canManage || hasPermission('view_purchase_requests');
     const [isEditing, setIsEditing] = useState(false);
     const [currentPart, setCurrentPart] = useState(part);
     const [showPurchaseModal, setShowPurchaseModal] = useState(false);
@@ -25,6 +26,7 @@ export const SparePartDetail: React.FC<SparePartDetailProps> = ({ part, onClose 
     const [purchaseMessage, setPurchaseMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
     const handleConfirmPurchase = async () => {
+        if (!canPurchaseRequests) return;
         setIsSubmitting(true);
         setPurchaseMessage(null);
         try {
@@ -57,7 +59,7 @@ export const SparePartDetail: React.FC<SparePartDetailProps> = ({ part, onClose 
         }
     };
 
-    if (isEditing) {
+    if (isEditing && canManage) {
         return (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
                 <div className="bg-industrial-800 rounded-xl shadow-2xl border border-industrial-600 w-full max-w-4xl overflow-y-auto max-h-[95vh] animate-slide-up">
@@ -220,7 +222,7 @@ export const SparePartDetail: React.FC<SparePartDetailProps> = ({ part, onClose 
                                                         El stock actual está por debajo del nivel mínimo. Se recomienda reabastecer.
                                                     </p>
                                                 </div>
-                                                {canManage && (
+                                                {canPurchaseRequests && (
                                                     <button
                                                         onClick={() => setShowPurchaseModal(true)}
                                                         className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-bold rounded shadow-lg transition-colors flex items-center gap-1.5"
