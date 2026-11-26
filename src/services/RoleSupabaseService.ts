@@ -58,6 +58,16 @@ export function normalizeRolePermissions(
     }
   }
 
+  // Si el rol tiene Gestionar Repuestos habilitado, asegurar que los permisos granulares de Almacén se reflejen activos
+  if (perms.manage_inventory === true) {
+    perms.view_inventory = true;
+    perms.create_inventory = true;
+    perms.view_part_requests = true;
+    perms.create_part_requests = true;
+    perms.receive_inventory = true;
+    perms.view_purchase_requests = true;
+  }
+
   return perms;
 }
 
@@ -83,7 +93,12 @@ export const RoleSupabaseService = {
             manage_machines: true,
             view_machines: true,
             manage_inventory: true,
-            view_inventory: true
+            view_inventory: true,
+            create_inventory: true,
+            view_part_requests: true,
+            create_part_requests: true,
+            receive_inventory: true,
+            view_purchase_requests: true
           },
           shareDataWithPeers: true,
           usersCount: 1

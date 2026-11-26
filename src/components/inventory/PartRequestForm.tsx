@@ -1,9 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { inventoryService } from '../../services';
+import React, { useState, useEffect, useMemo } from 'react';
+import { inventoryService, machineService } from '../../services';
+import { UserSupabaseService } from '../../services/UserSupabaseService';
 import { SparePart, RequestPriority } from '../../types/inventory';
-import { AlertTriangle, Plus, Trash2, Search, Edit, X, Save as SaveIcon, Loader2 } from 'lucide-react';
+import { UserProfile, Machine } from '../../../types';
+import { AlertTriangle, Plus, Trash2, Search, Edit, X, Save as SaveIcon, Loader2, User, CheckCircle } from 'lucide-react';
 
 import { PartsRequest, RequestItem } from '../../types/inventory';
+import { useAuth } from '../../../contexts/AuthContext';
 
 // Service initialized in index.ts
 
@@ -14,10 +17,28 @@ interface PartRequestFormProps {
 }
 
 export const PartRequestForm: React.FC<PartRequestFormProps> = ({ initialData, onCancel, onSuccess }) => {
+    const { hasPermission } = useAuth();
+    const canCreate = hasPermission('manage_inventory') || hasPermission('create_part_requests');
+    const canEdit = hasPermission('manage_inventory');
     const [parts, setParts] = useState<SparePart[]>([]);
     const [isSearchingParts, setIsSearchingParts] = useState(false);
     const [technicianId, setTechnicianId] = useState(initialData?.technicianId || '');
     const [priority, setPriority] = useState<RequestPriority>(initialData?.priority || 'NORMAL');
+
+    // Requester (System User) Selector State
+    const [systemUsers, setSystemUsers] = useState<UserProfile[]>([]);
+    const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+    const [requesterSearch, setRequesterSearch] = useState(initialData?.technicianId || '');
+    const [selectedRequester, setSelectedRequester] = useState<UserProfile | null>(null);
+    const [isRequesterDropdownOpen, setIsRequesterDropdownOpen] = useState(false);
+    const [showRequesterError, setShowRequesterError] = useState(false);
+
+    // Equipment (Lugar de Uso) Selector State
+    const [machines, setMachines] = useState<Machine[]>([]);
+    const [isLoadingMachines, setIsLoadingMachines] = useState(false);
+    const [machineSearch, setMachineSearch] = useState('');
+    const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
+    const [isMachineDropdownOpen, setIsMachineDropdownOpen] = useState(false);
 
     // Form Item State
     const [searchTerm, setSearchTerm] = useState('');
@@ -46,6 +67,92 @@ export const PartRequestForm: React.FC<PartRequestFormProps> = ({ initialData, o
     })) || []);
 
     const [feedback, setFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null);
+
+    // Load system users for requester selector
+    useEffect(() => {
+        let isMounted = true;
+        setIsLoadingUsers(true);
+        UserSupabaseService.getUsers()
+            .then(users => {
+                if (!isMounted) return;
+                const activeUsers = users.filter(u => u.status !== 'INACTIVE');
+                setSystemUsers(activeUsers);
+                if (initialData?.technicianId) {
+                    const matched = activeUsers.find(
+                        u =>
+                            u.full_name?.toLowerCase() === initialData.technicianId.toLowerCase() ||
+                            u.email?.toLowerCase() === initialData.technicianId.toLowerCase() ||
+                            u.id === initialData.technicianId
+                    );
+                    if (matched) {
+                        setSelectedRequester(matched);
+                        setRequesterSearch(matched.full_name || matched.email);
+                    }
+                }
+            })
+            .catch(err => console.error('Error loading system users:', err))
+            .finally(() => {
+                if (isMounted) setIsLoadingUsers(false);
+            });
+
+        return () => {
+            isMounted = false;
+        };
+    }, [initialData?.technicianId]);
+
+    const filteredRequesters = useMemo(() => {
+        const term = requesterSearch.trim().toLowerCase();
+        if (!term || (selectedRequester && term === (selectedRequester.full_name || selectedRequester.email).toLowerCase())) {
+            return systemUsers;
+        }
+        return systemUsers.filter(u =>
+            (u.full_name || '').toLowerCase().includes(term) ||
+            (u.email || '').toLowerCase().includes(term) ||
+            (u.job_title || '').toLowerCase().includes(term)
+        );
+    }, [systemUsers, requesterSearch, selectedRequester]);
+
+    const formatMachineLabel = (machine: Machine) => {
+        return (machine.alias || machine.code || machine.name || '').trim();
+    };
+
+    // Load system machines for Lugar de Uso selector
+    useEffect(() => {
+        let isMounted = true;
+        setIsLoadingMachines(true);
+        machineService.getAllMachines()
+            .then(data => {
+                if (!isMounted) return;
+                const activeMachines = (data || [])
+                    .filter(m => m.isActive !== false)
+                    .sort((a, b) => formatMachineLabel(a).localeCompare(formatMachineLabel(b)));
+                setMachines(activeMachines);
+            })
+            .catch(err => console.error('Error loading machines:', err))
+            .finally(() => {
+                if (isMounted) setIsLoadingMachines(false);
+            });
+
+        return () => {
+            isMounted = false;
+        };
+    }, []);
+
+    const filteredMachines = useMemo(() => {
+        const term = machineSearch.trim().toLowerCase();
+        if (!term || (selectedMachine && term === formatMachineLabel(selectedMachine).toLowerCase())) {
+            return machines;
+        }
+        return machines.filter(m =>
+            (m.alias || '').toLowerCase().includes(term) ||
+            (m.name || '').toLowerCase().includes(term) ||
+            (m.code || '').toLowerCase().includes(term) ||
+            (m.plate || '').toLowerCase().includes(term) ||
+            (m.brand || '').toLowerCase().includes(term) ||
+            (m.model || '').toLowerCase().includes(term) ||
+            (m.zone || '').toLowerCase().includes(term)
+        );
+    }, [machines, machineSearch, selectedMachine]);
 
     // Load initial parts on mount
     useEffect(() => {
@@ -162,6 +269,8 @@ export const PartRequestForm: React.FC<PartRequestFormProps> = ({ initialData, o
         setSearchTerm('');
         setQuantity(1);
         setUsageLocation('');
+        setMachineSearch('');
+        setSelectedMachine(null);
     };
 
     const startEditing = async (index: number) => {
@@ -171,6 +280,19 @@ export const PartRequestForm: React.FC<PartRequestFormProps> = ({ initialData, o
         setSearchTerm(item.partName);
         setQuantity(item.quantity);
         setUsageLocation(item.usageLocation || '');
+        setMachineSearch(item.usageLocation || '');
+        if (item.usageLocation) {
+            const target = item.usageLocation.toLowerCase();
+            const matchedMachine = machines.find(
+                m =>
+                    formatMachineLabel(m).toLowerCase() === target ||
+                    (m.name || '').toLowerCase() === target ||
+                    `${m.name} (${m.code || m.plate})`.toLowerCase() === target
+            );
+            setSelectedMachine(matchedMachine || null);
+        } else {
+            setSelectedMachine(null);
+        }
 
         const found = parts.find(p => p.id === item.partId);
         if (found) {
@@ -214,6 +336,8 @@ export const PartRequestForm: React.FC<PartRequestFormProps> = ({ initialData, o
         setSearchTerm('');
         setQuantity(1);
         setUsageLocation('');
+        setMachineSearch('');
+        setSelectedMachine(null);
     };
 
     const removeItem = (index: number) => {
@@ -224,6 +348,19 @@ export const PartRequestForm: React.FC<PartRequestFormProps> = ({ initialData, o
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (initialData && !canEdit) {
+            setFeedback({ type: 'error', message: 'No tiene permisos para editar solicitudes de repuestos.' });
+            return;
+        }
+        if (!initialData && !canCreate) {
+            setFeedback({ type: 'error', message: 'No tiene permisos para crear solicitudes de repuestos.' });
+            return;
+        }
+        if (!technicianId.trim()) {
+            setShowRequesterError(true);
+            return;
+        }
+        setShowRequesterError(false);
         setIsSubmitting(true);
         try {
             if (initialData) {
@@ -256,6 +393,9 @@ export const PartRequestForm: React.FC<PartRequestFormProps> = ({ initialData, o
                 // Reset form
                 setRequestItems([]);
                 setTechnicianId('');
+                setSelectedRequester(null);
+                setRequesterSearch('');
+                setShowRequesterError(false);
                 setPriority('NORMAL');
             }
         } catch (error) {
@@ -283,16 +423,105 @@ export const PartRequestForm: React.FC<PartRequestFormProps> = ({ initialData, o
 
             <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">Solicitante</label>
-                        <input
-                            type="text"
-                            required
-                            className="w-full bg-industrial-900 border border-industrial-600 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-industrial-accent transition-colors placeholder-industrial-600"
-                            placeholder="Ingrese el Nombre del Solicitante"
-                            value={technicianId}
-                            onChange={e => setTechnicianId(e.target.value)}
-                        />
+                    <div className="relative">
+                        <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">
+                            Solicitante <span className="text-red-400">*</span>
+                        </label>
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-industrial-500 w-4 h-4 pointer-events-none" />
+                            <input
+                                type="text"
+                                className={`w-full bg-industrial-900 border rounded-lg pl-10 pr-10 py-2.5 text-white outline-none focus:ring-2 transition-colors placeholder-industrial-600 ${
+                                    showRequesterError
+                                        ? 'border-red-500 focus:ring-red-500/40'
+                                        : 'border-industrial-600 focus:ring-industrial-accent'
+                                }`}
+                                placeholder="Buscar y seleccionar usuario..."
+                                value={requesterSearch}
+                                onFocus={() => setIsRequesterDropdownOpen(true)}
+                                onBlur={() => setTimeout(() => setIsRequesterDropdownOpen(false), 200)}
+                                onChange={e => {
+                                    const val = e.target.value;
+                                    setRequesterSearch(val);
+                                    setIsRequesterDropdownOpen(true);
+                                    if (selectedRequester || technicianId) {
+                                        setSelectedRequester(null);
+                                        setTechnicianId('');
+                                    }
+                                    if (showRequesterError) setShowRequesterError(false);
+                                }}
+                            />
+                            {(requesterSearch || selectedRequester) && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setRequesterSearch('');
+                                        setSelectedRequester(null);
+                                        setTechnicianId('');
+                                        setIsRequesterDropdownOpen(true);
+                                    }}
+                                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-industrial-500 hover:text-white transition-colors"
+                                    title="Limpiar selección"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            )}
+                        </div>
+
+                        {isRequesterDropdownOpen && (
+                            <div className="absolute z-50 w-full mt-1 bg-industrial-800 border border-industrial-600 rounded-lg shadow-2xl max-h-60 overflow-y-auto">
+                                {isLoadingUsers ? (
+                                    <div className="px-4 py-3 text-industrial-400 text-sm flex items-center justify-center gap-2">
+                                        <Loader2 className="w-4 h-4 animate-spin text-industrial-accent" />
+                                        <span>Cargando usuarios...</span>
+                                    </div>
+                                ) : filteredRequesters.length > 0 ? (
+                                    <ul className="py-1">
+                                        {filteredRequesters.map(user => {
+                                            const displayName = user.full_name || user.email;
+                                            const isSelected = selectedRequester?.id === user.id || technicianId === displayName;
+                                            return (
+                                                <li
+                                                    key={user.id}
+                                                    className={`px-4 py-2.5 cursor-pointer flex items-center gap-3 hover:bg-industrial-700 border-b border-industrial-700/50 last:border-0 ${isSelected ? 'bg-blue-900/30' : ''}`}
+                                                    onMouseDown={e => {
+                                                        e.preventDefault();
+                                                        setSelectedRequester(user);
+                                                        setTechnicianId(displayName);
+                                                        setRequesterSearch(displayName);
+                                                        setIsRequesterDropdownOpen(false);
+                                                        setShowRequesterError(false);
+                                                    }}
+                                                >
+                                                    <div className="w-7 h-7 rounded-full bg-industrial-700 border border-industrial-600 flex items-center justify-center flex-shrink-0">
+                                                        <User className="w-3.5 h-3.5 text-industrial-400" />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-white text-sm font-medium truncate">{user.full_name || 'Sin nombre'}</p>
+                                                        <p className="text-industrial-500 text-xs truncate">
+                                                            {user.email}{user.job_title ? ` • ${user.job_title}` : ''}
+                                                        </p>
+                                                    </div>
+                                                    {isSelected && (
+                                                        <CheckCircle className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                                                    )}
+                                                </li>
+                                            );
+                                        })}
+                                    </ul>
+                                ) : (
+                                    <div className="px-4 py-3 text-industrial-500 text-sm italic text-center">
+                                        No se encontraron usuarios.
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {showRequesterError && (
+                            <p className="text-xs text-red-400 mt-1.5 font-medium">
+                                Debe seleccionar un usuario de la lista.
+                            </p>
+                        )}
                     </div>
                     <div>
                         <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">Prioridad</label>
@@ -311,14 +540,14 @@ export const PartRequestForm: React.FC<PartRequestFormProps> = ({ initialData, o
                 <div className="border-t border-industrial-700 py-6">
                     <h3 className="text-lg font-bold text-white mb-4">Agregar Repuestos</h3>
 
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-                        <div className="md:col-span-6 relative">
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+                        <div className="md:col-span-5 relative">
                             <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">Repuesto (Buscar por nombre o código)</label>
                             <div className="relative">
-                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-industrial-500 w-4 h-4" />
+                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-industrial-500 w-4 h-4 pointer-events-none" />
                                 <input
                                     type="text"
-                                    className="w-full bg-industrial-900 border border-industrial-600 rounded-lg pl-10 pr-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-industrial-accent transition-colors placeholder-industrial-600"
+                                    className="w-full bg-industrial-900 border border-industrial-600 rounded-lg pl-10 pr-9 py-2.5 text-white outline-none focus:ring-2 focus:ring-industrial-accent transition-colors placeholder-industrial-600"
                                     placeholder="Buscar repuesto..."
                                     value={searchTerm}
                                     onFocus={() => setIsDropdownOpen(true)}
@@ -335,11 +564,26 @@ export const PartRequestForm: React.FC<PartRequestFormProps> = ({ initialData, o
                                         setIsSearchingParts(true);
                                     }}
                                 />
+                                {(searchTerm || selectedPart) && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setSearchTerm('');
+                                            setSelectedPart(null);
+                                            setSelectedPartId('');
+                                            setIsDropdownOpen(true);
+                                        }}
+                                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-industrial-500 hover:text-white transition-colors"
+                                        title="Limpiar selección"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                )}
                             </div>
 
                             {/* Floating Dropdown */}
                             {isDropdownOpen && (
-                                <div className="absolute z-50 w-full mt-1 bg-industrial-800 border border-industrial-600 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                                <div className="absolute z-50 w-full mt-1 bg-industrial-800 border border-industrial-600 rounded-lg shadow-2xl max-h-60 overflow-y-auto">
                                     {isSearchingParts ? (
                                         <div className="px-4 py-3 text-industrial-400 text-sm flex items-center justify-center gap-2">
                                             <Loader2 className="w-4 h-4 animate-spin text-industrial-accent" />
@@ -347,27 +591,30 @@ export const PartRequestForm: React.FC<PartRequestFormProps> = ({ initialData, o
                                         </div>
                                     ) : parts.length > 0 ? (
                                         <ul className="py-1">
-                                            {parts.map(p => (
-                                                <li
-                                                    key={p.id}
-                                                    className="px-4 py-3 hover:bg-industrial-700 cursor-pointer text-white flex justify-between items-center border-b border-industrial-700/50 last:border-0"
-                                                    onMouseDown={(e) => {
-                                                        e.preventDefault(); // Prevent input blur
-                                                        setSelectedPart(p);
-                                                        setSelectedPartId(p.id);
-                                                        setSearchTerm(`${p.partNumber} - ${p.name}`);
-                                                        setIsDropdownOpen(false);
-                                                    }}
-                                                >
-                                                    <div>
-                                                        <span className="font-mono text-industrial-400 font-bold mr-2">{p.partNumber}</span>
-                                                        <span className="font-medium">{p.name}</span>
-                                                    </div>
-                                                    <span className={`text-xs px-2 py-1 rounded-full font-bold ${p.currentStock > 0 ? 'bg-emerald-900/30 text-emerald-400' : 'bg-red-900/30 text-red-400'}`}>
-                                                        Stock: {p.currentStock}
-                                                    </span>
-                                                </li>
-                                            ))}
+                                            {parts.map(p => {
+                                                const isSelected = selectedPartId === p.id;
+                                                return (
+                                                    <li
+                                                        key={p.id}
+                                                        className={`px-4 py-2.5 cursor-pointer flex items-center justify-between gap-3 hover:bg-industrial-700 border-b border-industrial-700/50 last:border-0 ${isSelected ? 'bg-blue-900/30' : ''}`}
+                                                        onMouseDown={(e) => {
+                                                            e.preventDefault(); // Prevent input blur
+                                                            setSelectedPart(p);
+                                                            setSelectedPartId(p.id);
+                                                            setSearchTerm(`${p.partNumber} - ${p.name}`);
+                                                            setIsDropdownOpen(false);
+                                                        }}
+                                                    >
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-white text-sm font-medium truncate">{p.name}</p>
+                                                            <p className="text-industrial-500 text-xs truncate">{p.partNumber}</p>
+                                                        </div>
+                                                        <span className={`text-xs px-2 py-0.5 rounded-full font-semibold whitespace-nowrap flex-shrink-0 ${p.currentStock > 0 ? 'bg-emerald-900/30 text-emerald-400' : 'bg-red-900/30 text-red-400'}`}>
+                                                            Stock: {p.currentStock}
+                                                        </span>
+                                                    </li>
+                                                );
+                                            })}
                                         </ul>
                                     ) : (
                                         <div className="px-4 py-3 text-industrial-500 text-sm italic text-center">
@@ -378,13 +625,13 @@ export const PartRequestForm: React.FC<PartRequestFormProps> = ({ initialData, o
                             )}
 
                             {selectedPart && !isDropdownOpen && (
-                                <p className="mt-2 text-sm text-industrial-400">
+                                <p className="mt-2 text-xs text-industrial-400">
                                     Stock Disponible: <span className="font-bold text-white ml-1">{selectedPart.currentStock} {selectedPart.unitOfMeasure}</span>
                                 </p>
                             )}
                         </div>
 
-                        <div className="md:col-span-3">
+                        <div className="md:col-span-2">
                             <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">Cantidad</label>
                             <input
                                 type="number"
@@ -399,15 +646,96 @@ export const PartRequestForm: React.FC<PartRequestFormProps> = ({ initialData, o
                             />
                         </div>
 
-                        <div className="md:col-span-3">
-                            <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">Lugar de Uso</label>
-                            <input
-                                type="text"
-                                className="w-full bg-industrial-900 border border-industrial-600 rounded-lg px-4 py-2.5 text-white outline-none focus:ring-2 focus:ring-industrial-accent transition-colors placeholder-industrial-600"
-                                placeholder="Ej: Máquina 2"
-                                value={usageLocation}
-                                onChange={e => setUsageLocation(e.target.value)}
-                            />
+                        <div className="md:col-span-5 relative">
+                            <label className="block text-xs font-bold text-industrial-400 uppercase tracking-wider mb-2">Lugar de Uso (Equipo)</label>
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-industrial-500 w-4 h-4 pointer-events-none" />
+                                <input
+                                    type="text"
+                                    className="w-full bg-industrial-900 border border-industrial-600 rounded-lg pl-10 pr-9 py-2.5 text-white outline-none focus:ring-2 focus:ring-industrial-accent transition-colors placeholder-industrial-600"
+                                    placeholder="Buscar equipo..."
+                                    value={machineSearch}
+                                    onFocus={() => setIsMachineDropdownOpen(true)}
+                                    onBlur={() => setTimeout(() => setIsMachineDropdownOpen(false), 200)}
+                                    onChange={e => {
+                                        const val = e.target.value;
+                                        setMachineSearch(val);
+                                        setIsMachineDropdownOpen(true);
+                                        if (selectedMachine || usageLocation) {
+                                            setSelectedMachine(null);
+                                            setUsageLocation('');
+                                        }
+                                    }}
+                                />
+                                {(machineSearch || selectedMachine) && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setMachineSearch('');
+                                            setSelectedMachine(null);
+                                            setUsageLocation('');
+                                            setIsMachineDropdownOpen(true);
+                                        }}
+                                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-industrial-500 hover:text-white transition-colors"
+                                        title="Limpiar selección"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                )}
+                            </div>
+
+                            {isMachineDropdownOpen && (
+                                <div className="absolute z-50 w-full mt-1 bg-industrial-800 border border-industrial-600 rounded-lg shadow-2xl max-h-60 overflow-y-auto">
+                                    {isLoadingMachines ? (
+                                        <div className="px-4 py-3 text-industrial-400 text-sm flex items-center justify-center gap-2">
+                                            <Loader2 className="w-4 h-4 animate-spin text-industrial-accent" />
+                                            <span>Cargando equipos...</span>
+                                        </div>
+                                    ) : filteredMachines.length > 0 ? (
+                                        <ul className="py-1">
+                                            {filteredMachines.map(machine => {
+                                                const label = formatMachineLabel(machine);
+                                                const isSelected = selectedMachine?.id === machine.id || usageLocation === label;
+                                                const subtitle = [
+                                                    machine.name && machine.name !== label ? machine.name : '',
+                                                    machine.brand,
+                                                    machine.model,
+                                                    machine.zone
+                                                ]
+                                                    .filter(Boolean)
+                                                    .join(' • ');
+                                                return (
+                                                    <li
+                                                        key={machine.id}
+                                                        className={`px-4 py-2.5 cursor-pointer flex items-center justify-between gap-3 hover:bg-industrial-700 border-b border-industrial-700/50 last:border-0 ${isSelected ? 'bg-blue-900/30' : ''}`}
+                                                        onMouseDown={e => {
+                                                            e.preventDefault();
+                                                            setSelectedMachine(machine);
+                                                            setUsageLocation(label);
+                                                            setMachineSearch(label);
+                                                            setIsMachineDropdownOpen(false);
+                                                        }}
+                                                    >
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-white text-sm font-medium truncate">{label}</p>
+                                                            {subtitle && (
+                                                                <p className="text-industrial-500 text-xs truncate">{subtitle}</p>
+                                                            )}
+                                                        </div>
+                                                        {isSelected && (
+                                                            <CheckCircle className="w-4 h-4 text-blue-400 flex-shrink-0" />
+                                                        )}
+                                                    </li>
+                                                );
+                                            })}
+                                        </ul>
+                                    ) : (
+                                        <div className="px-4 py-3 text-industrial-500 text-sm italic text-center">
+                                            No se encontraron equipos.
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
 
                         <div className="md:col-span-12 flex justify-end mt-2">

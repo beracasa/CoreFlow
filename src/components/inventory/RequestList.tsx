@@ -85,6 +85,7 @@ export const RequestList: React.FC<RequestListProps> = ({ onSelectRequest }) => 
     const filteredRequests = requests;
 
     const generatePDF = () => {
+        if (!canManage) return;
         const doc = new jsPDF();
 
         // 1. Logo (Small size in top left)

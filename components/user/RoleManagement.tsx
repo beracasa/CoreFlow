@@ -32,11 +32,14 @@ const SYSTEM_PERMISSIONS: Permission[] = [
     { id: 'edit_wo', category: 'OPERATIONAL', label: 'Editar Órdenes de Mantenimiento', description: 'Editar información de la orden y eliminar registros.' },
     { id: 'log_hours', category: 'OPERATIONAL', label: 'Registrar Uso del Equipo', description: 'Actualizar contadores de horas de máquinas.' },
     
-    // Administrativos
-    { id: 'manage_inventory', category: 'ADMINISTRATIVE', label: 'Gestionar Repuestos', description: 'Agregar/Editar repuestos, stock, recepciones y solicitudes.' },
-    { id: 'view_inventory', category: 'ADMINISTRATIVE', label: 'Ver Repuestos', description: 'Ver repuestos y detalles, sin editar ni crear solicitudes.' },
-    { id: 'view_part_requests', category: 'ADMINISTRATIVE', label: 'Ver Solicitudes de Repuestos', description: 'Visualizar listado y detalle de solicitudes de repuestos.' },
-    { id: 'view_purchase_requests', category: 'ADMINISTRATIVE', label: 'Ver Solicitudes a Compras', description: 'Visualizar listado y detalle de solicitudes de compras.' },
+    // Almacén (Repuestos)
+    { id: 'view_inventory', category: 'ADMINISTRATIVE', label: 'Ver Repuestos', description: 'Acceso al módulo de Repuestos solo para ver el listado y el detalle del repuesto (sin editar ni exportar PDF).' },
+    { id: 'create_inventory', category: 'ADMINISTRATIVE', label: 'Crear Repuestos', description: 'Activa el botón de Nuevo Repuesto y permite crear y guardar nuevos repuestos.' },
+    { id: 'view_part_requests', category: 'ADMINISTRATIVE', label: 'Ver Lista Solicitudes', description: 'Permite ver la lista de solicitudes de repuestos, usar los filtros y ver el detalle (solo lectura, sin editar, entregar ni cerrar).' },
+    { id: 'create_part_requests', category: 'ADMINISTRATIVE', label: 'Crear Solicitud Repuestos', description: 'Permite acceder al módulo de solicitud de repuestos y crear una solicitud.' },
+    { id: 'receive_inventory', category: 'ADMINISTRATIVE', label: 'Recepción Repuestos', description: 'Acceso total al módulo de Recepción de Repuestos (recibir repuestos e historial) y habilita recibir desde Solicitudes Compras.' },
+    { id: 'view_purchase_requests', category: 'ADMINISTRATIVE', label: 'Solicitudes Compras', description: 'Permite acceder al módulo de Solicitudes Compras, ver la información y crear solicitudes a compras (requiere Recepción Repuestos para recibir).' },
+    { id: 'manage_inventory', category: 'ADMINISTRATIVE', label: 'Gestionar Repuestos', description: 'Control total del módulo de Repuestos: editar repuestos, exportar PDF, procesar entregas, cerrar/editar/eliminar solicitudes y todos los permisos anteriores.' },
     
     // Sistema
     { id: 'manage_config', category: 'SYSTEM', label: 'Gestionar Configuración', description: 'Acceso al módulo de Configuración y submódulos (excepto Usuarios y Roles).' },
@@ -231,6 +234,15 @@ export const RoleManagement: React.FC = () => {
         { view: 'view_inventory', edit: 'manage_inventory' },
     ];
 
+    const INVENTORY_GRANULAR_PERMS = [
+        'view_inventory',
+        'create_inventory',
+        'view_part_requests',
+        'create_part_requests',
+        'receive_inventory',
+        'view_purchase_requests',
+    ];
+
     const togglePermission = (permId: string) => {
         if (!canManage || isCurrentRoleProtected) return;
         const currentPerms = formData.permissions as Record<string, boolean> || {};
@@ -249,15 +261,19 @@ export const RoleManagement: React.FC = () => {
             }
             // Caso especial: Gestionar Repuestos habilita todos los submódulos de repuestos
             if (permId === 'manage_inventory') {
-                newPerms['view_inventory'] = true;
-                newPerms['view_part_requests'] = true;
-                newPerms['view_purchase_requests'] = true;
+                INVENTORY_GRANULAR_PERMS.forEach(id => {
+                    newPerms[id] = true;
+                });
             }
         } else {
             // 2. Si se desactiva un permiso de Ver, desactivar automáticamente el de Edición/Gestión.
             const pair = VIEW_EDIT_PAIRS.find(p => p.view === permId);
             if (pair) {
                 newPerms[pair.edit] = false;
+            }
+            // Si se desactiva cualquier permiso granular de Repuestos, desactivar Gestionar Repuestos
+            if (INVENTORY_GRANULAR_PERMS.includes(permId)) {
+                newPerms['manage_inventory'] = false;
             }
         }
 
@@ -285,6 +301,10 @@ export const RoleManagement: React.FC = () => {
             delete cleanedPermissions['manage_assets'];
             cleanedPermissions['supervise_intervention'] = Boolean(cleanedPermissions['supervise_intervention']);
             cleanedPermissions['supervise_order'] = Boolean(cleanedPermissions['supervise_order']);
+            cleanedPermissions['manage_inventory'] = Boolean(cleanedPermissions['manage_inventory']);
+            INVENTORY_GRANULAR_PERMS.forEach(id => {
+                cleanedPermissions[id] = Boolean(cleanedPermissions[id]);
+            });
 
             const updatedPayload: RoleDefinition = {
                 ...selectedRole,
@@ -352,7 +372,7 @@ export const RoleManagement: React.FC = () => {
     const categoryLabels: Record<string, string> = {
         'INFORMATIVE': 'Acceso Informativo',
         'OPERATIONAL': 'Acceso Operativo',
-        'ADMINISTRATIVE': 'Acceso Administrativo',
+        'ADMINISTRATIVE': 'Acceso Almacén',
         'FINANCIAL': 'Acceso Analíticas',
         'SYSTEM': 'Acceso al Sistema'
     };

@@ -12,6 +12,8 @@ import { useAuth } from '../../../contexts/AuthContext';
 export const PurchaseRequestList: React.FC = () => {
     const { hasPermission } = useAuth();
     const canManage = hasPermission('manage_inventory');
+    const canPurchaseRequests = canManage || hasPermission('view_purchase_requests');
+    const canReceiveParts = canManage || hasPermission('receive_inventory');
     const [requests, setRequests] = useState<ExtendedPurchaseRequest[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -36,7 +38,7 @@ export const PurchaseRequestList: React.FC = () => {
     const [isReceivingItem, setIsReceivingItem] = useState(false);
 
     const handleStatusChange = async (newStatus: 'Pendiente' | 'Parcial' | 'Recibido' | 'Cancelado') => {
-        if (!selectedRequest) return;
+        if (!canManage || !selectedRequest) return;
         setIsUpdatingStatus(true);
         setShowStatusDropdown(false);
         try {
@@ -52,7 +54,7 @@ export const PurchaseRequestList: React.FC = () => {
     };
 
     const handleReceiveItem = async (partId: string) => {
-        if (!selectedRequest || receivingQty <= 0) return;
+        if (!canReceiveParts || !selectedRequest || receivingQty <= 0) return;
         
         const item = selectedRequest.items.find(i => i.partId === partId);
         if (!item) return;
@@ -131,6 +133,7 @@ export const PurchaseRequestList: React.FC = () => {
     };
 
     const handleCreateDirectRequest = async (type: 'local' | 'proveedor') => {
+        if (!canPurchaseRequests) return;
         const validItems = selectedItems.filter(item => item.partId && item.quantity > 0);
         if (validItems.length === 0) return;
 
@@ -199,7 +202,7 @@ export const PurchaseRequestList: React.FC = () => {
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
-                {canManage && (
+                {canPurchaseRequests && (
                     <button
                         onClick={() => { setShowDirectModal(true); setSelectedItems([{ partId: '', quantity: 1, partName: '' }]); }}
                         className="px-4 py-2 bg-industrial-accent hover:bg-industrial-accent/90 text-white text-sm font-bold rounded-lg shadow-lg flex items-center gap-2 transition-all"
@@ -343,7 +346,7 @@ export const PurchaseRequestList: React.FC = () => {
                                                             >
                                                                 <Eye className="w-4 h-4" />
                                                             </button>
-                                                            {canManage && (
+                                                            {canPurchaseRequests && (
                                                                 <button
                                                                     onClick={() => exportPurchaseRequestPDF(req)}
                                                                     className="p-1.5 bg-industrial-700 hover:bg-blue-600 rounded-lg text-industrial-300 hover:text-white transition-all"
@@ -578,7 +581,7 @@ export const PurchaseRequestList: React.FC = () => {
                                                 }`}>
                                                     {(item.quantityReceived || 0) >= item.quantity ? 'RECIBIDO' : (item.quantityReceived || 0) > 0 ? 'PARCIAL' : 'PENDIENTE'}
                                                 </span>
-                                                {(item.quantityReceived || 0) < item.quantity && canManage && (
+                                                {(item.quantityReceived || 0) < item.quantity && canReceiveParts && (
                                                     receivingItemId === item.partId ? (
                                                         <div className="flex items-center gap-2">
                                                             <input
@@ -625,11 +628,11 @@ export const PurchaseRequestList: React.FC = () => {
                         <div className="p-6 bg-industrial-900/80 border-t border-industrial-700 flex gap-4">
                                 <button
                                     onClick={() => setSelectedRequest(null)}
-                                    className={`px-6 py-3 text-industrial-400 font-bold hover:text-white transition-colors ${!canManage ? 'flex-1 border border-industrial-700 rounded-lg bg-industrial-900/50' : ''}`}
+                                    className={`px-6 py-3 text-industrial-400 font-bold hover:text-white transition-colors ${!canPurchaseRequests ? 'flex-1 border border-industrial-700 rounded-lg bg-industrial-900/50' : ''}`}
                                 >
                                     Cerrar
                                 </button>
-                                {canManage && (
+                                {canPurchaseRequests && (
                                     <button
                                         onClick={() => exportPurchaseRequestPDF(selectedRequest)}
                                         className="flex-1 py-3 bg-white text-industrial-900 font-black hover:bg-industrial-100 rounded-lg transition-all flex items-center justify-center gap-3 shadow-xl"

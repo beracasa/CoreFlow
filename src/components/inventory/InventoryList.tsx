@@ -8,10 +8,13 @@ import { TablePagination } from '../shared/TablePagination';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { formatDate } from '../../utils/dateUtils';
+import { useAuth } from '../../../contexts/AuthContext';
 
 // Service initialized in index.ts
 
 export const InventoryList: React.FC = () => {
+    const { hasPermission } = useAuth();
+    const canManage = hasPermission('manage_inventory');
     const {
         parts,
         isLoading: loading,
@@ -41,6 +44,7 @@ export const InventoryList: React.FC = () => {
     }, []);
 
     const generatePDF = () => {
+        if (!canManage) return;
         const doc = new jsPDF();
 
         // Logo & Header
@@ -131,14 +135,16 @@ export const InventoryList: React.FC = () => {
                     </span>
                     Inventario de Repuestos
                 </h2>
-                <button
-                    onClick={generatePDF}
-                    disabled={parts.length === 0}
-                    className="px-4 py-2 bg-industrial-700 hover:bg-industrial-600 border border-industrial-600 text-white rounded-lg transition-colors text-sm font-medium flex items-center gap-2"
-                >
-                    <FileDown className="w-4 h-4" />
-                    Exportar PDF
-                </button>
+                {canManage && (
+                    <button
+                        onClick={generatePDF}
+                        disabled={parts.length === 0}
+                        className="px-4 py-2 bg-industrial-700 hover:bg-industrial-600 border border-industrial-600 text-white rounded-lg transition-colors text-sm font-medium flex items-center gap-2"
+                    >
+                        <FileDown className="w-4 h-4" />
+                        Exportar PDF
+                    </button>
+                )}
             </div>
 
 

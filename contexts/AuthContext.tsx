@@ -312,7 +312,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         matchedStoreUser.role !== user.role ||
         nextRoleName !== user.roleName ||
         matchedStoreUser.job_title !== user.job_title ||
-        matchedStoreUser.full_name !== user.full_name
+        matchedStoreUser.full_name !== user.full_name ||
+        JSON.stringify(nextPerms) !== JSON.stringify(user.permissions)
       ) {
         setUser(prev => prev ? {
           ...prev,
@@ -519,7 +520,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     view_calendar: ['manage_calendar'],
     view_machines: ['manage_machines'],
     view_inventory: ['manage_inventory'],
+    create_inventory: ['manage_inventory'],
     view_part_requests: ['manage_inventory'],
+    create_part_requests: ['manage_inventory'],
+    receive_inventory: ['manage_inventory'],
     view_purchase_requests: ['manage_inventory'],
   };
 
